@@ -1,0 +1,67 @@
+{
+    "name": "Argiago Workspace (Archlinux)",
+    // Pre-built image from https://github.com/zyrakq/arch-devcontainer-images
+    // See full list of available images at: https://github.com/zyrakq/arch-devcontainer-images#available-images
+    // You can replace this with any image from the arch-base family (base, lang, dind, dood variants)
+    "image": "ghcr.io/zyrakq/arch-devcontainer-images/arch-base-dood:latest",
+    "workspaceFolder": "/workspace/argiago",
+    "workspaceMount": "source=argiago-workspace,target=/workspace/argiago,type=volume",
+    "mounts": [
+        "source=argiago-home,target=/home/vscode,type=volume"
+    ],
+    "remoteUser": "vscode",
+    "runArgs": [
+        "--name",
+        "argiago-workspace",
+        "--network=argiago-workspace-network"
+    ],
+    "initializeCommand": [
+        "bash",
+        "-c",
+        "docker network ls | grep -q argiago-workspace-network || docker network create argiago-workspace-network"
+    ],
+    "features": {
+        "ghcr.io/zyrakq/arch-devcontainer-features/chaotic-aur:1": {
+            "mirror": "cdn",
+            "installPackages": "clang,protobuf"
+        },
+        "ghcr.io/zyrakq/arch-devcontainer-features/rust:2": {
+            "globalCrates": "cargo-audit"
+        },
+        "ghcr.io/zyrakq/arch-devcontainer-features/bun:1": {
+            "globalPackages": "typescript"
+        },
+        "ghcr.io/zyrakq/arch-devcontainer-features/clone-repo:1": {
+            "repoUrl": "git@github.com:zyrakq/argiago.git",
+            "targetDir": "/workspace/argiago"
+        }
+    },
+    "postCreateCommand": "curl -sSL https://trailbase.io/install.sh | bash",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                // VSCode
+                "vscode-icons-team.vscode-icons",
+                "aaron-bond.better-comments",
+                "IBM.output-colorizer",
+                // Markdown
+                "davidanson.vscode-markdownlint",
+                // Docker
+                "ms-azuretools.vscode-docker",
+                // Git
+                "eamodio.gitlens",
+                "codezombiech.gitignore",
+                // AI Assistant
+                "saoudrizwan.claude-dev",
+                // Lit
+                "runem.lit-plugin",
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "oven.bun-vscode"
+            ]
+        }
+    },
+    "containerEnv": {
+        "STEP_CA_TRUST": "true"
+    }
+}

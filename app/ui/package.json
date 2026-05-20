@@ -1,0 +1,30 @@
+{
+  "name": "argiago",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "watch": "bun run build --watch",
+    "build": "bun pre-build && bunx --bun vite build",
+    "pre-build": "bun i18n:build && tsc",
+    "i18n:extract": "lit-localize extract",
+    "i18n:build": "lit-localize build"
+  },
+  "dependencies": {
+    "@lit-labs/router": "^0.1.4",
+    "@lit/localize": "^0.12.2",
+    "@lit/localize-tools": "^0.8.1",
+    "lit": "^3.3.1",
+    "urlpattern-polyfill": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.9",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-lit": "^2.1.1",
+    "eslint-plugin-prettier": "^5.5.5",
+    "prettier": "^3.8.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
+  }
+}

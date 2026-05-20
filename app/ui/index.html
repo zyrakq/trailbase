@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Favicons are managed dynamically by FaviconService -->
+    <link rel="icon" href="/favicon-light.ico" id="icon-ico">
+    <link rel="icon" type="image/svg+xml" href="/favicon-light.svg" id="icon-svg">
+    <link rel="apple-touch-icon" href="/favicons/apple-light.png" id="apple-touch-icon">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#ff6b35">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>argiago</title>
+
+    <!-- Anti-FART: Prevent flash of inaccurate color theme -->
+    <script>
+      (function(){var e=localStorage.getItem("argiago-theme"),t;if(e==="light"||e==="dark"){t=e}else if(window.matchMedia("(prefers-color-scheme: dark)").matches){t="dark"}else{t="light"}document.documentElement.setAttribute("theme",t)})();
+    </script>
+    
+    <link rel="stylesheet" href="./src/index.css" />
+    <script type="module">
+      import 'urlpattern-polyfill';
+      import './src/app-component.ts';
+    </script>
+  </head>
+  <body>
+    <app-component></app-component>
+    <toast-container></toast-container>
+  </body>
+</html>
