@@ -23,7 +23,7 @@
     "features": {
         "ghcr.io/zyrakq/arch-devcontainer-features/chaotic-aur:1": {
             "mirror": "cdn",
-            "installPackages": "clang,protobuf"
+            "installPackages": "clang,protobuf,rust-analyzer,typescript-language-server"
         },
         "ghcr.io/zyrakq/arch-devcontainer-features/rust:2": {
             "globalCrates": "cargo-audit"
@@ -57,7 +57,14 @@
                 "runem.lit-plugin",
                 "dbaeumer.vscode-eslint",
                 "esbenp.prettier-vscode",
-                "oven.bun-vscode"
+                "oven.bun-vscode",
+                // Rust
+                "vadimcn.vscode-lldb",
+                "rust-lang.rust-analyzer",
+                "dustypomerleau.rust-syntax",
+                "barbosshack.crates-io",
+                "jscearcy.rust-doc-viewer",
+                "swellaby.vscode-rust-test-adapter"
             ]
         }
     },

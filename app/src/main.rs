@@ -1,20 +1,30 @@
-use axum::{routing::get, Router};
+mod components;
+mod frontend;
+mod logging;
+mod preflight;
+mod routes;
+mod settings;
+
+use settings::Settings;
 use std::path::PathBuf;
-use tower_http::services::{ServeDir, ServeFile};
 use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    info!("Starting server...");
+    let _ = dotenvy::dotenv();
 
-    let data_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("traildepot");
+    logging::init();
 
-    // Determine public directory from env var or use default
-    let public_dir = std::env::var("PUBLIC_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ui/dist"));
+    tokio_rustls::rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
 
-    info!("Serving static files from: {:?}", public_dir);
+    let settings = Settings::load()?;
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+    components::ensure_auth_ui(&manifest_dir)?;
+
+    let _bun_watch = frontend::start(&settings.frontend, &manifest_dir.join("ui"))?;
 
     let trailbase::Server {
         main_router,
@@ -22,38 +32,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tls,
         ..
     } = trailbase::Server::init(trailbase::ServerOptions {
-        data_dir: trailbase::DataDir(data_dir),
-        address: "0.0.0.0:4000".to_string(),
+        data_dir: trailbase::DataDir(manifest_dir.join("traildepot")),
+        address: settings.server.address.clone(),
         ..Default::default()
     })
     .await?;
 
-    // Custom API routes
-    let custom_routes = Router::new()
-        .route("/api/health", get(health_check))
-        .route("/api/hello", get(hello_handler));
-
-    // Static file serving with SPA fallback
-    let index_path = public_dir.join("index.html");
-    let static_service = ServeDir::new(&public_dir).fallback(ServeFile::new(&index_path));
-
-    // Merge routers: custom API -> trailbase API -> static files
-    let router = Router::new()
-        .merge(custom_routes)
+    let router = axum::Router::new()
+        .merge(routes::build())
         .merge(main_router.1)
-        .fallback_service(static_service);
+        .fallback_service(routes::static_files(&settings.frontend, &manifest_dir));
 
-    info!("Server running at http://localhost:4000");
-
+    info!("Server running at http://{}", settings.server.address);
     trailbase::api::serve((main_router.0, router), admin_router, tls).await?;
 
     Ok(())
-}
-
-async fn health_check() -> &'static str {
-    "OK"
-}
-
-async fn hello_handler() -> axum::Json<serde_json::Value> {
-    axum::Json(serde_json::json!({"message": "Hello!"}))
 }
