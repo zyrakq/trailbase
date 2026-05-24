@@ -3,7 +3,6 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
 import { authService } from '../services/auth.service';
-import { notificationService } from '@/features/notifications';
 import type { User } from '@/features/auth';
 import { ThemeController } from '@/features/theme';
 import logoLight from '@/assets/logo-light.svg';
@@ -26,6 +25,12 @@ export class AuthStatus extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
     await this.checkAuthStatus();
+    window.addEventListener('auth-state-updated', this.handleAuthStateUpdated);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener('auth-state-updated', this.handleAuthStateUpdated);
   }
 
   private async checkAuthStatus() {
@@ -35,15 +40,20 @@ export class AuthStatus extends LitElement {
     this.user = authState.user;
   }
 
-  private async handleSignIn() {
-    try {
-      this.loading = true;
-      await authService.signIn('oidc0', '/auth/callback');
-    } catch (error) {
-      notificationService.error('Failed to sign in. Please try again.');
-    } finally {
-      this.loading = false;
-    }
+  private handleAuthStateUpdated = () => {
+    const authState = authService.getAuthState();
+    this.isAuthenticated = authState.isAuthenticated;
+    this.user = authState.user;
+    this.requestUpdate();
+  };
+
+  private handleSignIn() {
+    // Delegate to the new modal entrypoint (choice between OIDC and password).
+    // Loading state retained for visual continuity with prior direct-redirect behavior.
+    this.loading = true;
+    authService.showLogin();
+    // Reset immediately — modal is synchronous and manages its own loading states.
+    this.loading = false;
   }
 
   private handleDashboardClick() {

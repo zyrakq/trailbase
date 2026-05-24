@@ -33,6 +33,11 @@ export class AppComponent extends LitElement {
       render: () => html`<oauth-callback></oauth-callback>`,
     },
     {
+      // Per-provider OIDC callback — registered as redirect_uri in Kanidm
+      path: '/auth/oidc0/callback',
+      render: () => html`<oauth-callback></oauth-callback>`,
+    },
+    {
       path: '/dashboard',
       render: () => html`<dashboard-page></dashboard-page>`,
       enter: async () => {

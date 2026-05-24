@@ -213,6 +213,70 @@
 <trans-unit id="s78c4bde18c238d45">
   <source>Argiago Repository</source>
 </trans-unit>
+<trans-unit id="s815c4f0a6876070c">
+  <source>Please enter your email and password.</source>
+  <target>Пожалуйста, введите ваш email и пароль.</target>
+</trans-unit>
+<trans-unit id="sc5161bbf7fbb7647">
+  <source>Successfully signed in.</source>
+  <target>Успешный вход.</target>
+</trans-unit>
+<trans-unit id="s352a78e565309bc8">
+  <source>Multi-factor authentication is required. Please sign in using Kanidm or contact your administrator.</source>
+  <target>Требуется многофакторная аутентификация. Пожалуйста, войдите с помощью Kanidm или свяжитесь с администратором.</target>
+</trans-unit>
+<trans-unit id="sca53e5ee345b14c7">
+  <source>Invalid email or password. Please try again.</source>
+  <target>Неверный email или пароль. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="s440973a5ab778843">
+  <source>Unable to connect. Please check your internet connection and try again.</source>
+  <target>Не удается подключиться. Проверьте подключение к интернету и попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="sf249dcf6c6b6f8ed">
+  <source>Sign in failed. Please try again.</source>
+  <target>Вход не удался. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="s5e27738a2e8eb763">
+  <source>Sign in</source>
+  <target>Войти</target>
+</trans-unit>
+<trans-unit id="s877a9a1a10c02489">
+  <source>Close sign in dialog</source>
+  <target>Закрыть диалог входа</target>
+</trans-unit>
+<trans-unit id="s6e622f3ba399d5a2">
+  <source>Continue with Kanidm</source>
+  <target>Продолжить с Kanidm</target>
+</trans-unit>
+<trans-unit id="sd6250add7a3ea7d1">
+  <source>Sign in with email and password</source>
+  <target>Войти с помощью email и пароля</target>
+</trans-unit>
+<trans-unit id="s38887b94b3320533">
+  <source>Email address</source>
+  <target>Адрес электронной почты</target>
+</trans-unit>
+<trans-unit id="sf6e1665c7022a1f8">
+  <source>Password</source>
+  <target>Пароль</target>
+</trans-unit>
+<trans-unit id="s452f791e0ff6a13e">
+  <source>Hide password</source>
+  <target>Скрыть пароль</target>
+</trans-unit>
+<trans-unit id="s2f7f35f6a5b733f5">
+  <source>Show password</source>
+  <target>Показать пароль</target>
+</trans-unit>
+<trans-unit id="sd4834a205d67ccdf">
+  <source>Signing in...</source>
+  <target>Вход...</target>
+</trans-unit>
+<trans-unit id="s535205a9a936dacd">
+  <source>Back to sign in options</source>
+  <target>Назад к вариантам входа</target>
+</trans-unit>
 </body>
 </file>
 </xliff>

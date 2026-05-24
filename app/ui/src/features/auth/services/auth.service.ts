@@ -1,19 +1,25 @@
-import type { AuthState, User } from '../types/auth.types';
+import type { AuthState, LoginResult, User } from '../types/auth.types';
 import { trailbaseService, type TrailBaseUser } from './trailbase.service';
-// Notification service will be accessed via events to avoid circular imports
+import { parseUserFromToken } from './jwt.utils';
 
-// Authentication service using TrailBase
+// Side-effect import: ensures <auth-modal> custom element is registered
+// before any code attempts to create one via showLogin().
+import '../components/auth-modal.ts';
+import type { AuthModal } from '../components/auth-modal.ts';
+
+// Authentication service — application state manager.
+// Owns auth state, delegates HTTP to trailbaseService, JWT decoding to jwt.utils.
 class AuthService {
   private static instance: AuthService;
   private authState: AuthState = {
     isAuthenticated: false,
     user: null,
-    token: null,
   };
   private initPromise: Promise<void> | null = null;
+  private authModal: AuthModal | null = null;
 
   private constructor() {
-    // Don't initialize immediately, let components call init()
+    // Initialization is deferred — components call init() explicitly
   }
 
   static getInstance(): AuthService {
@@ -24,40 +30,40 @@ class AuthService {
   }
 
   /**
-   * Initialize auth state by checking with TrailBase
-   * Should be called when app starts
+   * Initialize auth state by checking the TrailBase session cookie.
+   * Idempotent — subsequent calls return the same promise.
    */
   async init(): Promise<void> {
     if (this.initPromise) {
       return this.initPromise;
     }
-
     this.initPromise = this.loadAuthState();
     return this.initPromise;
   }
 
   /**
-   * Load authentication state from TrailBase
+   * Load authentication state from TrailBase via the /status endpoint.
+   * Uses jwt.utils.parseUserFromToken to decode the JWT — no dependency on
+   * the removed trailbaseService.getCurrentUser().
    */
   private async loadAuthState(): Promise<void> {
     try {
-      const trailbaseUser = await trailbaseService.getCurrentUser();
+      const status = await trailbaseService.getLoginStatus();
 
-      if (trailbaseUser) {
-        this.authState = {
-          isAuthenticated: true,
-          user: this.mapTrailBaseUser(trailbaseUser),
-          token: null, // TrailBase uses cookies, no token needed
-        };
+      if (status?.auth_token) {
+        const trailbaseUser = parseUserFromToken(status.auth_token);
+        if (trailbaseUser) {
+          this.authState = {
+            isAuthenticated: true,
+            user: this.mapTrailBaseUser(trailbaseUser),
+          };
+        } else {
+          this.authState = { isAuthenticated: false, user: null };
+        }
       } else {
-        this.authState = {
-          isAuthenticated: false,
-          user: null,
-          token: null,
-        };
+        this.authState = { isAuthenticated: false, user: null };
       }
-    } catch (error) {
-      // Dispatch notification event instead of direct service call
+    } catch {
       window.dispatchEvent(
         new CustomEvent('notification-add', {
           detail: {
@@ -70,16 +76,14 @@ class AuthService {
           composed: true,
         })
       );
-      this.authState = {
-        isAuthenticated: false,
-        user: null,
-        token: null,
-      };
+      this.authState = { isAuthenticated: false, user: null };
+    } finally {
+      this.notifyAuthStateChange();
     }
   }
 
   /**
-   * Map TrailBase user to our User type
+   * Map a TrailBase user object to the application User type.
    */
   private mapTrailBaseUser(tbUser: TrailBaseUser): User {
     return {
@@ -91,51 +95,101 @@ class AuthService {
   }
 
   /**
-   * Get current authentication state
+   * Return a snapshot of the current authentication state.
    */
   getAuthState(): AuthState {
     return { ...this.authState };
   }
 
   /**
-   * Check if user is authenticated
+   * Return true when a user is currently authenticated.
    */
   isAuthenticated(): boolean {
     return this.authState.isAuthenticated;
   }
 
   /**
-   * Get current user
+   * Return the current user, or null if not authenticated.
    */
   getUser(): User | null {
     return this.authState.user ? { ...this.authState.user } : null;
   }
 
   /**
-   * Initiate sign in via TrailBase OAuth
-   * @param provider - OAuth provider name
+   * Initiate OAuth/OIDC login by redirecting the browser to the provider.
+   *
+   * @param provider - OAuth provider key (default: 'oidc0')
    * @param redirectUri - Where to redirect after successful login
    */
-  async signIn(
-    provider: string = 'oidc0',
-    redirectUri?: string
-  ): Promise<void> {
+  async signIn(provider: string = 'oidc0', redirectUri?: string): Promise<void> {
     await trailbaseService.login(provider, redirectUri);
   }
 
   /**
-   * Sign out current user
+   * Open the authentication modal. Creates a single <auth-modal> instance
+   * appended to document.body and reuses it on subsequent calls.
+   */
+  showLogin(): void {
+    if (!this.authModal) {
+      this.authModal = document.createElement('auth-modal') as AuthModal;
+      document.body.appendChild(this.authModal);
+    }
+    this.authModal.open();
+  }
+
+  /**
+   * Authenticate with email and password.
+   *
+   * Handles both outcomes of the TrailBase login:
+   * - `redirect`: TrailBase issued a 303 and set HttpOnly cookies. Auth state
+   *   is NOT updated here — oauth-callback.ts will call refresh() after the
+   *   browser navigates to /auth/callback.
+   * - `tokens`: TrailBase returned a 200 JSON body (fallback path). Auth state
+   *   is updated immediately from the JWT for instant UI feedback, but there
+   *   is no cookie persistence across page reloads.
+   *
+   * The LoginResult is propagated to the caller (auth-modal.ts) so it can
+   * navigate on the redirect path.
+   *
+   * @param email - User email address
+   * @param password - User password
+   * @returns LoginResult — caller must handle both variants
+   * @throws AuthError — propagated from trailbaseService (typed codes)
+   */
+  async loginWithPassword(email: string, password: string): Promise<LoginResult> {
+    const result = await trailbaseService.loginWithPassword(email, password);
+
+    if (result.type === 'tokens') {
+      // Fast path: update state from JWT immediately (no /status roundtrip).
+      // Note: no cookie is set on this path — session does not survive reload.
+      if (result.data.auth_token) {
+        const trailbaseUser = parseUserFromToken(result.data.auth_token);
+        if (trailbaseUser) {
+          this.authState = {
+            isAuthenticated: true,
+            user: this.mapTrailBaseUser(trailbaseUser),
+          };
+        } else {
+          this.authState = { isAuthenticated: false, user: null };
+        }
+      } else {
+        this.authState = { isAuthenticated: false, user: null };
+      }
+      this.notifyAuthStateChange();
+    }
+    // redirect path: do not update state here — oauth-callback.ts calls refresh()
+
+    return result;
+  }
+
+  /**
+   * Sign out the current user and clear local auth state.
    */
   async signOut(): Promise<void> {
     try {
       await trailbaseService.logout();
-      this.authState = {
-        isAuthenticated: false,
-        user: null,
-        token: null,
-      };
+      this.authState = { isAuthenticated: false, user: null };
     } catch (error) {
-      // Dispatch notification event instead of direct service call
       window.dispatchEvent(
         new CustomEvent('notification-add', {
           detail: {
@@ -148,15 +202,31 @@ class AuthService {
         })
       );
       throw error;
+    } finally {
+      this.notifyAuthStateChange();
     }
   }
 
   /**
-   * Refresh auth state from TrailBase
-   * Useful after OAuth callback
+   * Re-read auth state from TrailBase. Called by oauth-callback.ts after the
+   * browser returns from the OIDC or password-login redirect flow.
    */
   async refresh(): Promise<void> {
     await this.loadAuthState();
+  }
+
+  /**
+   * Dispatch 'auth-state-updated' so UI components (AuthStatus, guards) react
+   * to auth state changes without polling.
+   */
+  private notifyAuthStateChange(): void {
+    window.dispatchEvent(
+      new CustomEvent('auth-state-updated', {
+        detail: { ...this.authState },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 }
 

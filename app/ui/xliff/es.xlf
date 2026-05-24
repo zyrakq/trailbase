@@ -213,6 +213,70 @@
 <trans-unit id="s78c4bde18c238d45">
   <source>Argiago Repository</source>
 </trans-unit>
+<trans-unit id="s815c4f0a6876070c">
+  <source>Please enter your email and password.</source>
+  <target>Por favor, introduce tu correo y contraseña.</target>
+</trans-unit>
+<trans-unit id="sc5161bbf7fbb7647">
+  <source>Successfully signed in.</source>
+  <target>Inicio de sesión exitoso.</target>
+</trans-unit>
+<trans-unit id="s352a78e565309bc8">
+  <source>Multi-factor authentication is required. Please sign in using Kanidm or contact your administrator.</source>
+  <target>Se requiere autenticación de múltiples factores. Inicia sesión usando Kanidm o contacta a tu administrador.</target>
+</trans-unit>
+<trans-unit id="sca53e5ee345b14c7">
+  <source>Invalid email or password. Please try again.</source>
+  <target>Correo o contraseña inválidos. Por favor, inténtalo de nuevo.</target>
+</trans-unit>
+<trans-unit id="s440973a5ab778843">
+  <source>Unable to connect. Please check your internet connection and try again.</source>
+  <target>No se puede conectar. Verifica tu conexión a internet e inténtalo de nuevo.</target>
+</trans-unit>
+<trans-unit id="sf249dcf6c6b6f8ed">
+  <source>Sign in failed. Please try again.</source>
+  <target>El inicio de sesión falló. Por favor, inténtalo de nuevo.</target>
+</trans-unit>
+<trans-unit id="s5e27738a2e8eb763">
+  <source>Sign in</source>
+  <target>Iniciar sesión</target>
+</trans-unit>
+<trans-unit id="s877a9a1a10c02489">
+  <source>Close sign in dialog</source>
+  <target>Cerrar diálogo de inicio de sesión</target>
+</trans-unit>
+<trans-unit id="s6e622f3ba399d5a2">
+  <source>Continue with Kanidm</source>
+  <target>Continuar con Kanidm</target>
+</trans-unit>
+<trans-unit id="sd6250add7a3ea7d1">
+  <source>Sign in with email and password</source>
+  <target>Iniciar sesión con correo y contraseña</target>
+</trans-unit>
+<trans-unit id="s38887b94b3320533">
+  <source>Email address</source>
+  <target>Dirección de correo electrónico</target>
+</trans-unit>
+<trans-unit id="sf6e1665c7022a1f8">
+  <source>Password</source>
+  <target>Contraseña</target>
+</trans-unit>
+<trans-unit id="s452f791e0ff6a13e">
+  <source>Hide password</source>
+  <target>Ocultar contraseña</target>
+</trans-unit>
+<trans-unit id="s2f7f35f6a5b733f5">
+  <source>Show password</source>
+  <target>Mostrar contraseña</target>
+</trans-unit>
+<trans-unit id="sd4834a205d67ccdf">
+  <source>Signing in...</source>
+  <target>Iniciando sesión...</target>
+</trans-unit>
+<trans-unit id="s535205a9a936dacd">
+  <source>Back to sign in options</source>
+  <target>Volver a las opciones de inicio de sesión</target>
+</trans-unit>
 </body>
 </file>
 </xliff>
