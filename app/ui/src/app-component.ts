@@ -7,7 +7,6 @@ import '@/features/theme/services/favicon.service';
 
 // Import components (they will be registered as custom elements)
 import '@/pages/welcome-page';
-import '@/features/auth/components/oauth-callback';
 import '@/pages/dashboard-page';
 import '@/features/notifications/components/toast-container';
 
@@ -18,7 +17,6 @@ export class AppComponent extends LitElement {
     localizationService.init();
   }
 
-  // Router - основной роутер с глобальными listeners (Router наследует от Routes)
   private _router = new Router(this, [
     {
       path: '/',
@@ -27,15 +25,6 @@ export class AppComponent extends LitElement {
         await authService.init();
         return true;
       },
-    },
-    {
-      path: '/auth/callback',
-      render: () => html`<oauth-callback></oauth-callback>`,
-    },
-    {
-      // Per-provider OIDC callback — registered as redirect_uri in Kanidm
-      path: '/auth/oidc0/callback',
-      render: () => html`<oauth-callback></oauth-callback>`,
     },
     {
       path: '/dashboard',

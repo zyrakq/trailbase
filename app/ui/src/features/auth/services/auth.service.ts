@@ -1,4 +1,4 @@
-import type { AuthState, LoginResult, User } from '../types/auth.types';
+import type { AuthState, User } from '../types/auth.types';
 import { trailbaseService, type TrailBaseUser } from './trailbase.service';
 import { parseUserFromToken } from './jwt.utils';
 
@@ -140,46 +140,32 @@ class AuthService {
   /**
    * Authenticate with email and password.
    *
-   * Handles both outcomes of the TrailBase login:
-   * - `redirect`: TrailBase issued a 303 and set HttpOnly cookies. Auth state
-   *   is NOT updated here — oauth-callback.ts will call refresh() after the
-   *   browser navigates to /auth/callback.
-   * - `tokens`: TrailBase returned a 200 JSON body (fallback path). Auth state
-   *   is updated immediately from the JWT for instant UI feedback, but there
-   *   is no cookie persistence across page reloads.
-   *
-   * The LoginResult is propagated to the caller (auth-modal.ts) so it can
-   * navigate on the redirect path.
+   * TrailBase returns a 200 JSON body with tokens and sets an HttpOnly session
+   * cookie in the same response. Auth state is updated immediately from the
+   * JWT for instant UI feedback. On the next page load, init() will restore
+   * the session via GET /api/auth/v1/status using the cookie.
    *
    * @param email - User email address
    * @param password - User password
-   * @returns LoginResult — caller must handle both variants
    * @throws AuthError — propagated from trailbaseService (typed codes)
    */
-  async loginWithPassword(email: string, password: string): Promise<LoginResult> {
-    const result = await trailbaseService.loginWithPassword(email, password);
+  async loginWithPassword(email: string, password: string): Promise<void> {
+    const data = await trailbaseService.loginWithPassword(email, password);
 
-    if (result.type === 'tokens') {
-      // Fast path: update state from JWT immediately (no /status roundtrip).
-      // Note: no cookie is set on this path — session does not survive reload.
-      if (result.data.auth_token) {
-        const trailbaseUser = parseUserFromToken(result.data.auth_token);
-        if (trailbaseUser) {
-          this.authState = {
-            isAuthenticated: true,
-            user: this.mapTrailBaseUser(trailbaseUser),
-          };
-        } else {
-          this.authState = { isAuthenticated: false, user: null };
-        }
+    if (data.auth_token) {
+      const trailbaseUser = parseUserFromToken(data.auth_token);
+      if (trailbaseUser) {
+        this.authState = {
+          isAuthenticated: true,
+          user: this.mapTrailBaseUser(trailbaseUser),
+        };
       } else {
         this.authState = { isAuthenticated: false, user: null };
       }
-      this.notifyAuthStateChange();
+    } else {
+      this.authState = { isAuthenticated: false, user: null };
     }
-    // redirect path: do not update state here — oauth-callback.ts calls refresh()
-
-    return result;
+    this.notifyAuthStateChange();
   }
 
   /**

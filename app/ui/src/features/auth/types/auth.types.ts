@@ -24,16 +24,3 @@ export interface OIDCConfig {
   tokenEndpoint: string;
   scope: string;
 }
-
-/**
- * Discriminated union returned by trailbase.service.ts loginWithPassword and
- * propagated up through auth.service.ts to auth-modal.ts.
- *
- * - `redirect`: TrailBase issued a 303 redirect; browser processed Set-Cookie
- *   headers (credentials:include). Modal must navigate to /auth/callback.
- * - `tokens`: TrailBase returned a 200 JSON body with tokens (fallback path).
- *   auth.service.ts updates state immediately from the JWT; no cookie persistence.
- */
-export type LoginResult =
-  | { type: 'redirect' }
-  | { type: 'tokens'; data: { auth_token: string | null } };

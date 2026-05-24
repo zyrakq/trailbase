@@ -4,5 +4,5 @@ export { OAuthCallback } from './components/oauth-callback.ts';
 export { AuthModal } from './components/auth-modal.ts';
 export { authService } from './services/auth.service.ts';
 export { trailbaseService } from './services/trailbase.service.ts';
-export type { AuthState, User, OIDCConfig, LoginResult } from './types/auth.types.ts';
+export type { AuthState, User, OIDCConfig } from './types/auth.types.ts';
 export { AuthError, AuthErrorCode } from './types/auth-error.ts';

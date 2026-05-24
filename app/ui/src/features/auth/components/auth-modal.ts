@@ -1,9 +1,10 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { msg } from '@lit/localize';
+import { msg, str } from '@lit/localize';
 import { localized } from '@/features/localization';
 import { authService } from '../services/auth.service';
 import { AuthError, AuthErrorCode } from '../types/auth-error';
+import { OIDC_PROVIDERS, type OIDCProvider } from '../config/auth-providers';
 
 // 'error' ViewState removed — errors are shown via errorMessage while in 'password' view
 type ViewState = 'choice' | 'password' | 'loading';
@@ -80,15 +81,17 @@ export class AuthModal extends LitElement {
     document.body.style.overflow = '';
   }
 
-  private handleOIDC() {
+  private handleOIDC(provider: OIDCProvider) {
     this.close();
-    // Absolute redirect_uri required — TrailBase and Kanidm only accept absolute URLs.
-    authService.signIn('oidc0', window.location.origin + '/auth/oidc0/callback').catch(() => {
+    // TrailBase handles the entire OAuth flow including /api/auth/v1/oauth/<provider>/callback.
+    // redirect_uri is just where the browser lands after auth is complete — our homepage.
+    // The session cookie is set by TrailBase before the redirect happens.
+    authService.signIn(provider.key, window.location.origin).catch(() => {
       window.dispatchEvent(
         new CustomEvent('notification-add', {
           detail: {
             id: `oidc-error-${Date.now()}`,
-            message: 'Failed to start Kanidm sign in. Please try again.',
+            message: msg(str`Failed to start ${provider.label} sign in. Please try again.`),
             type: 'error' as const,
           },
           bubbles: true,
@@ -133,31 +136,23 @@ export class AuthModal extends LitElement {
     this.errorMessage = '';
 
     try {
-      const result = await authService.loginWithPassword(trimmedEmail, trimmedPassword);
+      await authService.loginWithPassword(trimmedEmail, trimmedPassword);
 
-      if (result.type === 'redirect') {
-        // Cookie path: TrailBase issued a 303 and set HttpOnly cookies.
-        // Navigate to /auth/callback — oauth-callback.ts handles the rest
-        // (500ms delay + authService.refresh() + redirect to dashboard).
-        this.close();
-        window.location.href = '/auth/callback';
-      } else {
-        // Token path: auth state already updated in authService.loginWithPassword.
-        // Close modal — user is now signed in for this SPA session.
-        this.close();
-        window.dispatchEvent(
-          new CustomEvent('notification-add', {
-            detail: {
-              id: `auth-success-${Date.now()}`,
-              message: msg('Successfully signed in.'),
-              type: 'success' as const,
-              duration: 4000,
-            },
-            bubbles: true,
-            composed: true,
-          })
-        );
-      }
+      // Auth state updated in authService — close modal and show success notification.
+      // The session cookie has been set by TrailBase and will survive page reloads.
+      this.close();
+      window.dispatchEvent(
+        new CustomEvent('notification-add', {
+          detail: {
+            id: `auth-success-${Date.now()}`,
+            message: msg('Successfully signed in.'),
+            type: 'success' as const,
+            duration: 4000,
+          },
+          bubbles: true,
+          composed: true,
+        })
+      );
     } catch (error) {
       // Switch on typed AuthErrorCode — no substring matching
       if (error instanceof AuthError) {
@@ -227,17 +222,15 @@ export class AuthModal extends LitElement {
   private renderChoiceView() {
     return html`
       <div class="choice-view">
-        <button
-          class="btn btn-primary"
-          @click=${this.handleOIDC}
-        >
-          ${msg('Continue with Kanidm')}
-        </button>
+        ${OIDC_PROVIDERS.map(
+          (p) => html`
+            <button class="btn btn-primary" @click=${() => this.handleOIDC(p)}>
+              ${msg(str`Continue with ${p.label}`)}
+            </button>
+          `
+        )}
 
-        <button
-          class="btn btn-primary"
-          @click=${this.handlePasswordChoice}
-        >
+        <button class="btn btn-primary" @click=${this.handlePasswordChoice}>
           ${msg('Sign in with email and password')}
         </button>
       </div>

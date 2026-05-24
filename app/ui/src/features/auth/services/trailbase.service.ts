@@ -2,7 +2,6 @@
 // Documentation: https://trailbase.io/documentation/auth
 // OpenAPI: https://trailbase.io/api
 import { AuthError, AuthErrorCode } from '../types/auth-error';
-import type { LoginResult } from '../types/auth.types';
 
 /**
  * Response from /api/auth/v1/status endpoint
@@ -94,53 +93,36 @@ class TrailBaseService {
   /**
    * Authenticate with email and password.
    *
-   * Sends the absolute `redirect_uri` so TrailBase recognises it as a valid
-   * redirect target and issues a 303 response with HttpOnly cookies (cookie
-   * path). When `response.redirected` is true, fetch followed the 303 and
-   * Set-Cookie headers were processed by the browser before the redirect was
-   * followed — caller must navigate to `/auth/callback` to complete the session
-   * handshake via the existing `oauth-callback` component.
-   *
-   * Falls back to the 200 JSON path if TrailBase does not issue a redirect
-   * (e.g. when redirect_uri validation fails on the server side). On this path
-   * the session does not survive a page reload.
+   * TrailBase returns 200 JSON with auth_token, refresh_token, and csrf_token,
+   * and simultaneously sets an HttpOnly session cookie for future session
+   * restores via GET /api/auth/v1/status. No redirect_uri is required — the
+   * entire flow completes in this single request.
    *
    * @param email - User email address
    * @param password - User password
-   * @returns LoginResult discriminated union
+   * @returns LoginStatusResponse with tokens from TrailBase
    * @throws AuthError with a typed code on 401, 403, or network failure
    */
   async loginWithPassword(
     email: string,
     password: string
-  ): Promise<LoginResult> {
+  ): Promise<LoginStatusResponse> {
     let response: Response;
-
-    // Absolute redirect_uri is required — relative URIs are not recognised as
-    // valid redirect targets by TrailBase or the OIDC provider (Kanidm).
-    const callbackUrl = window.location.origin + '/auth/callback';
 
     try {
       response = await fetch('/api/auth/v1/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, password, redirect_uri: callbackUrl }),
+        body: JSON.stringify({ email, password }),
       });
     } catch {
       // fetch() itself threw — network-level failure (offline, DNS, CORS preflight)
       throw new AuthError(AuthErrorCode.NETWORK_ERROR, 'Network error during login');
     }
 
-    // response.redirected is true when fetch followed a 303 and Set-Cookie was
-    // processed by the browser. The final response is from /auth/callback (HTML).
-    if (response.redirected) {
-      return { type: 'redirect' };
-    }
-
     if (response.status === 200) {
-      const data = await response.json() as LoginStatusResponse;
-      return { type: 'tokens', data };
+      return response.json() as Promise<LoginStatusResponse>;
     }
 
     if (response.status === 401) {
