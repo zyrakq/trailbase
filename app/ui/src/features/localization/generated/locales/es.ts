@@ -3,7 +3,7 @@
     // Re-generate this file by running lit-localize
 
     
-    
+    import {str} from '@lit/localize';
 
     /* eslint-disable no-irregular-whitespace */
     /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -38,7 +38,6 @@
 's5eddcab87c38b6b6': `Bienvenido a tu área protegida`,
 's5f343a43e7ea9f91': `Error`,
 's6a6528b527495513': `Volver al Inicio`,
-'s6e622f3ba399d5a2': `Continuar con Kanidm`,
 's74693aa15a1926a9': `Probar Notificaciones`,
 's7fee95b66225e1fb': `Panel de Control`,
 's815c4f0a6876070c': `Por favor, introduce tu correo y contraseña.`,
@@ -74,6 +73,8 @@
 'sf3fda5790cfa46f6': `Error al conectar con el servidor de autenticación. La conexión fue rechazada debido a tiempo de espera de red (código de error: ETIMEDOUT). Por favor verifica tu conexión a internet e intenta de nuevo. Si el problema persiste, contacta a tu administrador del sistema.`,
 'sf6e1665c7022a1f8': `Contraseña`,
 'sffef1a8596bc58bb': `Autenticando...`,
+'sd008f3d08470b11c': str`Failed to start ${0} sign in. Please try again.`,
+'seb6ab868740e4e36': str`Continue with ${0}`,
 'sf2c19b921d23f6a0': `Welcome to argiago`,
 'sd5ce7d0a7aec4cb7': `argiago`,
 'sb1971760847d4502': `Argiago GitHub`,

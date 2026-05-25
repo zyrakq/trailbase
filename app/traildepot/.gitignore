@@ -6,7 +6,6 @@ uploads/
 wasm/
 scripts/
 
-config.textproto
 metadata.textproto
 
 # Runtime files, will be overriden by `trail`.

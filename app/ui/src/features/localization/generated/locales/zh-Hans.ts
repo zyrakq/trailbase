@@ -3,7 +3,7 @@
     // Re-generate this file by running lit-localize
 
     
-    
+    import {str} from '@lit/localize';
 
     /* eslint-disable no-irregular-whitespace */
     /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -38,7 +38,6 @@
 's5eddcab87c38b6b6': `欢迎来到您的受保护区域`,
 's5f343a43e7ea9f91': `错误`,
 's6a6528b527495513': `返回首页`,
-'s6e622f3ba399d5a2': `使用 Kanidm 继续`,
 's74693aa15a1926a9': `测试通知`,
 's7fee95b66225e1fb': `控制面板`,
 's815c4f0a6876070c': `请输入您的电子邮件和密码。`,
@@ -74,6 +73,8 @@
 'sf3fda5790cfa46f6': `无法连接到身份验证服务器。由于网络超时，连接被拒绝（错误代码：ETIMEDOUT）。请检查您的互联网连接并重试。如果问题仍然存在，请联系系统管理员寻求帮助。`,
 'sf6e1665c7022a1f8': `密码`,
 'sffef1a8596bc58bb': `正在验证身份...`,
+'sd008f3d08470b11c': str`Failed to start ${0} sign in. Please try again.`,
+'seb6ab868740e4e36': str`Continue with ${0}`,
 'sf2c19b921d23f6a0': `Welcome to argiago`,
 'sd5ce7d0a7aec4cb7': `argiago`,
 'sb1971760847d4502': `Argiago GitHub`,

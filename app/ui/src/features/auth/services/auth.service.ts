@@ -1,6 +1,5 @@
 import type { AuthState, User } from '../types/auth.types';
 import { trailbaseService, type TrailBaseUser } from './trailbase.service';
-import { parseUserFromToken } from './jwt.utils';
 
 // Side-effect import: ensures <auth-modal> custom element is registered
 // before any code attempts to create one via showLogin().
@@ -8,7 +7,7 @@ import '../components/auth-modal.ts';
 import type { AuthModal } from '../components/auth-modal.ts';
 
 // Authentication service — application state manager.
-// Owns auth state, delegates HTTP to trailbaseService, JWT decoding to jwt.utils.
+// Owns auth state, delegates HTTP and session management to trailbaseService (SDK).
 class AuthService {
   private static instance: AuthService;
   private authState: AuthState = {
@@ -30,7 +29,7 @@ class AuthService {
   }
 
   /**
-   * Initialize auth state by checking the TrailBase session cookie.
+   * Initialize auth state by restoring the TrailBase session from cookie.
    * Idempotent — subsequent calls return the same promise.
    */
   async init(): Promise<void> {
@@ -42,24 +41,18 @@ class AuthService {
   }
 
   /**
-   * Load authentication state from TrailBase via the /status endpoint.
-   * Uses jwt.utils.parseUserFromToken to decode the JWT — no dependency on
-   * the removed trailbaseService.getCurrentUser().
+   * Load authentication state from the SDK client.
+   * initClient() calls GET /api/auth/v1/status to restore session from cookie.
    */
   private async loadAuthState(): Promise<void> {
     try {
-      const status = await trailbaseService.getLoginStatus();
+      const trailbaseUser = await trailbaseService.getUser();
 
-      if (status?.auth_token) {
-        const trailbaseUser = parseUserFromToken(status.auth_token);
-        if (trailbaseUser) {
-          this.authState = {
-            isAuthenticated: true,
-            user: this.mapTrailBaseUser(trailbaseUser),
-          };
-        } else {
-          this.authState = { isAuthenticated: false, user: null };
-        }
+      if (trailbaseUser) {
+        this.authState = {
+          isAuthenticated: true,
+          user: this.mapTrailBaseUser(trailbaseUser),
+        };
       } else {
         this.authState = { isAuthenticated: false, user: null };
       }
@@ -138,30 +131,26 @@ class AuthService {
   }
 
   /**
-   * Authenticate with email and password.
+   * Authenticate with email and password via the SDK.
    *
-   * TrailBase returns a 200 JSON body with tokens and sets an HttpOnly session
-   * cookie in the same response. Auth state is updated immediately from the
-   * JWT for instant UI feedback. On the next page load, init() will restore
-   * the session via GET /api/auth/v1/status using the cookie.
+   * The SDK POSTs to /api/auth/v1/login without redirect_uri, receiving 200
+   * JSON. TrailBase sets an HttpOnly session cookie in the same response so
+   * that initClientFromCookies() on the next page load restores the session
+   * automatically via GET /api/auth/v1/status.
    *
    * @param email - User email address
    * @param password - User password
    * @throws AuthError — propagated from trailbaseService (typed codes)
    */
   async loginWithPassword(email: string, password: string): Promise<void> {
-    const data = await trailbaseService.loginWithPassword(email, password);
-
-    if (data.auth_token) {
-      const trailbaseUser = parseUserFromToken(data.auth_token);
-      if (trailbaseUser) {
-        this.authState = {
-          isAuthenticated: true,
-          user: this.mapTrailBaseUser(trailbaseUser),
-        };
-      } else {
-        this.authState = { isAuthenticated: false, user: null };
-      }
+    await trailbaseService.loginWithPassword(email, password);
+    // Read user from the SDK client — it was updated by client.login()
+    const trailbaseUser = await trailbaseService.getUser();
+    if (trailbaseUser) {
+      this.authState = {
+        isAuthenticated: true,
+        user: this.mapTrailBaseUser(trailbaseUser),
+      };
     } else {
       this.authState = { isAuthenticated: false, user: null };
     }
@@ -195,9 +184,13 @@ class AuthService {
 
   /**
    * Re-read auth state from TrailBase. Called by oauth-callback.ts after the
-   * browser returns from the OIDC or password-login redirect flow.
+   * browser returns from the OIDC redirect flow.
+   *
+   * checkCookies() forces the SDK to re-read the session cookie that TrailBase
+   * set at /api/auth/v1/oauth/<provider>/callback before redirecting here.
    */
   async refresh(): Promise<void> {
+    await trailbaseService.refreshFromCookies();
     await this.loadAuthState();
   }
 

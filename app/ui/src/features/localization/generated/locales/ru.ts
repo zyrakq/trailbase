@@ -3,7 +3,7 @@
     // Re-generate this file by running lit-localize
 
     
-    
+    import {str} from '@lit/localize';
 
     /* eslint-disable no-irregular-whitespace */
     /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -38,7 +38,6 @@
 's5eddcab87c38b6b6': `Добро пожаловать в защищенную зону`,
 's5f343a43e7ea9f91': `Ошибка`,
 's6a6528b527495513': `Вернуться на главную`,
-'s6e622f3ba399d5a2': `Продолжить с Kanidm`,
 's74693aa15a1926a9': `Тестовые уведомления`,
 's7fee95b66225e1fb': `Панель управления`,
 's815c4f0a6876070c': `Пожалуйста, введите ваш email и пароль.`,
@@ -74,6 +73,8 @@
 'sf3fda5790cfa46f6': `Не удалось подключиться к серверу аутентификации. Подключение было отклонено из-за таймаута сети (код ошибки: ETIMEDOUT). Пожалуйста, проверьте подключение к интернету и попробуйте снова. Если проблема не исчезнет, обратитесь к системному администратору.`,
 'sf6e1665c7022a1f8': `Пароль`,
 'sffef1a8596bc58bb': `Аутентификация...`,
+'sd008f3d08470b11c': str`Failed to start ${0} sign in. Please try again.`,
+'seb6ab868740e4e36': str`Continue with ${0}`,
 'sf2c19b921d23f6a0': `Welcome to argiago`,
 'sd5ce7d0a7aec4cb7': `argiago`,
 'sb1971760847d4502': `Argiago GitHub`,
