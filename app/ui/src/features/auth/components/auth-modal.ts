@@ -83,10 +83,10 @@ export class AuthModal extends LitElement {
 
   private handleOIDC(provider: OIDCProvider) {
     this.close();
-    // TrailBase handles the entire OAuth flow including /api/auth/v1/oauth/<provider>/callback.
-    // redirect_uri is just where the browser lands after auth is complete — our homepage.
-    // The session cookie is set by TrailBase before the redirect happens.
-    authService.signIn(provider.key, window.location.origin).catch(() => {
+    // TrailBase handles the OAuth exchange at /api/auth/v1/oauth/<provider>/callback.
+    // /auth/callback is our SPA landing page — TrailBase redirects here after setting
+    // the session cookie. oauth-callback.ts then calls authService.refresh().
+    authService.signIn(provider.key, '/auth/callback').catch(() => {
       window.dispatchEvent(
         new CustomEvent('notification-add', {
           detail: {
