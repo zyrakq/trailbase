@@ -59,32 +59,61 @@ class TrailBaseService {
   }
 
   /**
-   * Authenticate with email and password via the SDK.
+   * Authenticate with email and password using a form-encoded POST.
    *
-   * The SDK POSTs to /api/auth/v1/login without redirect_uri, receiving a
-   * 200 JSON response. TrailBase sets an HttpOnly session cookie in the same
-   * response, enabling session restore via initClientFromCookies() on reload.
+   * TrailBase only sets HttpOnly session cookies (COOKIE_AUTH_TOKEN,
+   * COOKIE_REFRESH_TOKEN) on the form path, NOT on the JSON path. The JSON
+   * path returns tokens in the response body and stores them in SDK memory
+   * only — they are lost on page reload. The form path triggers a 303 with
+   * Set-Cookie headers, which the browser processes while following the
+   * redirect. After this call, checkCookies()/initClientFromCookies() will
+   * find a valid cookie and restore the session on any subsequent page load.
    *
-   * @throws AuthError with a typed code on 401, 403, or network failure
+   * On error TrailBase redirects to `redirect_uri?alert=Login Failed: <code>`,
+   * which we parse to throw a typed AuthError.
+   *
+   * @throws AuthError with a typed code on bad credentials, MFA required, or network failure
    */
   async loginWithPassword(email: string, password: string): Promise<void> {
-    const client = await this.initClient();
+    const body = new URLSearchParams();
+    body.set('email', email);
+    body.set('password', password);
+    // TrailBase redirects here on both success and failure.
+    // The cookie is set before this redirect on the success path.
+    body.set('redirect_uri', '/auth/callback');
+
+    let response: Response;
     try {
-      await client.login(email, password);
-    } catch (err) {
-      // Map SDK errors to our typed AuthError codes
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('401') || msg.toLowerCase().includes('credential')) {
-        throw new AuthError(AuthErrorCode.INVALID_CREDENTIALS, 'Invalid email or password');
-      }
-      if (msg.includes('403')) {
-        throw new AuthError(AuthErrorCode.MFA_REQUIRED, 'Multi-factor authentication required');
-      }
-      if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) {
-        throw new AuthError(AuthErrorCode.NETWORK_ERROR, 'Network error during login');
-      }
-      throw new AuthError(AuthErrorCode.UNKNOWN, `Login failed: ${msg}`);
+      response = await fetch('/api/auth/v1/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        credentials: 'include',
+        // redirect: 'follow' (default) — browser follows the 303, cookies are
+        // processed from the redirect response before the follow happens.
+        body: body.toString(),
+      });
+    } catch {
+      throw new AuthError(AuthErrorCode.NETWORK_ERROR, 'Network error during login');
     }
+
+    // After following the redirect, check the final URL for an error param.
+    if (response.redirected) {
+      const finalUrl = new URL(response.url, window.location.origin);
+      const alert = finalUrl.searchParams.get('alert');
+      if (alert) {
+        if (alert.includes('401')) {
+          throw new AuthError(AuthErrorCode.INVALID_CREDENTIALS, 'Invalid email or password');
+        }
+        if (alert.includes('403')) {
+          throw new AuthError(AuthErrorCode.MFA_REQUIRED, 'Multi-factor authentication required');
+        }
+        throw new AuthError(AuthErrorCode.UNKNOWN, alert);
+      }
+      // No alert param — success, cookie is now set.
+      return;
+    }
+
+    throw new AuthError(AuthErrorCode.UNKNOWN, `Unexpected login response: ${response.status}`);
   }
 
   /**

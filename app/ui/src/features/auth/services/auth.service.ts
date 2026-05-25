@@ -131,30 +131,22 @@ class AuthService {
   }
 
   /**
-   * Authenticate with email and password via the SDK.
+   * Authenticate with email and password.
    *
-   * The SDK POSTs to /api/auth/v1/login without redirect_uri, receiving 200
-   * JSON. TrailBase sets an HttpOnly session cookie in the same response so
-   * that initClientFromCookies() on the next page load restores the session
-   * automatically via GET /api/auth/v1/status.
+   * Uses a form-encoded POST so TrailBase sets HttpOnly session cookies on the
+   * 303 redirect response — the only path that produces persistent cookies.
+   * After the form login completes, checkCookies() reads the fresh cookie via
+   * GET /api/auth/v1/status to populate auth state.
    *
    * @param email - User email address
    * @param password - User password
    * @throws AuthError — propagated from trailbaseService (typed codes)
    */
   async loginWithPassword(email: string, password: string): Promise<void> {
+    // Form POST — sets COOKIE_AUTH_TOKEN and COOKIE_REFRESH_TOKEN
     await trailbaseService.loginWithPassword(email, password);
-    // Read user from the SDK client — it was updated by client.login()
-    const trailbaseUser = await trailbaseService.getUser();
-    if (trailbaseUser) {
-      this.authState = {
-        isAuthenticated: true,
-        user: this.mapTrailBaseUser(trailbaseUser),
-      };
-    } else {
-      this.authState = { isAuthenticated: false, user: null };
-    }
-    this.notifyAuthStateChange();
+    // Cookie is now set; read it back to populate auth state immediately
+    await this.refresh();
   }
 
   /**
