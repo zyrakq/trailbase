@@ -45,7 +45,6 @@
 's8fa032cdafb3c9b0': `Cerrar Sesión`,
 's92a0d19a28995530': `Éxito`,
 's9c274ca3aae0227e': `Ocurrió un error durante la operación`,
-'sa0edd3227b3addeb': `Redirigiendo...`,
 'sa95b4224f685a36a': `Cerrar ventana`,
 'sae506e1a821a6d4b': `Error al cerrar sesión. Por favor intenta de nuevo.`,
 'saea6a4171ae86e4b': `Operacional`,

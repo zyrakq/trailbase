@@ -20,34 +20,26 @@ export class OAuthCallback extends LitElement {
 
   private async handleCallback() {
     try {
-      console.log('[OAuthCallback] Processing OAuth callback...');
-
-      // Wait a bit for TrailBase to set the cookie
+      // Wait for TrailBase to finalise the session cookie before reading it.
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Refresh auth state from TrailBase
       await authService.refresh();
 
       const authState = authService.getAuthState();
 
       if (authState.isAuthenticated) {
-        console.log('[OAuthCallback] Authentication successful!');
         this.status = 'success';
 
-        // Redirect to dashboard after a short delay
         setTimeout(() => {
-          console.log('[OAuthCallback] Redirecting to dashboard...');
           window.location.href = '/dashboard';
         }, 1500);
       } else {
-        console.error('[OAuthCallback] Authentication failed - no user found');
         this.status = 'error';
         this.errorMessage = msg(
           'Authentication failed. No user session found.'
         );
       }
     } catch (error) {
-      console.error('[OAuthCallback] Error processing callback:', error);
       this.status = 'error';
       this.errorMessage =
         error instanceof Error ? error.message : msg('Unknown error occurred');

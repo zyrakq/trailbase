@@ -57,17 +57,9 @@ class AuthService {
         this.authState = { isAuthenticated: false, user: null };
       }
     } catch {
-      window.dispatchEvent(
-        new CustomEvent('notification-add', {
-          detail: {
-            id: `auth-error-${Date.now()}`,
-            message:
-              'Failed to load authentication state. Please refresh the page.',
-            type: 'warning' as const,
-          },
-          bubbles: true,
-          composed: true,
-        })
+      this.notify(
+        'Failed to load authentication state. Please refresh the page.',
+        'warning'
       );
       this.authState = { isAuthenticated: false, user: null };
     } finally {
@@ -157,17 +149,7 @@ class AuthService {
       await trailbaseService.logout();
       this.authState = { isAuthenticated: false, user: null };
     } catch (error) {
-      window.dispatchEvent(
-        new CustomEvent('notification-add', {
-          detail: {
-            id: `signout-error-${Date.now()}`,
-            message: 'Failed to sign out. Please try again.',
-            type: 'error' as const,
-          },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      this.notify('Failed to sign out. Please try again.', 'error', 'signout');
       throw error;
     } finally {
       this.notifyAuthStateChange();
@@ -194,6 +176,23 @@ class AuthService {
     window.dispatchEvent(
       new CustomEvent('auth-state-updated', {
         detail: { ...this.authState },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  /**
+   * Dispatch a 'notification-add' toast event to the notification system.
+   */
+  private notify(
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info',
+    prefix = 'auth'
+  ): void {
+    window.dispatchEvent(
+      new CustomEvent('notification-add', {
+        detail: { id: `${prefix}-${Date.now()}`, message, type },
         bubbles: true,
         composed: true,
       })

@@ -1,5 +1,5 @@
 import { LitElement, css, html } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
 import { authService } from '../services/auth.service';
@@ -18,9 +18,6 @@ export class AuthStatus extends LitElement {
 
   @state()
   private user: User | null = null;
-
-  @property({ type: Boolean })
-  loading = false;
 
   async connectedCallback() {
     super.connectedCallback();
@@ -48,12 +45,7 @@ export class AuthStatus extends LitElement {
   };
 
   private handleSignIn() {
-    // Delegate to the new modal entrypoint (choice between OIDC and password).
-    // Loading state retained for visual continuity with prior direct-redirect behavior.
-    this.loading = true;
     authService.showLogin();
-    // Reset immediately — modal is synchronous and manages its own loading states.
-    this.loading = false;
   }
 
   private handleDashboardClick() {
@@ -86,7 +78,6 @@ export class AuthStatus extends LitElement {
                 <button
                   class="btn btn-primary"
                   @click=${this.handleDashboardClick}
-                  ?disabled=${this.loading}
                 >
                   ${msg('Go to Dashboard')}
                 </button>
@@ -95,9 +86,8 @@ export class AuthStatus extends LitElement {
                 <button
                   class="btn btn-primary"
                   @click=${this.handleSignIn}
-                  ?disabled=${this.loading}
                 >
-                  ${this.loading ? msg('Redirecting...') : msg('Sign In')}
+                  ${msg('Sign In')}
                 </button>
               `}
         </div>
@@ -124,8 +114,8 @@ export class AuthStatus extends LitElement {
     }
 
     .logo {
-      width: 240px;
-      height: 240px;
+      width: 120px;
+      height: 120px;
       margin-bottom: 1.5rem;
     }
 
@@ -199,8 +189,8 @@ export class AuthStatus extends LitElement {
       }
 
       .logo {
-        width: 220px;
-        height: 220px;
+        width: 100px;
+        height: 100px;
       }
 
       .title {

@@ -1,16 +1,13 @@
 /**
  * OIDC provider configuration for TrailBase OAuth integration.
  *
- * Each entry generates:
- * - A sign-in button in the auth modal
- * - A dedicated SPA callback route: /auth/{key}/callback
+ * Each entry generates a sign-in button in the auth modal.
+ * All providers share the same SPA callback route (/auth/callback), which is
+ * handled by the oauth-callback component. TrailBase manages the full OIDC
+ * exchange at /api/auth/v1/oauth/<provider>/callback before redirecting there.
  *
- * The callback URL must be registered as an allowed redirect URI in the OIDC
- * provider (e.g. Kanidm application config). It must share the same origin as
- * site_url in app/traildepot/config.textproto so TrailBase accepts it.
- *
- * Example Kanidm redirect URI to register:
- *   http://<site_url_origin>/auth/oidc0/callback
+ * The redirect URI registered in the OIDC provider (e.g. Kanidm) must be:
+ *   http://<site_url_origin>/auth/callback
  */
 export interface OIDCProvider {
   /** TrailBase provider key — matches oauth_providers[].key in config.textproto */

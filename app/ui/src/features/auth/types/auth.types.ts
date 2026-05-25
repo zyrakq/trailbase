@@ -17,10 +17,4 @@ export interface AuthState {
   user: User | null;
 }
 
-export interface OIDCConfig {
-  clientId: string;
-  redirectUri: string;
-  authorizationEndpoint: string;
-  tokenEndpoint: string;
-  scope: string;
-}
+
