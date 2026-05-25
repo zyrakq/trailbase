@@ -7,6 +7,7 @@
 | Pattern | Example |
 |---|---|
 | Components: `kebab-case.ts` | `auth-status.ts`, `toast-notification.ts` |
+| Component styles: `kebab-case.styles.ts` | `auth-modal.styles.ts`, `auth-status.styles.ts` |
 | Services: `kebab-case.service.ts` | `auth.service.ts`, `theme.service.ts` |
 | Controllers: `kebab-case.controller.ts` | `theme.controller.ts`, `locale.controller.ts` |
 | Types: `kebab-case.types.ts` | `auth.types.ts`, `notification.types.ts` |
@@ -38,7 +39,7 @@
 Every Lit component follows this exact order:
 
 ```typescript
-import { LitElement, css, html } from 'lit';
+import { LitElement, html } from 'lit';
 import { customElement, state, property } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
@@ -46,6 +47,8 @@ import { localized } from '@/features/localization';
 import { ThemeController } from '@/features/theme';
 // Asset imports
 import logoLight from '@/assets/logo-light.svg';
+// Styles (always in a sibling .styles.ts file — never inline)
+import { myComponentStyles } from './my-component.styles';
 
 @customElement('my-component')   // 1. Element registration
 @localized()                     // 2. i18n decorator (ALWAYS required)
@@ -72,8 +75,8 @@ export class MyComponent extends LitElement {
     return html`...`;
   }
 
-  // 8. static styles
-  static styles = css`...`;
+  // 8. static styles — imported from sibling .styles.ts
+  static styles = myComponentStyles;
 }
 
 // 9. Global type declaration (always at bottom)
@@ -399,7 +402,26 @@ export { MY_CONSTANT } from './types/my.types';
 
 ## Styling Conventions
 
-- Styles are **always** in `static styles = css\`...\`` (shadow DOM, scoped)
+Styles live in a **sibling `.styles.ts` file**, never inline in the component file.
+This keeps component logic files lean and avoids flooding the context window with CSS details.
+
+```typescript
+// my-component.styles.ts
+import { css } from 'lit';
+
+export const myComponentStyles = css`
+  :host { display: block; }
+  .container { padding: 1rem; }
+`;
+
+// my-component.ts
+import { myComponentStyles } from './my-component.styles';
+
+export class MyComponent extends LitElement {
+  static styles = myComponentStyles;
+}
+```
+
 - Use `:host` for the component's own display/layout
 - Use `@media` queries for responsive behavior
 - Class names: `kebab-case` (e.g., `.header-content`, `.main-content`, `.btn-primary`)
@@ -429,6 +451,7 @@ No test infrastructure exists yet. When adding tests:
 - Use `finally` to reset `loading` state
 - Declare `HTMLElementTagNameMap` at the bottom of every component file
 - Write all comments, docs, and strings in English
+- Extract `static styles` to a sibling `<name>.styles.ts` file — never inline CSS in component files
 
 ### Don't
 
@@ -436,7 +459,9 @@ No test infrastructure exists yet. When adding tests:
 - Import from internal paths of another feature (`@/features/auth/services/...`)
 - Call `localizationService.init()` anywhere except `app-component.ts`
 - Modify anything in `react/` (legacy, read-only reference)
+- Modify anything in `trailbase/` (cloned reference repo, read-only)
 - Use `cd <dir> && command` — use `workdir` parameter instead
 - Add `I` prefix to interface names (`IUser` → `User`)
 - Use `any` type (strict TypeScript is enforced)
 - Leave unused variables or parameters (TypeScript strict mode will error)
+- Put `static styles = css\`...\`` inline inside a component file

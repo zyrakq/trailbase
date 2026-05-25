@@ -46,6 +46,10 @@ argiago/
 │   ├── ui/                 # Frontend application (Lit + Vite)
 │   └── Cargo.toml
 ├── react/                  # Legacy React code — READ ONLY, do not modify
+├── trailbase/              # Cloned TrailBase repo — READ ONLY, reference only
+│   └── crates/
+│       ├── auth-ui/        # Official TrailBase auth UI — reference for auth flow internals
+│       └── core/           # Core API handlers (e.g. auth/api/login.rs)
 ├── Cargo.toml              # Workspace root
 ├── Cargo.lock
 ├── docker-compose.yml
@@ -130,25 +134,34 @@ features/<name>/
 
 ### `features/auth/`
 
-Authentication via TrailBase OAuth (OIDC).
+Authentication via TrailBase OAuth (OIDC) and password login (form-encoded POST for cookie persistence).
 
 | File | Role |
 |---|---|
-| `services/trailbase.service.ts` | Raw HTTP client for TrailBase REST API (no SDK) |
+| `config/auth-providers.ts` | Static OIDC provider list (`OIDC_PROVIDERS`) |
+| `services/trailbase.service.ts` | HTTP adapter for TrailBase REST API; uses `trailbase` npm SDK internally |
 | `services/auth.service.ts` | App-level auth state manager, singleton with init-once guard |
+| `components/auth-modal.ts` | Login modal: OIDC buttons + password form |
 | `components/auth-status.ts` | Sign-in card / "Go to Dashboard" button |
-| `components/oauth-callback.ts` | OAuth redirect handler (loading → success → redirect) |
-| `types/auth.types.ts` | `User`, `AuthState`, `OIDCConfig` interfaces |
+| `components/oauth-callback.ts` | Handles `/auth/callback` after OIDC or password redirect; calls `authService.refresh()` |
+| `types/auth.types.ts` | `User`, `AuthState` interfaces |
+| `types/auth-error.ts` | `AuthErrorCode` const, `AuthError extends Error` |
 
 **TrailBase endpoints used**:
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/auth/v1/oauth/{provider}/login` | Initiate OAuth (browser redirect) |
-| `GET /api/auth/v1/status` | Check session / get JWT (cookie-based) |
-| `GET /api/auth/v1/logout` | Invalidate session |
+| `POST /api/auth/v1/login` | Password login (form-encoded, sets HttpOnly cookie via 303) |
+| `GET /api/auth/v1/status` | Check session / restore from cookie |
+| `POST /api/auth/v1/logout` | Invalidate session |
 
-**Auth state**: In-memory only. Persisted via HttpOnly cookie set by TrailBase. On every page load, `authService.init()` re-fetches `/api/auth/v1/status` to reconstruct state.
+**Auth state**: In-memory only. Persisted via HttpOnly cookie set by TrailBase. On every page load,
+`authService.init()` calls `initClientFromCookies()` (SDK) → `GET /api/auth/v1/status` to reconstruct state.
+
+**Cookie path requirement**: TrailBase only sets `Set-Cookie` on form-encoded POST (`application/x-www-form-urlencoded`)
+with a `redirect_uri`; JSON POST returns tokens in the response body only (no cookie). See
+`trailbase/crates/core/src/auth/api/login.rs`, `build_auth_token_flow_response()` for the server-side logic.
 
 ### `features/theme/`
 
@@ -247,21 +260,25 @@ Data lives in `app/traildepot/`.
 ### Authentication Flow
 
 ```
-1. App loads → authService.init() → GET /api/auth/v1/status (cookie)
+1. App loads → authService.init() → initClientFromCookies() → GET /api/auth/v1/status (cookie)
    → 401: unauthenticated state
-   → 200: parse JWT → user object in memory
+   → 200: client.user() decodes JWT → user object in memory
 
-2. Sign In click → authService.signIn('oidc0', '/auth/callback')
-   → window.location.href = '/api/auth/v1/oauth/oidc0/login?redirect_uri=...'
-   → Browser → TrailBase → OIDC provider
+2a. OIDC Sign In → authService.signIn('oidc0', '/auth/callback')
+    → window.location.href = '/api/auth/v1/oauth/oidc0/login?redirect_uri=/auth/callback'
+    → Browser → TrailBase → Kanidm OIDC provider
+    → TrailBase /api/auth/v1/oauth/oidc0/callback (sets HttpOnly cookie) → /auth/callback
 
-3. OIDC provider → TrailBase (sets HttpOnly cookie) → /auth/callback
+2b. Password Sign In → authService.loginWithPassword(email, pwd)
+    → trailbaseService: form-encoded POST /api/auth/v1/login + redirect_uri=/auth/callback
+    → TrailBase sets HttpOnly cookie → 303 → fetch follows → response.redirected = true
+    → authService.refresh() → /auth/callback navigation handled by router
 
-4. <oauth-callback> mounts → wait 500ms → authService.refresh()
-   → GET /api/auth/v1/status → parse JWT → isAuthenticated: true
+3. <oauth-callback> mounts → wait 500ms → authService.refresh()
+   → client.checkCookies() → GET /api/auth/v1/status → isAuthenticated: true
    → wait 1500ms → window.location.href = '/dashboard'
 
-5. Sign Out → GET /api/auth/v1/logout → reset authState → navigate to /
+4. Sign Out → client.logout() → POST /api/auth/v1/logout → reset authState → navigate to /
 ```
 
 ### Notification Flow
