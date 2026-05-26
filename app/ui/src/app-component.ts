@@ -8,6 +8,7 @@ import '@/features/theme/services/favicon.service';
 // Import components (they will be registered as custom elements)
 import '@/pages/welcome-page';
 import '@/pages/dashboard-page';
+import '@/pages/profile-page';
 import '@/features/auth/components/oauth-callback';
 import '@/features/notifications/components/toast-container';
 
@@ -35,8 +36,23 @@ export class AppComponent extends LitElement {
       render: () => html`<oauth-callback></oauth-callback>`,
     },
     {
+      // Legacy route — kept for backwards compatibility.
+      // Redirects authenticated users to /profile; unauthenticated to /.
       path: '/dashboard',
-      render: () => html`<dashboard-page></dashboard-page>`,
+      render: () => html``,
+      enter: async () => {
+        await authService.init();
+        if (!authService.isAuthenticated()) {
+          this._router.goto('/');
+        } else {
+          this._router.goto('/profile');
+        }
+        return false;
+      },
+    },
+    {
+      path: '/profile',
+      render: () => html`<profile-page></profile-page>`,
       enter: async () => {
         await authService.init();
         if (!authService.isAuthenticated()) {

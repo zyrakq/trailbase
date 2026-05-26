@@ -48,8 +48,8 @@ export class AuthStatus extends LitElement {
     authService.showLogin();
   }
 
-  private handleDashboardClick() {
-    window.location.href = '/dashboard';
+  private handleProfileClick() {
+    window.location.href = '/profile';
   }
 
   render() {
@@ -77,9 +77,9 @@ export class AuthStatus extends LitElement {
             ? html`
                 <button
                   class="btn btn-primary"
-                  @click=${this.handleDashboardClick}
+                  @click=${this.handleProfileClick}
                 >
-                  ${msg('Go to Dashboard')}
+                  ${msg('Go to Profile')}
                 </button>
               `
             : html`

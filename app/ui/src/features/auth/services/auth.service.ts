@@ -14,6 +14,7 @@ class AuthService {
   private authState: AuthState = {
     isAuthenticated: false,
     user: null,
+    hasMfa: false,
   };
   private initPromise: Promise<void> | null = null;
   private authModal: AuthModal | null = null;
@@ -44,6 +45,7 @@ class AuthService {
   /**
    * Load authentication state from the SDK client.
    * initClient() calls GET /api/auth/v1/status to restore session from cookie.
+   * hasMfa is sourced from the SDK User.mfa field — no manual tracking needed.
    */
   private async loadAuthState(): Promise<void> {
     try {
@@ -53,16 +55,17 @@ class AuthService {
         this.authState = {
           isAuthenticated: true,
           user: this.mapTrailBaseUser(trailbaseUser),
+          hasMfa: trailbaseUser.mfa ?? false,
         };
       } else {
-        this.authState = { isAuthenticated: false, user: null };
+        this.authState = { isAuthenticated: false, user: null, hasMfa: false };
       }
     } catch {
       this.notify(
         'Failed to load authentication state. Please refresh the page.',
         'warning'
       );
-      this.authState = { isAuthenticated: false, user: null };
+      this.authState = { isAuthenticated: false, user: null, hasMfa: false };
     } finally {
       this.notifyAuthStateChange();
     }
@@ -129,18 +132,36 @@ class AuthService {
   /**
    * Authenticate with email and password.
    *
-   * Uses a form-encoded POST so TrailBase sets HttpOnly session cookies on the
-   * 303 redirect response — the only path that produces persistent cookies.
-   * After the form login completes, checkCookies() reads the fresh cookie via
-   * GET /api/auth/v1/status to populate auth state.
+   * Returns `{ requiresMfa: true; mfaToken: string }` when the account has
+   * TOTP enabled — the caller (auth-modal) must prompt for the TOTP code and
+   * call `loginWithMfa()` to complete authentication.
    *
-   * @param email - User email address
-   * @param password - User password
+   * Returns void on successful direct login (no MFA required).
+   *
    * @throws AuthError — propagated from trailbaseService (typed codes)
    */
-  async loginWithPassword(email: string, password: string): Promise<void> {
-    await trailbaseService.loginWithPassword(email, password);
+  async loginWithPassword(
+    email: string,
+    password: string
+  ): Promise<{ requiresMfa: true; mfaToken: string } | void> {
+    const result = await trailbaseService.loginWithPassword(email, password);
+    if (result && result.requiresMfa) {
+      return result;
+    }
     await this.refresh();
+  }
+
+  /**
+   * Complete MFA login by submitting a TOTP code.
+   *
+   * On success, loads auth state with `hasMfa: true` and notifies listeners.
+   *
+   * @throws AuthError(INVALID_CREDENTIALS) on wrong code
+   * @throws AuthError(NETWORK_ERROR) on fetch failure
+   */
+  async loginWithMfa(mfaToken: string, totpCode: string): Promise<void> {
+    await trailbaseService.loginWithMfa(mfaToken, totpCode);
+    await this.loadAuthState();
   }
 
   /**
@@ -196,7 +217,7 @@ class AuthService {
   async signOut(): Promise<void> {
     try {
       await trailbaseService.logout();
-      this.authState = { isAuthenticated: false, user: null };
+      this.authState = { isAuthenticated: false, user: null, hasMfa: false };
     } catch (error) {
       this.notify('Failed to sign out. Please try again.', 'error', 'signout');
       throw error;

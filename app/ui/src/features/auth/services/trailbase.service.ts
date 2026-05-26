@@ -1,6 +1,6 @@
 // TrailBase API client — wraps the official trailbase SDK.
 // SDK docs: https://trailbase.io/documentation/auth
-import { initClientFromCookies, type Client } from 'trailbase';
+import { initClientFromCookies, FetchError, type Client } from 'trailbase';
 import { AuthError, AuthErrorCode } from '../types/auth-error';
 
 /**
@@ -9,6 +9,8 @@ import { AuthError, AuthErrorCode } from '../types/auth-error';
 export interface TrailBaseUser {
   id: string;
   email?: string;
+  /** True if the user has TOTP/MFA enabled. Sourced from the SDK User.mfa field. */
+  mfa?: boolean;
 }
 
 class TrailBaseService {
@@ -46,7 +48,7 @@ class TrailBaseService {
     const client = await this.initClient();
     const user = client.user();
     if (!user) return null;
-    return { id: user.id, email: user.email };
+    return { id: user.id, email: user.email, mfa: user.mfa };
   }
 
   /**
@@ -74,7 +76,10 @@ class TrailBaseService {
    *
    * @throws AuthError with a typed code on bad credentials, MFA required, or network failure
    */
-  async loginWithPassword(email: string, password: string): Promise<void> {
+  async loginWithPassword(
+    email: string,
+    password: string
+  ): Promise<{ requiresMfa: true; mfaToken: string } | void> {
     const body = new URLSearchParams();
     body.set('email', email);
     body.set('password', password);
@@ -111,10 +116,13 @@ class TrailBaseService {
           );
         }
         if (alert.includes('403')) {
-          throw new AuthError(
-            AuthErrorCode.MFA_REQUIRED,
-            'Multi-factor authentication required'
-          );
+          // TrailBase encodes the mfa_token in the alert param as
+          // "Login Failed: 403 <mfa_token_value>" or similar.
+          // Extract the token: everything after the last space in the alert.
+          // If parsing fails, fall back to the raw alert string.
+          const parts = alert.split(' ');
+          const mfaToken = parts[parts.length - 1] ?? alert;
+          return { requiresMfa: true as const, mfaToken };
         }
         throw new AuthError(AuthErrorCode.UNKNOWN, alert);
       }
@@ -237,6 +245,40 @@ class TrailBaseService {
       AuthErrorCode.UNKNOWN,
       text || `Resend failed: ${response.status}`
     );
+  }
+
+  /**
+   * Complete MFA login by submitting a TOTP code.
+   *
+   * Called after `loginWithPassword()` returns `requiresMfa: true`.
+   * Delegates to client.loginSecond() from the SDK (POST /api/auth/v1/login_mfa).
+   *
+   * @throws AuthError(INVALID_CREDENTIALS) on 401 (wrong TOTP code)
+   * @throws AuthError(NETWORK_ERROR) on fetch failure
+   * @throws AuthError(UNKNOWN) on any other non-200 status
+   */
+  async loginWithMfa(mfaToken: string, totpCode: string): Promise<void> {
+    const client = await this.initClient();
+    try {
+      await client.loginSecond({ mfaToken: { token: mfaToken }, totpCode });
+    } catch (err) {
+      if (err instanceof FetchError) {
+        if (err.status === 401) {
+          throw new AuthError(
+            AuthErrorCode.INVALID_CREDENTIALS,
+            'Invalid MFA code'
+          );
+        }
+        throw new AuthError(
+          AuthErrorCode.UNKNOWN,
+          `MFA login failed: ${err.status}`
+        );
+      }
+      throw new AuthError(
+        AuthErrorCode.NETWORK_ERROR,
+        'Network error during MFA login'
+      );
+    }
   }
 
   /**

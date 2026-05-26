@@ -6,6 +6,8 @@ server {
   logs_retention_sec: 604800
 }
 auth {
+  disable_password_auth: true
+  enable_otp_signin: true
   oauth_providers: [{
     key: "oidc0"
     value {

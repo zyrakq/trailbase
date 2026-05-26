@@ -147,6 +147,35 @@ Authentication via TrailBase OAuth (OIDC) and password login (form-encoded POST 
 | `types/auth.types.ts` | `User`, `AuthState` interfaces |
 | `types/auth-error.ts` | `AuthErrorCode` const, `AuthError extends Error` |
 
+**TrailBase SDK Client — available methods** (`app/ui/node_modules/trailbase/dist/index.d.ts`):
+
+Before adding a raw `fetch()` call to `trailbase.service.ts` or any auth-related service,
+check the SDK `Client` interface first. The following methods are already implemented:
+
+| SDK method | Purpose |
+|---|---|
+| `client.login(email, password)` | JSON login → tokens in memory (no cookie, session lost on reload) |
+| `client.loginSecond({ mfaToken, totpCode })` | Complete MFA login (TOTP second factor) |
+| `client.requestOtp(email)` | Request email OTP code |
+| `client.loginOtp(email, code)` | Login with email OTP code |
+| `client.logout()` | Invalidate session |
+| `client.registerTOTP({ png })` | Start TOTP setup, returns `{ url, png }` |
+| `client.confirmTOTP(totpUrl, totp)` | Confirm TOTP setup (saves secret) |
+| `client.unregisterTOTP(totp)` | Disable TOTP |
+| `client.deleteUser()` | Delete the authenticated user |
+| `client.checkCookies()` | Re-read HttpOnly session cookie |
+| `client.refreshAuthToken()` | Force token refresh |
+| `client.user()` | Current user: `{ id, email, admin?, mfa? }` |
+| `client.records(name)` | CRUD API for data tables |
+
+> **Cookie caveat**: `client.login()` uses a JSON POST which returns tokens in SDK memory
+> only — no HttpOnly cookie is set, so session is lost on page reload. Use the form-encoded
+> POST path (`trailbaseService.loginWithPassword`) for persistent sessions. See the
+> `loginWithPassword` JSDoc in `trailbase.service.ts` for details.
+
+> **Error handling**: SDK methods throw `FetchError` (exported from `trailbase`) on non-2xx
+> responses. Catch and map to `AuthError` with typed `AuthErrorCode` values.
+
 **TrailBase endpoints used**:
 
 | Endpoint | Purpose |

@@ -6,7 +6,7 @@ import { authService } from '../services/auth.service';
 import { AuthError, AuthErrorCode } from '../types/auth-error';
 import { OIDC_PROVIDERS, type OIDCProvider } from '../config/auth-providers';
 
-type ViewState = 'choice' | 'password' | 'loading' | 'register' | 'register-loading' | 'register-success';
+type ViewState = 'choice' | 'password' | 'loading' | 'register' | 'register-loading' | 'register-success' | 'mfa' | 'mfa-loading';
 
 @customElement('auth-modal')
 @localized()
@@ -21,6 +21,8 @@ export class AuthModal extends LitElement {
   @state() private showConfirmPassword = false;
   @state() private registrationEmailSent = false;
   @state() private resendState: 'idle' | 'loading' | 'sent' | 'rate-limited' | 'smtp-error' = 'idle';
+  @state() private mfaToken = '';
+  @state() private mfaCode = '';
 
   open() {
     this.view = 'choice';
@@ -32,6 +34,8 @@ export class AuthModal extends LitElement {
     this.showConfirmPassword = false;
     this.registrationEmailSent = false;
     this.resendState = 'idle';
+    this.mfaToken = '';
+    this.mfaCode = '';
 
     this.isOpen = true;
     document.body.style.overflow = 'hidden';
@@ -103,6 +107,12 @@ export class AuthModal extends LitElement {
   }
 
   private handleBack() {
+    if (this.view === 'mfa' || this.view === 'mfa-loading') {
+      this.view = 'password';
+      this.errorMessage = '';
+      this.mfaCode = '';
+      return;
+    }
     this.view = 'choice';
     this.errorMessage = '';
     this.email = '';
@@ -172,7 +182,17 @@ export class AuthModal extends LitElement {
     this.errorMessage = '';
 
     try {
-      await authService.loginWithPassword(trimmedEmail, trimmedPassword);
+      const result = await authService.loginWithPassword(trimmedEmail, trimmedPassword);
+
+      if (result && result.requiresMfa) {
+        // Switch to MFA view — do NOT close the modal
+        this.mfaToken = result.mfaToken;
+        this.mfaCode = '';
+        this.view = 'mfa';
+        return;
+      }
+
+      // Direct login success
       this.close();
       window.dispatchEvent(
         new CustomEvent('notification-add', {
@@ -191,11 +211,6 @@ export class AuthModal extends LitElement {
         switch (error.code) {
           case AuthErrorCode.INVALID_CREDENTIALS:
             this.errorMessage = msg('Invalid email or password. Please try again.');
-            break;
-          case AuthErrorCode.MFA_REQUIRED:
-            this.errorMessage = msg(
-              'Multi-factor authentication is required. Please sign in using Kanidm or contact your administrator.'
-            );
             break;
           case AuthErrorCode.NETWORK_ERROR:
             this.errorMessage = msg(
@@ -281,6 +296,53 @@ export class AuthModal extends LitElement {
     }
   }
 
+  private handleMfaCodeInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    // Allow only digits, max 6 characters
+    this.mfaCode = target.value.replace(/\D/g, '').slice(0, 6);
+    if (this.errorMessage) this.errorMessage = '';
+  }
+
+  private async handleMfaSubmit(e: Event) {
+    e.preventDefault();
+    if (this.view === 'mfa-loading') return;
+
+    const code = this.mfaCode.trim();
+    if (code.length !== 6) {
+      this.errorMessage = msg('Please enter the 6-digit code from your authenticator app.');
+      return;
+    }
+
+    this.view = 'mfa-loading';
+    this.errorMessage = '';
+
+    try {
+      await authService.loginWithMfa(this.mfaToken, code);
+      this.close();
+      window.dispatchEvent(
+        new CustomEvent('notification-add', {
+          detail: {
+            id: `auth-mfa-success-${Date.now()}`,
+            message: msg('Successfully signed in.'),
+            type: 'success' as const,
+            duration: 4000,
+          },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    } catch (error) {
+      if (error instanceof AuthError && error.code === AuthErrorCode.INVALID_CREDENTIALS) {
+        this.errorMessage = msg('Invalid code. Please try again.');
+      } else if (error instanceof AuthError && error.code === AuthErrorCode.NETWORK_ERROR) {
+        this.errorMessage = msg('Unable to connect. Please check your internet connection and try again.');
+      } else {
+        this.errorMessage = msg('Verification failed. Please try again.');
+      }
+      this.view = 'mfa';
+    }
+  }
+
   private handleEmailInput(e: Event) {
     const target = e.target as HTMLInputElement;
     this.email = target.value;
@@ -306,6 +368,9 @@ export class AuthModal extends LitElement {
       this.view === 'register-success'
     ) {
       return msg('Create account');
+    }
+    if (this.view === 'mfa' || this.view === 'mfa-loading') {
+      return msg('Two-factor authentication');
     }
     return msg('Sign in');
   }
@@ -333,10 +398,56 @@ export class AuthModal extends LitElement {
                 ? this.renderRegisterView()
                 : this.view === 'register-success'
                   ? this.renderRegisterSuccessView()
-                  : this.renderPasswordView()}
+                  : this.view === 'mfa' || this.view === 'mfa-loading'
+                    ? this.renderMfaView()
+                    : this.renderPasswordView()}
           </div>
         </div>
       </div>
+    `;
+  }
+
+  private renderMfaView() {
+    const isLoading = this.view === 'mfa-loading';
+
+    return html`
+      <form class="password-form" @submit=${this.handleMfaSubmit}>
+        <p class="mfa-subtitle">
+          ${msg('Enter the 6-digit code from your authenticator app.')}
+        </p>
+
+        <div class="form-field">
+          <label for="mfa-code">${msg('Verification code')}</label>
+          <input
+            id="mfa-code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            placeholder="000000"
+            .value=${this.mfaCode}
+            @input=${this.handleMfaCodeInput}
+            ?disabled=${isLoading}
+            required
+          />
+        </div>
+
+        ${this.errorMessage
+          ? html`<div class="error-message" role="alert">${this.errorMessage}</div>`
+          : ''}
+
+        <button type="submit" class="btn btn-primary" ?disabled=${isLoading || this.mfaCode.length !== 6}>
+          ${isLoading ? msg('Verifying...') : msg('Verify')}
+        </button>
+      </form>
+
+      <button
+        class="back-link"
+        @click=${this.handleBack}
+        ?disabled=${isLoading}
+      >
+        ${msg('Back to sign in')}
+      </button>
     `;
   }
 
@@ -899,6 +1010,13 @@ export class AuthModal extends LitElement {
       .modal-header { padding: 0.875rem 1rem; }
       .modal-content { padding: 1rem; }
       .modal-title { font-size: 1rem; }
+    }
+
+    .mfa-subtitle {
+      font-size: 0.9375rem;
+      color: var(--theme-color-text-secondary);
+      margin: 0 0 1rem 0;
+      transition: color 0.2s ease;
     }
   `;
 }
