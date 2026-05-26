@@ -47,15 +47,76 @@ async fn hello_handler() -> axum::Json<serde_json::Value> {
 
 /// Return public configuration flags to the frontend.
 ///
-/// Reads `disable_password_auth` from the live TrailBase config — the same
-/// value the TrailBase register endpoint enforces. Changes made through the
-/// admin panel are reflected immediately without a server restart.
+/// Reads `disable_password_auth` and `oauth_providers` from the live TrailBase
+/// config. Changes made through the admin panel are reflected immediately without
+/// a server restart.
 async fn public_config_handler(
     State(state): State<AppState>,
 ) -> axum::Json<serde_json::Value> {
-    let registration_enabled =
-        state.access_config(|c| !c.auth.disable_password_auth.unwrap_or(false));
-    axum::Json(serde_json::json!({ "registrationEnabled": registration_enabled }))
+    let (registration_enabled, oauth_providers) = state.access_config(|c| {
+        let registration_enabled = !c.auth.disable_password_auth.unwrap_or(false);
+
+        let oauth_providers: Vec<serde_json::Value> = c
+            .auth
+            .oauth_providers
+            .iter()
+            .map(|(key, provider_config)| {
+                let provider_id = provider_config.provider_id.unwrap_or(0);
+                let (display_name, img_name) = provider_meta(
+                    provider_id,
+                    provider_config.display_name.as_deref(),
+                );
+                serde_json::json!({
+                    "key": key,
+                    "displayName": display_name,
+                    "imgName": img_name,
+                })
+            })
+            .collect();
+
+        (registration_enabled, oauth_providers)
+    });
+
+    axum::Json(serde_json::json!({
+        "registrationEnabled": registration_enabled,
+        "oauthProviders": oauth_providers,
+    }))
+}
+
+/// Map a TrailBase `OAuthProviderId` integer to a display name and icon filename.
+///
+/// The `display_name` proto field (if set in config.textproto) takes precedence
+/// over the default derived from the provider type. Integer values match the
+/// `OAuthProviderId` enum in `trailbase/crates/core/proto/config.proto`.
+fn provider_meta(provider_id: i32, display_name: Option<&str>) -> (String, &'static str) {
+    let img_name = match provider_id {
+        9  => "apple.svg",
+        10 => "discord.svg",
+        11 => "gitlab.svg",
+        12 => "google.svg",
+        13 => "facebook.svg",
+        14 => "microsoft.svg",
+        15 => "twitch.svg",
+        16 => "yandex.svg",
+        17 => "github.svg",
+        _  => "oidc.svg",  // OIDC0 (2) and unknown providers
+    };
+
+    let default_name = match provider_id {
+        9  => "Apple",
+        10 => "Discord",
+        11 => "GitLab",
+        12 => "Google",
+        13 => "Facebook",
+        14 => "Microsoft",
+        15 => "Twitch",
+        16 => "Yandex",
+        17 => "GitHub",
+        _  => "OIDC",
+    };
+
+    let name = display_name.unwrap_or(default_name).to_string();
+    (name, img_name)
 }
 
 /// Intercept TrailBase's default password-reset email link and redirect to the SPA page.

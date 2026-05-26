@@ -1,12 +1,24 @@
 // Public config service — fetches server-side feature flags for the frontend.
 // No caching: each call fetches fresh data from the server.
 
+/** OAuth provider metadata returned by /api/config/public. */
+export interface OAuthProviderConfig {
+  /** TrailBase provider map key, e.g. "oidc0", "google". */
+  key: string;
+  /** Human-readable provider name, e.g. "OIDC", "Google". */
+  displayName: string;
+  /** Icon filename served at /_/auth/oauth2/<imgName>, e.g. "oidc.svg". */
+  imgName: string;
+}
+
 export interface PublicConfig {
   registrationEnabled: boolean;
+  oauthProviders: OAuthProviderConfig[];
 }
 
 const DEFAULT_CONFIG: PublicConfig = {
   registrationEnabled: true,
+  oauthProviders: [],
 };
 
 class ConfigService {

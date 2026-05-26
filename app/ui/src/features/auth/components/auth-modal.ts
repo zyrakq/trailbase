@@ -2,7 +2,7 @@ import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
-import { configService } from '../services/config.service';
+import { configService, type OAuthProviderConfig } from '../services/config.service';
 import { authModalStyles } from './auth-modal.styles';
 
 // Sub-component side-effect imports — registers the custom elements.
@@ -33,6 +33,7 @@ export class AuthModal extends LitElement {
   @state() private sharedEmail = '';
   @state() private mfaToken = '';
   @state() private registrationEnabled = true;
+  @state() private oauthProviders: OAuthProviderConfig[] = [];
   @state() private registerSuccessEmailSent = false;
 
   open() {
@@ -43,6 +44,7 @@ export class AuthModal extends LitElement {
 
     configService.fetchConfig().then((config) => {
       this.registrationEnabled = config.registrationEnabled;
+      this.oauthProviders = config.oauthProviders;
     });
 
     this.isOpen = true;
@@ -160,7 +162,10 @@ export class AuthModal extends LitElement {
   private renderCurrentView() {
     switch (this.view) {
       case 'choice':
-        return html`<auth-choice-view .registrationEnabled=${this.registrationEnabled}></auth-choice-view>`;
+        return html`<auth-choice-view
+          .registrationEnabled=${this.registrationEnabled}
+          .oauthProviders=${this.oauthProviders}
+        ></auth-choice-view>`;
 
       case 'password':
         return html`<auth-password-view .initialEmail=${this.sharedEmail}></auth-password-view>`;

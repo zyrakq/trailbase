@@ -69,7 +69,6 @@
 'sf6e1665c7022a1f8': `Пароль`,
 'sffef1a8596bc58bb': `Аутентификация...`,
 'sd008f3d08470b11c': str`Failed to start ${0} sign in. Please try again.`,
-'seb6ab868740e4e36': str`Continue with ${0}`,
 'sc84410561a2a8073': `Create an account`,
 's85366fac18679f28': `Forgot password?`,
 's59169c4e8fbcdccf': `Signing in…`,
