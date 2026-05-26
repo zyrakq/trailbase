@@ -3,6 +3,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { msg, str } from '@lit/localize';
 import { localized } from '@/features/localization';
 import { authService } from '../services/auth.service';
+import { configService } from '../services/config.service';
 import { AuthError, AuthErrorCode } from '../types/auth-error';
 import { OIDC_PROVIDERS, type OIDCProvider } from '../config/auth-providers';
 
@@ -23,6 +24,7 @@ export class AuthModal extends LitElement {
   @state() private resendState: 'idle' | 'loading' | 'sent' | 'rate-limited' | 'smtp-error' = 'idle';
   @state() private mfaToken = '';
   @state() private mfaCode = '';
+  @state() private registrationEnabled = true;
 
   open() {
     this.view = 'choice';
@@ -36,6 +38,10 @@ export class AuthModal extends LitElement {
     this.resendState = 'idle';
     this.mfaToken = '';
     this.mfaCode = '';
+
+    configService.fetchConfig().then((config) => {
+      this.registrationEnabled = config.registrationEnabled;
+    });
 
     this.isOpen = true;
     document.body.style.overflow = 'hidden';
@@ -466,11 +472,14 @@ export class AuthModal extends LitElement {
           ${msg('Sign in with email and password')}
         </button>
 
-        <div class="divider"></div>
-
-        <button class="btn btn-secondary" @click=${this.handleRegisterChoice}>
-          ${msg('Create an account')}
-        </button>
+        ${this.registrationEnabled
+          ? html`
+            <div class="divider"></div>
+            <button class="btn btn-secondary" @click=${this.handleRegisterChoice}>
+              ${msg('Create an account')}
+            </button>
+          `
+          : ''}
       </div>
     `;
   }

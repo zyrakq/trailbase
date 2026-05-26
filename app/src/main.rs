@@ -27,10 +27,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _bun_watch = frontend::start(&settings.frontend, &manifest_dir.join("ui"))?;
 
     let trailbase::Server {
+        state,
         main_router,
         admin_router,
         tls,
-        ..
     } = trailbase::Server::init(trailbase::ServerOptions {
         data_dir: trailbase::DataDir(manifest_dir.join("traildepot")),
         address: settings.server.address.clone(),
@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     .await?;
 
     let router = axum::Router::new()
-        .merge(routes::build())
+        .merge(routes::build(state))
         .merge(main_router.1)
         .fallback_service(routes::static_files(&settings.frontend, &manifest_dir));
 
