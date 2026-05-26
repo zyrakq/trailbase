@@ -181,6 +181,16 @@ class AuthService {
   }
 
   /**
+   * Request a new verification email for an unverified account.
+   * Delegates to trailbaseService — rate-limited to once per 4 hours by TrailBase.
+   *
+   * @throws AuthError RATE_LIMITED or NETWORK_ERROR on failure
+   */
+  async resendVerificationEmail(email: string): Promise<void> {
+    await trailbaseService.resendVerificationEmail(email);
+  }
+
+  /**
    * Sign out the current user and clear local auth state.
    */
   async signOut(): Promise<void> {

@@ -192,6 +192,47 @@ class TrailBaseService {
   }
 
   /**
+   * Request a new verification email for an unverified account.
+   *
+   * Calls GET /api/auth/v1/verify_email/trigger — TrailBase rate-limits this
+   * to once per 4 hours per email address.
+   *
+   * @throws AuthError RATE_LIMITED if the 4-hour window has not elapsed
+   * @throws AuthError NETWORK_ERROR on fetch failure
+   */
+  async resendVerificationEmail(email: string): Promise<void> {
+    let response: Response;
+    try {
+      response = await fetch(
+        `/api/auth/v1/verify_email/trigger?email=${encodeURIComponent(email)}`,
+        { credentials: 'include' }
+      );
+    } catch {
+      throw new AuthError(
+        AuthErrorCode.NETWORK_ERROR,
+        'Network error during verification email resend'
+      );
+    }
+
+    if (response.ok) {
+      return;
+    }
+
+    if (response.status === 429) {
+      throw new AuthError(
+        AuthErrorCode.RATE_LIMITED,
+        'Verification email already sent recently'
+      );
+    }
+
+    const text = await response.text().catch(() => '');
+    throw new AuthError(
+      AuthErrorCode.UNKNOWN,
+      text || `Resend failed: ${response.status}`
+    );
+  }
+
+  /**
    * Redirect the browser to the OAuth provider login page.
    * TrailBase handles the full OIDC exchange at /api/auth/v1/oauth/<provider>/callback.
    * After auth, TrailBase sets the session cookie and redirects to redirectUri.

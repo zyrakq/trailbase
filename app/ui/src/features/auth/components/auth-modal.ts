@@ -20,6 +20,7 @@ export class AuthModal extends LitElement {
   @state() private showPassword = false;
   @state() private showConfirmPassword = false;
   @state() private registrationEmailSent = false;
+  @state() private resendState: 'idle' | 'loading' | 'sent' | 'rate-limited' = 'idle';
 
   open() {
     this.view = 'choice';
@@ -30,6 +31,7 @@ export class AuthModal extends LitElement {
     this.showPassword = false;
     this.showConfirmPassword = false;
     this.registrationEmailSent = false;
+    this.resendState = 'idle';
 
     this.isOpen = true;
     document.body.style.overflow = 'hidden';
@@ -109,6 +111,36 @@ export class AuthModal extends LitElement {
     this.showPassword = false;
     this.showConfirmPassword = false;
     this.registrationEmailSent = false;
+    this.resendState = 'idle';
+  }
+
+  private handleSignInInstead() {
+    // Keep email pre-filled — user just typed it in the register form
+    this.password = '';
+    this.confirmPassword = '';
+    this.showPassword = false;
+    this.showConfirmPassword = false;
+    this.errorMessage = '';
+    this.resendState = 'idle';
+    this.view = 'password';
+  }
+
+  private async handleResend() {
+    if (this.resendState === 'loading' || this.resendState === 'sent') return;
+    this.resendState = 'loading';
+    try {
+      await authService.resendVerificationEmail(this.email.trim());
+      this.resendState = 'sent';
+    } catch (error) {
+      if (
+        error instanceof AuthError &&
+        error.code === AuthErrorCode.RATE_LIMITED
+      ) {
+        this.resendState = 'rate-limited';
+      } else {
+        this.resendState = 'idle';
+      }
+    }
   }
 
   private togglePasswordVisibility(e: Event) {
@@ -471,27 +503,49 @@ export class AuthModal extends LitElement {
     return html`
       <div class="success-view">
         <div class="success-icon" aria-hidden="true">✓</div>
-        <p class="success-title">${msg('Account created!')}</p>
         ${this.registrationEmailSent
           ? html`
+              <p class="success-title">${msg('Check your inbox')}</p>
               <p class="success-message">
-                ${msg('A verification email has been sent to your address.')}
+                ${msg(
+                  "If this email isn't registered yet, a verification link has been sent. Please check your inbox and click the link to complete sign in."
+                )}
               </p>
-              <p class="success-message">
-                ${msg('Please check your inbox and follow the link to complete sign in.')}
-              </p>
+
+              ${this.resendState === 'sent'
+                ? html`<p class="resend-confirmation">${msg('Verification email resent.')}</p>`
+                : this.resendState === 'rate-limited'
+                  ? html`<p class="resend-rate-limited">
+                      ${msg('You can request a new link in a few hours.')}
+                    </p>`
+                  : ''}
+
+              <button
+                class="btn btn-secondary"
+                @click=${this.handleResend}
+                ?disabled=${this.resendState === 'loading' || this.resendState === 'sent' || this.resendState === 'rate-limited'}
+              >
+                ${this.resendState === 'loading'
+                  ? msg('Sending...')
+                  : msg('Resend verification email')}
+              </button>
+
+              <button class="btn btn-primary" @click=${this.handleSignInInstead}>
+                ${msg('Sign in instead')}
+              </button>
             `
           : html`
+              <p class="success-title">${msg('Account created')}</p>
               <p class="success-message">
                 ${msg('Your account has been created, but we could not send a verification email.')}
               </p>
               <p class="success-message">
                 ${msg('Please contact support to verify your account and complete sign in.')}
               </p>
+              <button class="btn btn-primary" @click=${this.close.bind(this)}>
+                ${msg('Close')}
+              </button>
             `}
-        <button class="btn btn-primary" @click=${this.close.bind(this)}>
-          ${msg('Close')}
-        </button>
       </div>
     `;
   }
@@ -773,6 +827,18 @@ export class AuthModal extends LitElement {
       color: var(--theme-color-text-secondary);
       margin: 0;
       line-height: 1.5;
+    }
+
+    .resend-confirmation {
+      font-size: 0.875rem;
+      color: var(--theme-color-success);
+      margin: 0;
+    }
+
+    .resend-rate-limited {
+      font-size: 0.875rem;
+      color: var(--theme-color-text-muted);
+      margin: 0;
     }
 
     .btn {
