@@ -147,15 +147,15 @@ class AuthService {
    * Register a new user with email and password.
    *
    * After successful registration, attempts to log the user in automatically.
-   * If auto-login fails or EMAIL_NOT_SENT is thrown (SMTP not configured),
-   * returns requiresVerification: true so the UI can show an appropriate message.
+   * Returns a result object indicating whether verification is required and
+   * whether the verification email was successfully sent.
    *
    * @throws AuthError — propagated from trailbaseService except EMAIL_NOT_SENT
    */
   async registerWithPassword(
     email: string,
     password: string
-  ): Promise<{ requiresVerification: boolean }> {
+  ): Promise<{ requiresVerification: boolean; emailSent: boolean }> {
     try {
       await trailbaseService.registerWithPassword(email, password);
     } catch (err) {
@@ -164,7 +164,7 @@ class AuthService {
         err instanceof AuthError &&
         err.code === AuthErrorCode.EMAIL_NOT_SENT
       ) {
-        return { requiresVerification: true };
+        return { requiresVerification: true, emailSent: false };
       }
       throw err;
     }
@@ -173,10 +173,10 @@ class AuthService {
     try {
       await trailbaseService.loginWithPassword(email, password);
       await this.refresh();
-      return { requiresVerification: false };
+      return { requiresVerification: false, emailSent: true };
     } catch {
-      // Registration succeeded but auto-login failed — likely requires email verification
-      return { requiresVerification: true };
+      // Registration succeeded but auto-login failed — email verification is pending
+      return { requiresVerification: true, emailSent: true };
     }
   }
 

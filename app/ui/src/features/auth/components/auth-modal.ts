@@ -19,6 +19,7 @@ export class AuthModal extends LitElement {
   @state() private confirmPassword = '';
   @state() private showPassword = false;
   @state() private showConfirmPassword = false;
+  @state() private registrationEmailSent = false;
 
   open() {
     this.view = 'choice';
@@ -28,6 +29,7 @@ export class AuthModal extends LitElement {
     this.confirmPassword = '';
     this.showPassword = false;
     this.showConfirmPassword = false;
+    this.registrationEmailSent = false;
 
     this.isOpen = true;
     document.body.style.overflow = 'hidden';
@@ -106,6 +108,7 @@ export class AuthModal extends LitElement {
     this.confirmPassword = '';
     this.showPassword = false;
     this.showConfirmPassword = false;
+    this.registrationEmailSent = false;
   }
 
   private togglePasswordVisibility(e: Event) {
@@ -199,6 +202,7 @@ export class AuthModal extends LitElement {
       const result = await authService.registerWithPassword(trimmedEmail, trimmedPassword);
 
       if (result.requiresVerification) {
+        this.registrationEmailSent = result.emailSent;
         this.view = 'register-success';
       } else {
         this.close();
@@ -468,12 +472,23 @@ export class AuthModal extends LitElement {
       <div class="success-view">
         <div class="success-icon" aria-hidden="true">✓</div>
         <p class="success-title">${msg('Account created!')}</p>
-        <p class="success-message">
-          ${msg('Your account has been created, but we could not send a verification email.')}
-        </p>
-        <p class="success-message">
-          ${msg('Please contact support to verify your account and complete sign in.')}
-        </p>
+        ${this.registrationEmailSent
+          ? html`
+              <p class="success-message">
+                ${msg('A verification email has been sent to your address.')}
+              </p>
+              <p class="success-message">
+                ${msg('Please check your inbox and follow the link to complete sign in.')}
+              </p>
+            `
+          : html`
+              <p class="success-message">
+                ${msg('Your account has been created, but we could not send a verification email.')}
+              </p>
+              <p class="success-message">
+                ${msg('Please contact support to verify your account and complete sign in.')}
+              </p>
+            `}
         <button class="btn btn-primary" @click=${this.close.bind(this)}>
           ${msg('Close')}
         </button>
