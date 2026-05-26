@@ -6,11 +6,11 @@ import { localizationService } from '@/features/localization';
 import '@/features/theme/services/favicon.service';
 
 // Import components (they will be registered as custom elements)
-import '@/pages/welcome-page';
-import '@/pages/dashboard-page';
-import '@/pages/profile-page';
+import '@/pages/welcome/index.ts';
+import '@/pages/dashboard/index.ts';
+import '@/pages/profile/index.ts';
 import '@/features/auth/components/oauth-callback';
-import '@/pages/reset-password-page';
+import '@/pages/reset-password/index.ts';
 import '@/features/notifications/components/toast-container';
 
 @customElement('app-component')

@@ -237,11 +237,54 @@ In-app toast notification system.
 ## Pages (`src/pages/`)
 
 Page components compose features and shared components into full-page layouts.
+Each page lives in its own folder. The `index.ts` is a thin orchestration shell;
+visual sections are extracted into self-contained block components under `blocks/`.
 
-| File | Route | Description |
+```
+pages/
+├── welcome/
+│   └── index.ts
+├── dashboard/
+│   ├── index.ts
+│   ├── index.styles.ts
+│   └── blocks/
+│       ├── user-info.ts
+│       └── notification-tests.ts
+├── profile/
+│   ├── index.ts
+│   ├── index.styles.ts
+│   └── blocks/
+│       ├── user-card.ts
+│       └── security-card.ts
+└── reset-password/
+    ├── index.ts
+    ├── index.styles.ts
+    └── blocks/
+        ├── password-form.ts
+        ├── success-state.ts
+        ├── invalid-token.ts
+        └── error-state.ts
+```
+
+| Folder | Route | Description |
 |---|---|---|
-| `welcome-page.ts` | `/` | Public landing page with `<auth-status>` |
-| `dashboard-page.ts` | `/dashboard` | Authenticated user dashboard (user info, sign-out, notification tests) |
+| `welcome/` | `/` | Public landing page with `<auth-status>` |
+| `dashboard/` | `/dashboard` | Authenticated user dashboard (user info, notification tests) |
+| `profile/` | `/profile` | User profile and TOTP security settings |
+| `reset-password/` | `/reset-password` | Password reset flow (form, success, invalid-token, error states) |
+
+**`index.ts` responsibilities**:
+
+- Declare page-level `@state()` properties
+- Call services (`authService`, `totpService`, etc.) on lifecycle hooks
+- Pass data to blocks as properties; listen for `CustomEvent`s from blocks
+- Render layout: `<app-header>`, block components, `<footer-info>`
+
+**Block component rules**:
+
+- Pure presentation — no direct service calls
+- Communicate up via `CustomEvent` (`bubbles: true, composed: true`)
+- Each block has its own `<block-name>.styles.ts` sibling file
 
 **Standard page shell pattern**:
 

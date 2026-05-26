@@ -11,7 +11,10 @@
 | Services: `kebab-case.service.ts` | `auth.service.ts`, `theme.service.ts` |
 | Controllers: `kebab-case.controller.ts` | `theme.controller.ts`, `locale.controller.ts` |
 | Types: `kebab-case.types.ts` | `auth.types.ts`, `notification.types.ts` |
-| Pages: `kebab-case-page.ts` | `dashboard-page.ts`, `welcome-page.ts` |
+| Pages: `page-name/index.ts` | `dashboard/index.ts`, `welcome/index.ts` |
+| Page styles: `page-name/index.styles.ts` | `dashboard/index.styles.ts` |
+| Page blocks: `page-name/blocks/section-name.ts` | `dashboard/blocks/user-info.ts` |
+| Block styles: `page-name/blocks/section-name.styles.ts` | `dashboard/blocks/user-info.styles.ts` |
 | Data files: `kebab-case.ts` | `locale-metadata.ts`, `locale-codes.ts` |
 | Utilities: `kebab-case.ts` | `prevent-fart.ts` |
 | CSS: `kebab-case.css` | `theme-variables.css` |
@@ -332,6 +335,52 @@ For flows with distinct outcomes (loading → success/error):
 // In template: switch on this.status
 ```
 
+### Conditional Rendering (if-else over nested ternaries)
+
+When `render()` needs to branch on state, extract a private `renderX()` helper
+that returns `TemplateResult`. Never use nested ternaries inside templates.
+
+```typescript
+import type { TemplateResult } from 'lit';
+
+// ✅ Correct — readable, easy to extend
+private renderMain(): TemplateResult {
+  if (this.status === 'success') {
+    return html`<my-success-block></my-success-block>`;
+  }
+
+  if (this.status === 'error') {
+    return html`<my-error-block></my-error-block>`;
+  }
+
+  return html`<my-form-block .error=${this.serverError}></my-form-block>`;
+}
+
+render() {
+  return html`<main>${this.renderMain()}</main>`;
+}
+
+// ❌ Wrong — deeply nested ternaries in template
+render() {
+  return html`
+    <main>
+      ${this.status === 'success'
+        ? html`<my-success-block></my-success-block>`
+        : this.status === 'error'
+          ? html`<my-error-block></my-error-block>`
+          : html`<my-form-block></my-form-block>`}
+    </main>
+  `;
+}
+```
+
+A single inline ternary is acceptable when the two branches are short:
+
+```typescript
+// ✅ OK — simple, fits on one line
+html`<button ?disabled=${this.loading}>${this.loading ? msg('Saving...') : msg('Save')}</button>`
+```
+
 ### Fetch Pattern
 
 ```typescript
@@ -451,7 +500,7 @@ No test infrastructure exists yet. When adding tests:
 - Use `finally` to reset `loading` state
 - Declare `HTMLElementTagNameMap` at the bottom of every component file
 - Write all comments, docs, and strings in English
-- Extract `static styles` to a sibling `<name>.styles.ts` file — never inline CSS in component files
+- Extract `static styles` to a sibling `<name>.styles.ts` file — applies to components, pages (`index.styles.ts`), and blocks
 
 ### Don't
 
@@ -464,4 +513,5 @@ No test infrastructure exists yet. When adding tests:
 - Add `I` prefix to interface names (`IUser` → `User`)
 - Use `any` type (strict TypeScript is enforced)
 - Leave unused variables or parameters (TypeScript strict mode will error)
-- Put `static styles = css\`...\`` inline inside a component file
+- Put `static styles = css\`...\`` inline inside a component file (components, pages, or blocks)
+- Use nested ternaries inside `html\`...\`` templates — use private `renderX()` helpers instead
