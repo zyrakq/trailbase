@@ -119,6 +119,7 @@ class TrailBaseService {
   /**
    * Register a new user with email and password.
    *
+   * TrailBase requires `password_repeat` matching `password` in the request body.
    * Uses JSON POST to /api/auth/v1/register. TrailBase may require email
    * verification depending on server configuration — in that case the user
    * will not be immediately authenticated after registration.
@@ -132,7 +133,7 @@ class TrailBaseService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, password_repeat: password }),
       });
     } catch {
       throw new AuthError(AuthErrorCode.NETWORK_ERROR, 'Network error during registration');
@@ -146,7 +147,7 @@ class TrailBaseService {
     if (response.status === 409 || text.toLowerCase().includes('already')) {
       throw new AuthError(AuthErrorCode.EMAIL_TAKEN, 'Email already registered');
     }
-    if (response.status === 400 && text.toLowerCase().includes('password')) {
+    if (response.status === 400 && text.toLowerCase().includes('too short')) {
       throw new AuthError(AuthErrorCode.WEAK_PASSWORD, 'Password does not meet requirements');
     }
     if (response.status === 403) {
