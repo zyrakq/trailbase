@@ -1,39 +1,11 @@
 # Project Structure
 
-## Brief overview
+See [ARCHITECTURE.md — Frontend Structure](../ARCHITECTURE.md#frontend-structure-appui) and
+[ARCHITECTURE.md — Feature Modules](../ARCHITECTURE.md#feature-modules-srcfeatures) for the
+full directory layout, feature structure, and path aliases.
 
-Feature-based modular architecture preparing for future microfrontend migration.
+## Component placement guidance
 
-## Core principles
-
-- Isolation: Each feature is self-contained with its own components, services, types
-- Public API: Features export via index.ts - only documented interfaces are public
-- Scalability: Easy to extract features into separate packages later
-
-## Directory organization
-
-- `features/` - Isolated functional modules (auth, notifications, etc.)
-- `pages/` - Top-level page components
-- `shared/` - Reusable UI components not tied to specific features
-- `assets/` - Static resources (images, icons, etc.)
-
-## Feature structure
-
-Each feature contains:
-
-- `components/` - Feature-specific components
-- `services/` - Business logic and API calls
-- `types/` - TypeScript interfaces
-- `index.ts` - Public API exports only
-
-## Path strategy
-
-- Intra-feature: relative paths
-- Inter-feature: path aliases (`@/features/*`, `@/pages/*`, `@/shared/*`)
-
-## Component reusability
-
-- High-reuse components → `features/` (with own services, types)
-- Simple UI components → `shared/`
-- Examples: theme toggler, form inputs, modals, data tables
+- High-reuse components with their own services/types → `features/`
+- Simple, stateless UI elements → `shared/`
 - Always consider portability when designing components
