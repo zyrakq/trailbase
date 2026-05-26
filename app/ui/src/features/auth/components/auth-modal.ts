@@ -20,7 +20,7 @@ export class AuthModal extends LitElement {
   @state() private showPassword = false;
   @state() private showConfirmPassword = false;
   @state() private registrationEmailSent = false;
-  @state() private resendState: 'idle' | 'loading' | 'sent' | 'rate-limited' = 'idle';
+  @state() private resendState: 'idle' | 'loading' | 'sent' | 'rate-limited' | 'smtp-error' = 'idle';
 
   open() {
     this.view = 'choice';
@@ -132,11 +132,14 @@ export class AuthModal extends LitElement {
       await authService.resendVerificationEmail(this.email.trim());
       this.resendState = 'sent';
     } catch (error) {
-      if (
-        error instanceof AuthError &&
-        error.code === AuthErrorCode.RATE_LIMITED
-      ) {
-        this.resendState = 'rate-limited';
+      if (error instanceof AuthError) {
+        if (error.code === AuthErrorCode.RATE_LIMITED) {
+          this.resendState = 'rate-limited';
+        } else if (error.code === AuthErrorCode.EMAIL_NOT_SENT) {
+          this.resendState = 'smtp-error';
+        } else {
+          this.resendState = 'idle';
+        }
       } else {
         this.resendState = 'idle';
       }
@@ -518,12 +521,16 @@ export class AuthModal extends LitElement {
                   ? html`<p class="resend-rate-limited">
                       ${msg('You can request a new link in a few hours.')}
                     </p>`
-                  : ''}
+                  : this.resendState === 'smtp-error'
+                    ? html`<p class="resend-smtp-error">
+                        ${msg('Could not send the email. Please contact support.')}
+                      </p>`
+                    : ''}
 
               <button
                 class="btn btn-secondary"
                 @click=${this.handleResend}
-                ?disabled=${this.resendState === 'loading' || this.resendState === 'sent' || this.resendState === 'rate-limited'}
+                ?disabled=${this.resendState === 'loading' || this.resendState === 'sent' || this.resendState === 'rate-limited' || this.resendState === 'smtp-error'}
               >
                 ${this.resendState === 'loading'
                   ? msg('Sending...')
@@ -838,6 +845,12 @@ export class AuthModal extends LitElement {
     .resend-rate-limited {
       font-size: 0.875rem;
       color: var(--theme-color-text-muted);
+      margin: 0;
+    }
+
+    .resend-smtp-error {
+      font-size: 0.875rem;
+      color: var(--theme-color-error);
       margin: 0;
     }
 

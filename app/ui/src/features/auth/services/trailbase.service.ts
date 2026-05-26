@@ -225,6 +225,13 @@ class TrailBaseService {
       );
     }
 
+    if (response.status === 424) {
+      throw new AuthError(
+        AuthErrorCode.EMAIL_NOT_SENT,
+        'Verification email could not be sent'
+      );
+    }
+
     const text = await response.text().catch(() => '');
     throw new AuthError(
       AuthErrorCode.UNKNOWN,

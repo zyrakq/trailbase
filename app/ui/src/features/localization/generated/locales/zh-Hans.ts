@@ -89,6 +89,7 @@
 's8d85cfe2f59f0366': `If this email isn't registered yet, a verification link has been sent. Please check your inbox and click the link to complete sign in.`,
 's86c6967126989c25': `Verification email resent.`,
 's18db9d04bed5f64b': `You can request a new link in a few hours.`,
+'s3e59d1d45febe1b3': `Could not send the email. Please contact support.`,
 's686306cdb839fb8d': `Sending...`,
 's97ee1bd2cffede65': `Resend verification email`,
 'sb6a33664b18e690d': `Sign in instead`,
