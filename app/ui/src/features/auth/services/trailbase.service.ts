@@ -117,6 +117,45 @@ class TrailBaseService {
   }
 
   /**
+   * Register a new user with email and password.
+   *
+   * Uses JSON POST to /api/auth/v1/register. TrailBase may require email
+   * verification depending on server configuration — in that case the user
+   * will not be immediately authenticated after registration.
+   *
+   * @throws AuthError with a typed code on failure
+   */
+  async registerWithPassword(email: string, password: string): Promise<void> {
+    let response: Response;
+    try {
+      response = await fetch('/api/auth/v1/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+    } catch {
+      throw new AuthError(AuthErrorCode.NETWORK_ERROR, 'Network error during registration');
+    }
+
+    if (response.ok) {
+      return;
+    }
+
+    const text = await response.text().catch(() => '');
+    if (response.status === 409 || text.toLowerCase().includes('already')) {
+      throw new AuthError(AuthErrorCode.EMAIL_TAKEN, 'Email already registered');
+    }
+    if (response.status === 400 && text.toLowerCase().includes('password')) {
+      throw new AuthError(AuthErrorCode.WEAK_PASSWORD, 'Password does not meet requirements');
+    }
+    if (response.status === 403) {
+      throw new AuthError(AuthErrorCode.REGISTRATION_DISABLED, 'Registration is disabled');
+    }
+    throw new AuthError(AuthErrorCode.UNKNOWN, text || `Registration failed: ${response.status}`);
+  }
+
+  /**
    * Redirect the browser to the OAuth provider login page.
    * TrailBase handles the full OIDC exchange at /api/auth/v1/oauth/<provider>/callback.
    * After auth, TrailBase sets the session cookie and redirects to redirectUri.

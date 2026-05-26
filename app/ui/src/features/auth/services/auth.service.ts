@@ -142,6 +142,34 @@ class AuthService {
   }
 
   /**
+   * Register a new user with email and password.
+   *
+   * After successful registration, attempts to log the user in automatically.
+   * If auto-login fails (e.g. email verification required), the error is
+   * swallowed and the caller receives a successful registration signal.
+   *
+   * @param email - User email address
+   * @param password - User password
+   * @throws AuthError — propagated from trailbaseService (typed codes)
+   */
+  async registerWithPassword(
+    email: string,
+    password: string
+  ): Promise<{ requiresVerification: boolean }> {
+    await trailbaseService.registerWithPassword(email, password);
+
+    // Attempt auto-login after registration
+    try {
+      await trailbaseService.loginWithPassword(email, password);
+      await this.refresh();
+      return { requiresVerification: false };
+    } catch {
+      // Registration succeeded but auto-login failed — likely requires email verification
+      return { requiresVerification: true };
+    }
+  }
+
+  /**
    * Sign out the current user and clear local auth state.
    */
   async signOut(): Promise<void> {

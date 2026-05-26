@@ -6,8 +6,7 @@ import { authService } from '../services/auth.service';
 import { AuthError, AuthErrorCode } from '../types/auth-error';
 import { OIDC_PROVIDERS, type OIDCProvider } from '../config/auth-providers';
 
-// 'error' ViewState removed — errors are shown via errorMessage while in 'password' view
-type ViewState = 'choice' | 'password' | 'loading';
+type ViewState = 'choice' | 'password' | 'loading' | 'register' | 'register-loading' | 'register-success';
 
 @customElement('auth-modal')
 @localized()
@@ -17,20 +16,22 @@ export class AuthModal extends LitElement {
   @state() private errorMessage = '';
   @state() private email = '';
   @state() private password = '';
+  @state() private confirmPassword = '';
   @state() private showPassword = false;
+  @state() private showConfirmPassword = false;
 
   open() {
-    // Reset to clean choice state on every open (supports reuse)
     this.view = 'choice';
     this.errorMessage = '';
     this.email = '';
     this.password = '';
+    this.confirmPassword = '';
     this.showPassword = false;
+    this.showConfirmPassword = false;
 
     this.isOpen = true;
     document.body.style.overflow = 'hidden';
 
-    // Pause toasts (matches NotificationModal contract exactly)
     window.dispatchEvent(
       new CustomEvent('modal-opened', {
         bubbles: true,
@@ -43,7 +44,6 @@ export class AuthModal extends LitElement {
     this.isOpen = false;
     document.body.style.overflow = '';
 
-    // Resume toasts
     window.dispatchEvent(
       new CustomEvent('modal-closed', {
         bubbles: true,
@@ -83,9 +83,6 @@ export class AuthModal extends LitElement {
 
   private handleOIDC(provider: OIDCProvider) {
     this.close();
-    // TrailBase handles the OAuth exchange at /api/auth/v1/oauth/<provider>/callback.
-    // /auth/callback is our SPA landing page — TrailBase redirects here after setting
-    // the session cookie. oauth-callback.ts then calls authService.refresh().
     authService.signIn(provider.key, '/auth/callback').catch(() => {
       window.dispatchEvent(
         new CustomEvent('notification-add', {
@@ -106,17 +103,34 @@ export class AuthModal extends LitElement {
     this.errorMessage = '';
   }
 
+  private handleRegisterChoice() {
+    this.view = 'register';
+    this.errorMessage = '';
+    this.email = '';
+    this.password = '';
+    this.confirmPassword = '';
+    this.showPassword = false;
+    this.showConfirmPassword = false;
+  }
+
   private handleBack() {
     this.view = 'choice';
     this.errorMessage = '';
     this.email = '';
     this.password = '';
+    this.confirmPassword = '';
     this.showPassword = false;
+    this.showConfirmPassword = false;
   }
 
   private togglePasswordVisibility(e: Event) {
     e.preventDefault();
     this.showPassword = !this.showPassword;
+  }
+
+  private toggleConfirmPasswordVisibility(e: Event) {
+    e.preventDefault();
+    this.showConfirmPassword = !this.showConfirmPassword;
   }
 
   private async handlePasswordSubmit(e: Event) {
@@ -138,8 +152,6 @@ export class AuthModal extends LitElement {
     try {
       await authService.loginWithPassword(trimmedEmail, trimmedPassword);
 
-      // Auth state updated in authService — close modal and show success notification.
-      // The session cookie has been set by TrailBase and will survive page reloads.
       this.close();
       window.dispatchEvent(
         new CustomEvent('notification-add', {
@@ -154,7 +166,6 @@ export class AuthModal extends LitElement {
         })
       );
     } catch (error) {
-      // Switch on typed AuthErrorCode — no substring matching
       if (error instanceof AuthError) {
         switch (error.code) {
           case AuthErrorCode.INVALID_CREDENTIALS:
@@ -177,20 +188,103 @@ export class AuthModal extends LitElement {
         this.errorMessage = msg('Sign in failed. Please try again.');
       }
 
-      this.view = 'password'; // Stay in form for retry or back
+      this.view = 'password';
+    }
+  }
+
+  private async handleRegisterSubmit(e: Event) {
+    e.preventDefault();
+
+    if (this.view === 'register-loading') return;
+
+    const trimmedEmail = this.email.trim();
+    const trimmedPassword = this.password;
+    const trimmedConfirm = this.confirmPassword;
+
+    if (!trimmedEmail || !trimmedPassword || !trimmedConfirm) {
+      this.errorMessage = msg('Please fill in all fields.');
+      return;
+    }
+
+    if (trimmedPassword !== trimmedConfirm) {
+      this.errorMessage = msg('Passwords do not match.');
+      return;
+    }
+
+    this.view = 'register-loading';
+    this.errorMessage = '';
+
+    try {
+      const result = await authService.registerWithPassword(trimmedEmail, trimmedPassword);
+
+      if (result.requiresVerification) {
+        this.view = 'register-success';
+      } else {
+        this.close();
+        window.dispatchEvent(
+          new CustomEvent('notification-add', {
+            detail: {
+              id: `register-success-${Date.now()}`,
+              message: msg('Account created and signed in successfully.'),
+              type: 'success' as const,
+              duration: 4000,
+            },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      }
+    } catch (error) {
+      if (error instanceof AuthError) {
+        switch (error.code) {
+          case AuthErrorCode.EMAIL_TAKEN:
+            this.errorMessage = msg('This email is already registered. Please sign in instead.');
+            break;
+          case AuthErrorCode.WEAK_PASSWORD:
+            this.errorMessage = msg('Password does not meet requirements. Please choose a stronger password.');
+            break;
+          case AuthErrorCode.REGISTRATION_DISABLED:
+            this.errorMessage = msg('Registration is currently disabled. Please contact an administrator.');
+            break;
+          case AuthErrorCode.NETWORK_ERROR:
+            this.errorMessage = msg(
+              'Unable to connect. Please check your internet connection and try again.'
+            );
+            break;
+          default:
+            this.errorMessage = msg('Registration failed. Please try again.');
+        }
+      } else {
+        this.errorMessage = msg('Registration failed. Please try again.');
+      }
+
+      this.view = 'register';
     }
   }
 
   private handleEmailInput(e: Event) {
     const target = e.target as HTMLInputElement;
     this.email = target.value;
-    if (this.errorMessage) this.errorMessage = ''; // Clear on edit
+    if (this.errorMessage) this.errorMessage = '';
   }
 
   private handlePasswordInput(e: Event) {
     const target = e.target as HTMLInputElement;
     this.password = target.value;
-    if (this.errorMessage) this.errorMessage = ''; // Clear on edit
+    if (this.errorMessage) this.errorMessage = '';
+  }
+
+  private handleConfirmPasswordInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    this.confirmPassword = target.value;
+    if (this.errorMessage) this.errorMessage = '';
+  }
+
+  private get modalTitle(): string {
+    if (this.view === 'register' || this.view === 'register-loading' || this.view === 'register-success') {
+      return msg('Create account');
+    }
+    return msg('Sign in');
   }
 
   render() {
@@ -200,11 +294,11 @@ export class AuthModal extends LitElement {
       <div class="modal-overlay" @click=${this.handleOverlayClick}>
         <div class="modal-card">
           <div class="modal-header">
-            <span class="modal-title">${msg('Sign in')}</span>
+            <span class="modal-title">${this.modalTitle}</span>
             <button
               class="modal-close"
               @click=${(e: Event) => this.handleClose(e)}
-              aria-label=${msg('Close sign in dialog')}
+              aria-label=${msg('Close dialog')}
             >
               ✕
             </button>
@@ -212,7 +306,11 @@ export class AuthModal extends LitElement {
           <div class="modal-content">
             ${this.view === 'choice'
               ? this.renderChoiceView()
-              : this.renderPasswordView()}
+              : this.view === 'register' || this.view === 'register-loading'
+                ? this.renderRegisterView()
+                : this.view === 'register-success'
+                  ? this.renderRegisterSuccessView()
+                  : this.renderPasswordView()}
           </div>
         </div>
       </div>
@@ -232,6 +330,12 @@ export class AuthModal extends LitElement {
 
         <button class="btn btn-primary" @click=${this.handlePasswordChoice}>
           ${msg('Sign in with email and password')}
+        </button>
+
+        <div class="divider"></div>
+
+        <button class="btn btn-secondary" @click=${this.handleRegisterChoice}>
+          ${msg('Create an account')}
         </button>
       </div>
     `;
@@ -297,6 +401,110 @@ export class AuthModal extends LitElement {
       <button class="back-link" @click=${this.handleBack} ?disabled=${isLoading}>
         ${msg('Back to sign in options')}
       </button>
+    `;
+  }
+
+  private renderRegisterView() {
+    const isLoading = this.view === 'register-loading';
+
+    return html`
+      <form class="password-form" @submit=${this.handleRegisterSubmit}>
+        <div class="form-field">
+          <label for="reg-email">${msg('Email address')}</label>
+          <input
+            id="reg-email"
+            type="email"
+            autocomplete="email"
+            .value=${this.email}
+            @input=${this.handleEmailInput}
+            ?disabled=${isLoading}
+            required
+          />
+        </div>
+
+        <div class="form-field password-field">
+          <label for="reg-password">${msg('Password')}</label>
+          <div class="password-input-wrapper">
+            <input
+              id="reg-password"
+              type=${this.showPassword ? 'text' : 'password'}
+              autocomplete="new-password"
+              .value=${this.password}
+              @input=${this.handlePasswordInput}
+              ?disabled=${isLoading}
+              required
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              @click=${this.togglePasswordVisibility}
+              aria-label=${this.showPassword
+                ? msg('Hide password')
+                : msg('Show password')}
+              ?disabled=${isLoading}
+            >
+              ${this.showPassword ? this.eyeSlashIcon() : this.eyeIcon()}
+            </button>
+          </div>
+        </div>
+
+        <div class="form-field password-field">
+          <label for="reg-confirm-password">${msg('Confirm password')}</label>
+          <div class="password-input-wrapper">
+            <input
+              id="reg-confirm-password"
+              type=${this.showConfirmPassword ? 'text' : 'password'}
+              autocomplete="new-password"
+              .value=${this.confirmPassword}
+              @input=${this.handleConfirmPasswordInput}
+              ?disabled=${isLoading}
+              required
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              @click=${this.toggleConfirmPasswordVisibility}
+              aria-label=${this.showConfirmPassword
+                ? msg('Hide password')
+                : msg('Show password')}
+              ?disabled=${isLoading}
+            >
+              ${this.showConfirmPassword ? this.eyeSlashIcon() : this.eyeIcon()}
+            </button>
+          </div>
+        </div>
+
+        ${this.errorMessage
+          ? html`<div class="error-message" role="alert">${this.errorMessage}</div>`
+          : ''}
+
+        <button
+          type="submit"
+          class="btn btn-primary"
+          ?disabled=${isLoading}
+        >
+          ${isLoading ? msg('Creating account...') : msg('Create account')}
+        </button>
+      </form>
+
+      <button class="back-link" @click=${this.handleBack} ?disabled=${isLoading}>
+        ${msg('Back to sign in options')}
+      </button>
+    `;
+  }
+
+  private renderRegisterSuccessView() {
+    return html`
+      <div class="success-view">
+        <div class="success-icon" aria-hidden="true">✓</div>
+        <p class="success-title">${msg('Account created!')}</p>
+        <p class="success-message">
+          ${msg('Please check your email to verify your account before signing in.')}
+        </p>
+        <button class="btn btn-primary" @click=${this.handleBack}>
+          ${msg('Sign in')}
+        </button>
+      </div>
     `;
   }
 
@@ -449,7 +657,14 @@ export class AuthModal extends LitElement {
       gap: 0.75rem;
     }
 
-    /* Password form */
+    .divider {
+      height: 1px;
+      background: var(--theme-color-border);
+      margin: 0.25rem 0;
+      transition: background-color 0.2s ease;
+    }
+
+    /* Password / Register form */
     .password-form {
       display: flex;
       flex-direction: column;
@@ -479,8 +694,6 @@ export class AuthModal extends LitElement {
       border: 1px solid var(--theme-color-border);
       border-radius: 6px;
       box-sizing: border-box;
-      /* Standard form element reset ensures consistent sizing inside Lit shadow DOM */
-      /* (global * { box-sizing } in index.css does not pierce shadow roots) */
       margin: 0;
       transition:
         background-color 0.2s ease,
@@ -503,13 +716,12 @@ export class AuthModal extends LitElement {
     .password-field .password-input-wrapper {
       position: relative;
       display: flex;
-      /* wrapper provides layout only; input itself must declare box model */
       align-items: center;
     }
 
     .password-field input {
       padding-right: 2.5rem;
-      box-sizing: border-box; /* guarantee no overflow even with extra right padding for toggle */
+      box-sizing: border-box;
     }
 
     .password-toggle {
@@ -577,7 +789,44 @@ export class AuthModal extends LitElement {
       cursor: not-allowed;
     }
 
-    /* Primary buttons (match auth-status + theme rules exactly) */
+    /* Success view */
+    .success-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0;
+      text-align: center;
+    }
+
+    .success-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--theme-color-success);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .success-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--theme-color-text-primary);
+      margin: 0;
+    }
+
+    .success-message {
+      font-size: 0.875rem;
+      color: var(--theme-color-text-secondary);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    /* Primary and secondary buttons */
     .btn {
       padding: 0.75rem 1.5rem;
       font-size: 0.9375rem;
@@ -606,6 +855,16 @@ export class AuthModal extends LitElement {
 
     .btn-primary:active:not(:disabled) {
       background: var(--theme-color-primary-active);
+    }
+
+    .btn-secondary {
+      background: var(--theme-color-surface);
+      color: var(--theme-color-text-primary);
+      border: 1px solid var(--theme-color-border);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--theme-color-background);
     }
 
     @media (max-width: 640px) {
