@@ -6,13 +6,13 @@ import { configService } from '../services/config.service';
 import { authModalStyles } from './auth-modal.styles';
 
 // Sub-component side-effect imports — registers the custom elements.
-import './auth-choice-view';
-import './auth-password-view';
-import './auth-register-view';
-import './auth-register-success-view';
-import './auth-mfa-view';
-import './auth-forgot-password-view';
-import './auth-forgot-password-sent-view';
+import './views/auth-choice-view';
+import './views/auth-password-view';
+import './views/auth-register-view';
+import './views/auth-register-success-view';
+import './views/auth-mfa-view';
+import './views/auth-forgot-password-view';
+import './views/auth-forgot-password-sent-view';
 
 type ViewState =
   | 'choice'

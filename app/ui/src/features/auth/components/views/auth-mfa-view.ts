@@ -1,10 +1,10 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
-import { authService } from '../services/auth.service';
-import { AuthError, AuthErrorCode } from '../types/auth-error';
-import { authModalStyles } from './auth-modal.styles';
+import { authService } from '../../services/auth.service';
+import { AuthError, AuthErrorCode } from '../../types/auth-error';
+import { authSharedStyles } from '../auth-shared.styles';
 
 /**
  * MFA / TOTP verification view.
@@ -111,7 +111,16 @@ export class AuthMfaView extends LitElement {
     `;
   }
 
-  static styles = authModalStyles;
+  static styles = [
+    authSharedStyles,
+    css`
+      .password-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+    `,
+  ];
 }
 
 declare global {

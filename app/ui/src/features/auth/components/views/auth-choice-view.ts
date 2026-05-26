@@ -1,10 +1,10 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { msg, str } from '@lit/localize';
 import { localized } from '@/features/localization';
-import { authService } from '../services/auth.service';
-import { OIDC_PROVIDERS, type OIDCProvider } from '../config/auth-providers';
-import { authModalStyles } from './auth-modal.styles';
+import { authService } from '../../services/auth.service';
+import { OIDC_PROVIDERS, type OIDCProvider } from '../../config/auth-providers';
+import { authSharedStyles } from '../auth-shared.styles';
 
 /**
  * Choice view — OIDC buttons, email/password sign-in, optional registration.
@@ -68,7 +68,23 @@ export class AuthChoiceView extends LitElement {
     `;
   }
 
-  static styles = authModalStyles;
+  static styles = [
+    authSharedStyles,
+    css`
+      .choice-view {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .divider {
+        height: 1px;
+        background: var(--theme-color-border);
+        margin: 0.25rem 0;
+        transition: background-color 0.2s ease;
+      }
+    `,
+  ];
 }
 
 declare global {
