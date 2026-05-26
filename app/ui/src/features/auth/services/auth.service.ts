@@ -1,5 +1,6 @@
 import type { AuthState, User } from '../types/auth.types';
 import { trailbaseService, type TrailBaseUser } from './trailbase.service';
+import { AuthError, AuthErrorCode } from '../types/auth-error';
 
 // Side-effect import: ensures <auth-modal> custom element is registered
 // before any code attempts to create one via showLogin().
@@ -106,7 +107,10 @@ class AuthService {
    * @param provider - OAuth provider key (default: 'oidc0')
    * @param redirectUri - Where to redirect after successful login
    */
-  async signIn(provider: string = 'oidc0', redirectUri?: string): Promise<void> {
+  async signIn(
+    provider: string = 'oidc0',
+    redirectUri?: string
+  ): Promise<void> {
     await trailbaseService.login(provider, redirectUri);
   }
 
@@ -135,9 +139,7 @@ class AuthService {
    * @throws AuthError — propagated from trailbaseService (typed codes)
    */
   async loginWithPassword(email: string, password: string): Promise<void> {
-    // Form POST — sets COOKIE_AUTH_TOKEN and COOKIE_REFRESH_TOKEN
     await trailbaseService.loginWithPassword(email, password);
-    // Cookie is now set; read it back to populate auth state immediately
     await this.refresh();
   }
 
@@ -145,18 +147,27 @@ class AuthService {
    * Register a new user with email and password.
    *
    * After successful registration, attempts to log the user in automatically.
-   * If auto-login fails (e.g. email verification required), the error is
-   * swallowed and the caller receives a successful registration signal.
+   * If auto-login fails or EMAIL_NOT_SENT is thrown (SMTP not configured),
+   * returns requiresVerification: true so the UI can show an appropriate message.
    *
-   * @param email - User email address
-   * @param password - User password
-   * @throws AuthError — propagated from trailbaseService (typed codes)
+   * @throws AuthError — propagated from trailbaseService except EMAIL_NOT_SENT
    */
   async registerWithPassword(
     email: string,
     password: string
   ): Promise<{ requiresVerification: boolean }> {
-    await trailbaseService.registerWithPassword(email, password);
+    try {
+      await trailbaseService.registerWithPassword(email, password);
+    } catch (err) {
+      // 424: account was created but verification email failed (e.g. no SMTP)
+      if (
+        err instanceof AuthError &&
+        err.code === AuthErrorCode.EMAIL_NOT_SENT
+      ) {
+        return { requiresVerification: true };
+      }
+      throw err;
+    }
 
     // Attempt auto-login after registration
     try {

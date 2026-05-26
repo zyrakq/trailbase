@@ -32,30 +32,17 @@ export class AuthModal extends LitElement {
     this.isOpen = true;
     document.body.style.overflow = 'hidden';
 
-    window.dispatchEvent(
-      new CustomEvent('modal-opened', {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    window.dispatchEvent(new CustomEvent('modal-opened', { bubbles: true, composed: true }));
   }
 
   close() {
     this.isOpen = false;
     document.body.style.overflow = '';
-
-    window.dispatchEvent(
-      new CustomEvent('modal-closed', {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    window.dispatchEvent(new CustomEvent('modal-closed', { bubbles: true, composed: true }));
   }
 
   private handleOverlayClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      this.close();
-    }
+    if (e.target === e.currentTarget) this.close();
   }
 
   private handleClose(e: Event) {
@@ -65,9 +52,7 @@ export class AuthModal extends LitElement {
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && this.isOpen) {
-      this.close();
-    }
+    if (e.key === 'Escape' && this.isOpen) this.close();
   };
 
   connectedCallback() {
@@ -135,7 +120,6 @@ export class AuthModal extends LitElement {
 
   private async handlePasswordSubmit(e: Event) {
     e.preventDefault();
-
     if (this.view === 'loading') return;
 
     const trimmedEmail = this.email.trim();
@@ -151,7 +135,6 @@ export class AuthModal extends LitElement {
 
     try {
       await authService.loginWithPassword(trimmedEmail, trimmedPassword);
-
       this.close();
       window.dispatchEvent(
         new CustomEvent('notification-add', {
@@ -187,14 +170,12 @@ export class AuthModal extends LitElement {
       } else {
         this.errorMessage = msg('Sign in failed. Please try again.');
       }
-
       this.view = 'password';
     }
   }
 
   private async handleRegisterSubmit(e: Event) {
     e.preventDefault();
-
     if (this.view === 'register-loading') return;
 
     const trimmedEmail = this.email.trim();
@@ -257,7 +238,6 @@ export class AuthModal extends LitElement {
       } else {
         this.errorMessage = msg('Registration failed. Please try again.');
       }
-
       this.view = 'register';
     }
   }
@@ -281,7 +261,11 @@ export class AuthModal extends LitElement {
   }
 
   private get modalTitle(): string {
-    if (this.view === 'register' || this.view === 'register-loading' || this.view === 'register-success') {
+    if (
+      this.view === 'register' ||
+      this.view === 'register-loading' ||
+      this.view === 'register-success'
+    ) {
       return msg('Create account');
     }
     return msg('Sign in');
@@ -375,9 +359,7 @@ export class AuthModal extends LitElement {
               type="button"
               class="password-toggle"
               @click=${this.togglePasswordVisibility}
-              aria-label=${this.showPassword
-                ? msg('Hide password')
-                : msg('Show password')}
+              aria-label=${this.showPassword ? msg('Hide password') : msg('Show password')}
               ?disabled=${isLoading}
             >
               ${this.showPassword ? this.eyeSlashIcon() : this.eyeIcon()}
@@ -389,11 +371,7 @@ export class AuthModal extends LitElement {
           ? html`<div class="error-message" role="alert">${this.errorMessage}</div>`
           : ''}
 
-        <button
-          type="submit"
-          class="btn btn-primary"
-          ?disabled=${isLoading}
-        >
+        <button type="submit" class="btn btn-primary" ?disabled=${isLoading}>
           ${isLoading ? msg('Signing in...') : msg('Sign in')}
         </button>
       </form>
@@ -438,9 +416,7 @@ export class AuthModal extends LitElement {
               type="button"
               class="password-toggle"
               @click=${this.togglePasswordVisibility}
-              aria-label=${this.showPassword
-                ? msg('Hide password')
-                : msg('Show password')}
+              aria-label=${this.showPassword ? msg('Hide password') : msg('Show password')}
               ?disabled=${isLoading}
             >
               ${this.showPassword ? this.eyeSlashIcon() : this.eyeIcon()}
@@ -464,9 +440,7 @@ export class AuthModal extends LitElement {
               type="button"
               class="password-toggle"
               @click=${this.toggleConfirmPasswordVisibility}
-              aria-label=${this.showConfirmPassword
-                ? msg('Hide password')
-                : msg('Show password')}
+              aria-label=${this.showConfirmPassword ? msg('Hide password') : msg('Show password')}
               ?disabled=${isLoading}
             >
               ${this.showConfirmPassword ? this.eyeSlashIcon() : this.eyeIcon()}
@@ -478,11 +452,7 @@ export class AuthModal extends LitElement {
           ? html`<div class="error-message" role="alert">${this.errorMessage}</div>`
           : ''}
 
-        <button
-          type="submit"
-          class="btn btn-primary"
-          ?disabled=${isLoading}
-        >
+        <button type="submit" class="btn btn-primary" ?disabled=${isLoading}>
           ${isLoading ? msg('Creating account...') : msg('Create account')}
         </button>
       </form>
@@ -499,10 +469,13 @@ export class AuthModal extends LitElement {
         <div class="success-icon" aria-hidden="true">✓</div>
         <p class="success-title">${msg('Account created!')}</p>
         <p class="success-message">
-          ${msg('Please check your email to verify your account before signing in.')}
+          ${msg('Your account has been created, but we could not send a verification email.')}
         </p>
-        <button class="btn btn-primary" @click=${this.handleBack}>
-          ${msg('Sign in')}
+        <p class="success-message">
+          ${msg('Please contact support to verify your account and complete sign in.')}
+        </p>
+        <button class="btn btn-primary" @click=${this.close.bind(this)}>
+          ${msg('Close')}
         </button>
       </div>
     `;
@@ -510,17 +483,8 @@ export class AuthModal extends LitElement {
 
   private eyeIcon() {
     return html`
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
         <circle cx="12" cy="12" r="3" />
       </svg>
@@ -529,17 +493,8 @@ export class AuthModal extends LitElement {
 
   private eyeSlashIcon() {
     return html`
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9 9 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
         <line x1="1" y1="1" x2="23" y2="23" />
       </svg>
@@ -568,12 +523,8 @@ export class AuthModal extends LitElement {
     }
 
     @keyframes fadeIn {
-      from {
-        opacity: 0;
-      }
-      to {
-        opacity: 1;
-      }
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     .modal-card {
@@ -585,20 +536,12 @@ export class AuthModal extends LitElement {
       display: flex;
       flex-direction: column;
       animation: slideUp 0.3s ease-out;
-      transition:
-        background-color 0.2s ease,
-        box-shadow 0.2s ease;
+      transition: background-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     @keyframes slideUp {
-      from {
-        transform: translateY(20px);
-        opacity: 0;
-      }
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
 
     .modal-header {
@@ -630,9 +573,7 @@ export class AuthModal extends LitElement {
       font-size: 20px;
       cursor: pointer;
       border-radius: 6px;
-      transition:
-        background-color 0.2s ease,
-        color 0.2s ease;
+      transition: background-color 0.2s ease, color 0.2s ease;
     }
 
     .modal-close:hover {
@@ -650,7 +591,6 @@ export class AuthModal extends LitElement {
       overflow-y: auto;
     }
 
-    /* Choice view */
     .choice-view {
       display: flex;
       flex-direction: column;
@@ -664,7 +604,6 @@ export class AuthModal extends LitElement {
       transition: background-color 0.2s ease;
     }
 
-    /* Password / Register form */
     .password-form {
       display: flex;
       flex-direction: column;
@@ -695,11 +634,7 @@ export class AuthModal extends LitElement {
       border-radius: 6px;
       box-sizing: border-box;
       margin: 0;
-      transition:
-        background-color 0.2s ease,
-        border-color 0.2s ease,
-        color 0.2s ease,
-        box-shadow 0.2s ease;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
     }
 
     .form-field input:focus {
@@ -789,7 +724,6 @@ export class AuthModal extends LitElement {
       cursor: not-allowed;
     }
 
-    /* Success view */
     .success-view {
       display: flex;
       flex-direction: column;
@@ -826,7 +760,6 @@ export class AuthModal extends LitElement {
       line-height: 1.5;
     }
 
-    /* Primary and secondary buttons */
     .btn {
       padding: 0.75rem 1.5rem;
       font-size: 0.9375rem;
@@ -868,21 +801,10 @@ export class AuthModal extends LitElement {
     }
 
     @media (max-width: 640px) {
-      .modal-card {
-        max-width: 100%;
-      }
-
-      .modal-header {
-        padding: 0.875rem 1rem;
-      }
-
-      .modal-content {
-        padding: 1rem;
-      }
-
-      .modal-title {
-        font-size: 1rem;
-      }
+      .modal-card { max-width: 100%; }
+      .modal-header { padding: 0.875rem 1rem; }
+      .modal-content { padding: 1rem; }
+      .modal-title { font-size: 1rem; }
     }
   `;
 }

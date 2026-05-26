@@ -93,7 +93,10 @@ class TrailBaseService {
         body: body.toString(),
       });
     } catch {
-      throw new AuthError(AuthErrorCode.NETWORK_ERROR, 'Network error during login');
+      throw new AuthError(
+        AuthErrorCode.NETWORK_ERROR,
+        'Network error during login'
+      );
     }
 
     // After following the redirect, check the final URL for an error param.
@@ -102,10 +105,16 @@ class TrailBaseService {
       const alert = finalUrl.searchParams.get('alert');
       if (alert) {
         if (alert.includes('401')) {
-          throw new AuthError(AuthErrorCode.INVALID_CREDENTIALS, 'Invalid email or password');
+          throw new AuthError(
+            AuthErrorCode.INVALID_CREDENTIALS,
+            'Invalid email or password'
+          );
         }
         if (alert.includes('403')) {
-          throw new AuthError(AuthErrorCode.MFA_REQUIRED, 'Multi-factor authentication required');
+          throw new AuthError(
+            AuthErrorCode.MFA_REQUIRED,
+            'Multi-factor authentication required'
+          );
         }
         throw new AuthError(AuthErrorCode.UNKNOWN, alert);
       }
@@ -113,7 +122,10 @@ class TrailBaseService {
       return;
     }
 
-    throw new AuthError(AuthErrorCode.UNKNOWN, `Unexpected login response: ${response.status}`);
+    throw new AuthError(
+      AuthErrorCode.UNKNOWN,
+      `Unexpected login response: ${response.status}`
+    );
   }
 
   /**
@@ -136,24 +148,47 @@ class TrailBaseService {
         body: JSON.stringify({ email, password, password_repeat: password }),
       });
     } catch {
-      throw new AuthError(AuthErrorCode.NETWORK_ERROR, 'Network error during registration');
+      throw new AuthError(
+        AuthErrorCode.NETWORK_ERROR,
+        'Network error during registration'
+      );
     }
 
     if (response.ok) {
       return;
     }
 
+    // 424: account created, but verification email failed to send (e.g. no SMTP)
+    if (response.status === 424) {
+      throw new AuthError(
+        AuthErrorCode.EMAIL_NOT_SENT,
+        'Account created but verification email failed'
+      );
+    }
+
     const text = await response.text().catch(() => '');
     if (response.status === 409 || text.toLowerCase().includes('already')) {
-      throw new AuthError(AuthErrorCode.EMAIL_TAKEN, 'Email already registered');
+      throw new AuthError(
+        AuthErrorCode.EMAIL_TAKEN,
+        'Email already registered'
+      );
     }
     if (response.status === 400 && text.toLowerCase().includes('too short')) {
-      throw new AuthError(AuthErrorCode.WEAK_PASSWORD, 'Password does not meet requirements');
+      throw new AuthError(
+        AuthErrorCode.WEAK_PASSWORD,
+        'Password does not meet requirements'
+      );
     }
     if (response.status === 403) {
-      throw new AuthError(AuthErrorCode.REGISTRATION_DISABLED, 'Registration is disabled');
+      throw new AuthError(
+        AuthErrorCode.REGISTRATION_DISABLED,
+        'Registration is disabled'
+      );
     }
-    throw new AuthError(AuthErrorCode.UNKNOWN, text || `Registration failed: ${response.status}`);
+    throw new AuthError(
+      AuthErrorCode.UNKNOWN,
+      text || `Registration failed: ${response.status}`
+    );
   }
 
   /**
