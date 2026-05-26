@@ -212,6 +212,28 @@ class AuthService {
   }
 
   /**
+   * Request a password-reset email for the given address.
+   * Delegates to trailbaseService — rate-limited to once per 60 minutes by TrailBase.
+   *
+   * @throws AuthError RATE_LIMITED, EMAIL_NOT_SENT, NETWORK_ERROR, or UNKNOWN
+   */
+  async requestPasswordReset(email: string): Promise<void> {
+    await trailbaseService.requestPasswordReset(email);
+  }
+
+  /**
+   * Complete a password reset using the JWT token from the email link.
+   * Delegates to trailbaseService.
+   *
+   * @throws AuthError UNKNOWN('invalid-token') when token is expired/malformed
+   * @throws AuthError UNKNOWN(serverMessage) on password policy violation
+   * @throws AuthError NETWORK_ERROR on fetch failure
+   */
+  async resetPassword(token: string, password: string): Promise<void> {
+    await trailbaseService.resetPassword(token, password);
+  }
+
+  /**
    * Sign out the current user and clear local auth state.
    */
   async signOut(): Promise<void> {

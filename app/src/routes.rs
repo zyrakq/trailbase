@@ -24,6 +24,10 @@ pub fn build(state: AppState) -> Router {
         .route("/api/health", get(health_check))
         .route("/api/hello", get(hello_handler))
         .route("/api/config/public", get(public_config_handler))
+        .route(
+            "/_/auth/reset_password/update/{token}",
+            get(password_reset_redirect),
+        )
         .with_state(state)
 }
 
@@ -52,4 +56,16 @@ async fn public_config_handler(
     let registration_enabled =
         state.access_config(|c| !c.auth.disable_password_auth.unwrap_or(false));
     axum::Json(serde_json::json!({ "registrationEnabled": registration_enabled }))
+}
+
+/// Intercept TrailBase's default password-reset email link and redirect to the SPA page.
+///
+/// TrailBase sends reset emails pointing to `/_/auth/reset_password/update/{TOKEN}`.
+/// Because our router is merged before TrailBase's, this handler takes precedence and
+/// redirects the browser to our SPA page with the token in the query string.
+async fn password_reset_redirect(
+    axum::extract::Path(token): axum::extract::Path<String>,
+) -> impl axum::response::IntoResponse {
+    let location = format!("/reset-password?token={}", token);
+    axum::response::Redirect::to(&location)
 }

@@ -248,6 +248,118 @@ class TrailBaseService {
   }
 
   /**
+   * Request a password-reset email for the given address.
+   *
+   * Calls POST /api/auth/v1/reset_password/request. TrailBase always returns
+   * 200 for known AND unknown emails (anti-enumeration). The only non-200
+   * responses are 429 (rate-limited) and 424 (SMTP failure).
+   *
+   * @throws AuthError RATE_LIMITED on 429
+   * @throws AuthError EMAIL_NOT_SENT on 424
+   * @throws AuthError UNKNOWN on 400 or other non-200
+   * @throws AuthError NETWORK_ERROR on fetch failure
+   */
+  async requestPasswordReset(email: string): Promise<void> {
+    let response: Response;
+    try {
+      response = await fetch('/api/auth/v1/reset_password/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email }),
+      });
+    } catch {
+      throw new AuthError(
+        AuthErrorCode.NETWORK_ERROR,
+        'Network error during password reset request'
+      );
+    }
+
+    if (response.ok) {
+      return;
+    }
+
+    if (response.status === 429) {
+      throw new AuthError(
+        AuthErrorCode.RATE_LIMITED,
+        'Password reset email already sent recently'
+      );
+    }
+
+    if (response.status === 424) {
+      throw new AuthError(
+        AuthErrorCode.EMAIL_NOT_SENT,
+        'Could not send password reset email'
+      );
+    }
+
+    const text2 = await response.text().catch(() => '');
+    throw new AuthError(
+      AuthErrorCode.UNKNOWN,
+      text2 || `Password reset request failed: ${response.status}`
+    );
+  }
+
+  /**
+   * Complete a password reset by submitting the new password and the JWT token
+   * from the reset email link.
+   *
+   * Calls POST /api/auth/v1/reset_password/update. On 400, inspects the
+   * response text to distinguish an invalid/expired token from a password
+   * policy violation — if the text contains "token" or "invalid" it is a
+   * token error; otherwise it is a policy error surfaced as UNKNOWN with the
+   * server message so the caller can display it verbatim.
+   *
+   * @throws AuthError UNKNOWN (message = 'invalid-token') on token-related 400
+   * @throws AuthError UNKNOWN (server message) on password-policy 400
+   * @throws AuthError NETWORK_ERROR on fetch failure
+   * @throws AuthError UNKNOWN on any other non-200
+   */
+  async resetPassword(token: string, password: string): Promise<void> {
+    let response: Response;
+    try {
+      response = await fetch('/api/auth/v1/reset_password/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          password,
+          password_repeat: password,
+          password_reset_token: token,
+        }),
+      });
+    } catch {
+      throw new AuthError(
+        AuthErrorCode.NETWORK_ERROR,
+        'Network error during password reset'
+      );
+    }
+
+    if (response.ok) {
+      return;
+    }
+
+    const text3 = await response.text().catch(() => '');
+
+    if (response.status === 400) {
+      const lower = text3.toLowerCase();
+      if (lower.includes('token') || lower.includes('invalid') || lower.includes('expired')) {
+        throw new AuthError(AuthErrorCode.UNKNOWN, 'invalid-token');
+      }
+      // Password policy violation — surface server message verbatim
+      throw new AuthError(
+        AuthErrorCode.UNKNOWN,
+        text3 || 'Password does not meet requirements'
+      );
+    }
+
+    throw new AuthError(
+      AuthErrorCode.UNKNOWN,
+      text3 || `Password reset failed: ${response.status}`
+    );
+  }
+
+  /**
    * Complete MFA login by submitting a TOTP code.
    *
    * Called after `loginWithPassword()` returns `requiresMfa: true`.

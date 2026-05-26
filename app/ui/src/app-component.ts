@@ -10,6 +10,7 @@ import '@/pages/welcome-page';
 import '@/pages/dashboard-page';
 import '@/pages/profile-page';
 import '@/features/auth/components/oauth-callback';
+import '@/pages/reset-password-page';
 import '@/features/notifications/components/toast-container';
 
 @customElement('app-component')
@@ -34,6 +35,17 @@ export class AppComponent extends LitElement {
       // calls authService.refresh() to load auth state from the cookie.
       path: '/auth/callback',
       render: () => html`<oauth-callback></oauth-callback>`,
+    },
+    {
+      path: '/reset-password',
+      render: () => html`<reset-password-page></reset-password-page>`,
+      enter: async () => {
+        // Initialize auth so the header renders correctly (e.g. shows user avatar
+        // if somehow an authenticated user follows a reset link). Does NOT redirect
+        // authenticated users — they are allowed to reset their password too.
+        await authService.init();
+        return true;
+      },
     },
     {
       // Legacy route — kept for backwards compatibility.

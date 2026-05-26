@@ -1,4 +1,4 @@
-import { LitElement, css, html } from 'lit';
+import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { msg, str } from '@lit/localize';
 import { localized } from '@/features/localization';
@@ -6,8 +6,10 @@ import { authService } from '../services/auth.service';
 import { configService } from '../services/config.service';
 import { AuthError, AuthErrorCode } from '../types/auth-error';
 import { OIDC_PROVIDERS, type OIDCProvider } from '../config/auth-providers';
+import { authModalStyles } from './auth-modal.styles';
+import { eyeIcon, eyeSlashIcon } from './auth-icons';
 
-type ViewState = 'choice' | 'password' | 'loading' | 'register' | 'register-loading' | 'register-success' | 'mfa' | 'mfa-loading';
+type ViewState = 'choice' | 'password' | 'loading' | 'register' | 'register-loading' | 'register-success' | 'mfa' | 'mfa-loading' | 'forgot-password' | 'forgot-password-loading' | 'forgot-password-sent';
 
 @customElement('auth-modal')
 @localized()
@@ -113,6 +115,12 @@ export class AuthModal extends LitElement {
   }
 
   private handleBack() {
+    if (this.view === 'forgot-password' || this.view === 'forgot-password-loading') {
+      this.view = 'password';
+      this.errorMessage = '';
+      // email is intentionally preserved so the user does not have to retype it
+      return;
+    }
     if (this.view === 'mfa' || this.view === 'mfa-loading') {
       this.view = 'password';
       this.errorMessage = '';
@@ -128,6 +136,64 @@ export class AuthModal extends LitElement {
     this.showConfirmPassword = false;
     this.registrationEmailSent = false;
     this.resendState = 'idle';
+  }
+
+  private handleForgotPasswordChoice() {
+    this.view = 'forgot-password';
+    this.errorMessage = '';
+    // email is intentionally preserved from the password view
+  }
+
+  private handleBackToChoice() {
+    this.view = 'choice';
+    this.errorMessage = '';
+    this.email = '';
+    this.password = '';
+    this.confirmPassword = '';
+    this.showPassword = false;
+    this.showConfirmPassword = false;
+    this.registrationEmailSent = false;
+    this.resendState = 'idle';
+  }
+
+  private async handleForgotPasswordSubmit(e: Event) {
+    e.preventDefault();
+    if (this.view === 'forgot-password-loading') return;
+
+    const trimmedEmail = this.email.trim();
+    if (!trimmedEmail) {
+      this.errorMessage = msg('Please enter your email address.');
+      return;
+    }
+
+    this.view = 'forgot-password-loading';
+    this.errorMessage = '';
+
+    try {
+      await authService.requestPasswordReset(trimmedEmail);
+      this.view = 'forgot-password-sent';
+    } catch (error) {
+      if (error instanceof AuthError) {
+        switch (error.code) {
+          case AuthErrorCode.RATE_LIMITED:
+            this.errorMessage = msg(
+              'A reset link was already sent. Check your inbox or wait 1 hour before trying again.'
+            );
+            break;
+          case AuthErrorCode.EMAIL_NOT_SENT:
+            this.errorMessage = msg('Could not send the email. Please contact support.');
+            break;
+          case AuthErrorCode.NETWORK_ERROR:
+            this.errorMessage = msg('Network error. Please check your connection.');
+            break;
+          default:
+            this.errorMessage = error.message || msg('An error occurred. Please try again.');
+        }
+      } else {
+        this.errorMessage = msg('An error occurred. Please try again.');
+      }
+      this.view = 'forgot-password';
+    }
   }
 
   private handleSignInInstead() {
@@ -378,6 +444,13 @@ export class AuthModal extends LitElement {
     if (this.view === 'mfa' || this.view === 'mfa-loading') {
       return msg('Two-factor authentication');
     }
+    if (
+      this.view === 'forgot-password' ||
+      this.view === 'forgot-password-loading' ||
+      this.view === 'forgot-password-sent'
+    ) {
+      return msg('Reset password');
+    }
     return msg('Sign in');
   }
 
@@ -404,9 +477,13 @@ export class AuthModal extends LitElement {
                 ? this.renderRegisterView()
                 : this.view === 'register-success'
                   ? this.renderRegisterSuccessView()
-                  : this.view === 'mfa' || this.view === 'mfa-loading'
-                    ? this.renderMfaView()
-                    : this.renderPasswordView()}
+                  : this.view === 'forgot-password' || this.view === 'forgot-password-loading'
+                    ? this.renderForgotPasswordView()
+                    : this.view === 'forgot-password-sent'
+                      ? this.renderForgotPasswordSentView()
+                      : this.view === 'mfa' || this.view === 'mfa-loading'
+                        ? this.renderMfaView()
+                        : this.renderPasswordView()}
           </div>
         </div>
       </div>
@@ -521,17 +598,26 @@ export class AuthModal extends LitElement {
               aria-label=${this.showPassword ? msg('Hide password') : msg('Show password')}
               ?disabled=${isLoading}
             >
-              ${this.showPassword ? this.eyeSlashIcon() : this.eyeIcon()}
+              ${this.showPassword ? eyeSlashIcon() : eyeIcon()}
             </button>
           </div>
         </div>
+
+        <button
+          type="button"
+          class="forgot-password-link"
+          @click=${this.handleForgotPasswordChoice}
+          ?disabled=${isLoading}
+        >
+          ${msg('Forgot password?')}
+        </button>
 
         ${this.errorMessage
           ? html`<div class="error-message" role="alert">${this.errorMessage}</div>`
           : ''}
 
         <button type="submit" class="btn btn-primary" ?disabled=${isLoading}>
-          ${isLoading ? msg('Signing in...') : msg('Sign in')}
+          ${isLoading ? msg('Signing in\u2026') : msg('Sign in')}
         </button>
       </form>
 
@@ -578,7 +664,7 @@ export class AuthModal extends LitElement {
               aria-label=${this.showPassword ? msg('Hide password') : msg('Show password')}
               ?disabled=${isLoading}
             >
-              ${this.showPassword ? this.eyeSlashIcon() : this.eyeIcon()}
+              ${this.showPassword ? eyeSlashIcon() : eyeIcon()}
             </button>
           </div>
         </div>
@@ -602,7 +688,7 @@ export class AuthModal extends LitElement {
               aria-label=${this.showConfirmPassword ? msg('Hide password') : msg('Show password')}
               ?disabled=${isLoading}
             >
-              ${this.showConfirmPassword ? this.eyeSlashIcon() : this.eyeIcon()}
+              ${this.showConfirmPassword ? eyeSlashIcon() : eyeIcon()}
             </button>
           </div>
         </div>
@@ -677,357 +763,63 @@ export class AuthModal extends LitElement {
     `;
   }
 
-  private eyeIcon() {
+  private renderForgotPasswordView() {
+    const isLoading = this.view === 'forgot-password-loading';
+
     return html`
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
+      <form class="password-form" @submit=${this.handleForgotPasswordSubmit}>
+        <p class="mfa-subtitle">
+          ${msg("Enter your email address and we'll send you a reset link.")}
+        </p>
+
+        <div class="form-field">
+          <label for="auth-email">${msg('Email address')}</label>
+          <input
+            id="auth-email"
+            type="email"
+            autocomplete="email"
+            .value=${this.email}
+            @input=${this.handleEmailInput}
+            ?disabled=${isLoading}
+            required
+          />
+        </div>
+
+        ${this.errorMessage
+          ? html`<div class="error-message" role="alert">${this.errorMessage}</div>`
+          : ''}
+
+        <button type="submit" class="btn btn-primary" ?disabled=${isLoading}>
+          ${isLoading ? msg('Sending\u2026') : msg('Send reset link')}
+        </button>
+      </form>
+
+      <button
+        class="back-link"
+        @click=${this.handleBack}
+        ?disabled=${isLoading}
+      >
+        ${msg('Back to sign in')}
+      </button>
     `;
   }
 
-  private eyeSlashIcon() {
+  private renderForgotPasswordSentView() {
     return html`
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9 9 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
-        <line x1="1" y1="1" x2="23" y2="23" />
-      </svg>
+      <div class="success-view">
+        <p class="success-message">
+          ${msg(
+            "If this email address is registered, you'll receive a reset link shortly. Check your inbox."
+          )}
+        </p>
+        <button class="btn btn-primary" @click=${this.handleBackToChoice}>
+          ${msg('Back to sign in')}
+        </button>
+      </div>
     `;
   }
 
-  static styles = css`
-    :host {
-      display: block;
-    }
-
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
-      padding: 1rem;
-      animation: fadeIn 0.2s ease-out;
-      pointer-events: auto;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    .modal-card {
-      background: var(--theme-color-surface-elevated);
-      border-radius: 8px;
-      box-shadow: var(--theme-shadow-lg);
-      max-width: 420px;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      animation: slideUp 0.3s ease-out;
-      transition: background-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    @keyframes slideUp {
-      from { transform: translateY(20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid var(--theme-color-border);
-      transition: border-color 0.2s ease;
-    }
-
-    .modal-title {
-      font-size: 1.125rem;
-      font-weight: 600;
-      color: var(--theme-color-text-primary);
-      transition: color 0.2s ease;
-    }
-
-    .modal-close {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px;
-      height: 32px;
-      padding: 0;
-      border: none;
-      background: transparent;
-      color: var(--theme-color-text-secondary);
-      font-size: 20px;
-      cursor: pointer;
-      border-radius: 6px;
-      transition: background-color 0.2s ease, color 0.2s ease;
-    }
-
-    .modal-close:hover {
-      background: var(--theme-color-background);
-      color: var(--theme-color-text-primary);
-    }
-
-    .modal-close:focus {
-      outline: 2px solid var(--theme-color-primary);
-      outline-offset: 2px;
-    }
-
-    .modal-content {
-      padding: 1.25rem;
-      overflow-y: auto;
-    }
-
-    .choice-view {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .divider {
-      height: 1px;
-      background: var(--theme-color-border);
-      margin: 0.25rem 0;
-      transition: background-color 0.2s ease;
-    }
-
-    .password-form {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .form-field {
-      display: flex;
-      flex-direction: column;
-      gap: 0.375rem;
-    }
-
-    .form-field label {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--theme-color-text-primary);
-      transition: color 0.2s ease;
-    }
-
-    .form-field input {
-      width: 100%;
-      padding: 0.625rem 0.75rem;
-      font-size: 0.9375rem;
-      font-family: inherit;
-      color: var(--theme-color-text-primary);
-      background: var(--theme-color-surface);
-      border: 1px solid var(--theme-color-border);
-      border-radius: 6px;
-      box-sizing: border-box;
-      margin: 0;
-      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .form-field input:focus {
-      outline: none;
-      border-color: var(--theme-color-primary);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-color-primary) 15%, transparent);
-    }
-
-    .form-field input:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .password-field .password-input-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-
-    .password-field input {
-      padding-right: 2.5rem;
-      box-sizing: border-box;
-    }
-
-    .password-toggle {
-      position: absolute;
-      right: 0.5rem;
-      top: 50%;
-      transform: translateY(-50%);
-      background: transparent;
-      border: none;
-      color: var(--theme-color-text-secondary);
-      cursor: pointer;
-      padding: 0.25rem;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: color 0.2s ease;
-    }
-
-    .password-toggle:hover:not(:disabled) {
-      color: var(--theme-color-text-primary);
-    }
-
-    .password-toggle:focus {
-      outline: 2px solid var(--theme-color-primary);
-      outline-offset: 1px;
-    }
-
-    .password-toggle:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .error-message {
-      font-size: 0.875rem;
-      color: var(--theme-color-error);
-      background: var(--theme-color-surface);
-      border: 1px solid var(--theme-color-error);
-      border-radius: 6px;
-      padding: 0.625rem 0.75rem;
-      transition: all 0.2s ease;
-    }
-
-    .back-link {
-      display: block;
-      width: 100%;
-      margin-top: 1rem;
-      padding: 0.5rem;
-      font-size: 0.875rem;
-      color: var(--theme-color-text-secondary);
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      text-align: center;
-      transition: color 0.2s ease;
-    }
-
-    .back-link:hover:not(:disabled) {
-      color: var(--theme-color-text-primary);
-      text-decoration: underline;
-    }
-
-    .back-link:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .success-view {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.5rem 0;
-      text-align: center;
-    }
-
-    .success-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: var(--theme-color-success);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      font-weight: 700;
-    }
-
-    .success-title {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--theme-color-text-primary);
-      margin: 0;
-    }
-
-    .success-message {
-      font-size: 0.875rem;
-      color: var(--theme-color-text-secondary);
-      margin: 0;
-      line-height: 1.5;
-    }
-
-    .resend-confirmation {
-      font-size: 0.875rem;
-      color: var(--theme-color-success);
-      margin: 0;
-    }
-
-    .resend-rate-limited {
-      font-size: 0.875rem;
-      color: var(--theme-color-text-muted);
-      margin: 0;
-    }
-
-    .resend-smtp-error {
-      font-size: 0.875rem;
-      color: var(--theme-color-error);
-      margin: 0;
-    }
-
-    .btn {
-      padding: 0.75rem 1.5rem;
-      font-size: 0.9375rem;
-      font-weight: 500;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background-color 0.2s ease;
-      font-family: inherit;
-      width: 100%;
-    }
-
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .btn-primary {
-      background: var(--theme-color-primary);
-      color: white;
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      background: var(--theme-color-primary-hover);
-    }
-
-    .btn-primary:active:not(:disabled) {
-      background: var(--theme-color-primary-active);
-    }
-
-    .btn-secondary {
-      background: var(--theme-color-surface);
-      color: var(--theme-color-text-primary);
-      border: 1px solid var(--theme-color-border);
-    }
-
-    .btn-secondary:hover:not(:disabled) {
-      background: var(--theme-color-background);
-    }
-
-    @media (max-width: 640px) {
-      .modal-card { max-width: 100%; }
-      .modal-header { padding: 0.875rem 1rem; }
-      .modal-content { padding: 1rem; }
-      .modal-title { font-size: 1rem; }
-    }
-
-    .mfa-subtitle {
-      font-size: 0.9375rem;
-      color: var(--theme-color-text-secondary);
-      margin: 0 0 1rem 0;
-      transition: color 0.2s ease;
-    }
-  `;
+  static styles = authModalStyles;
 }
 
 declare global {
