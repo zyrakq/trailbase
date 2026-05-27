@@ -11,6 +11,7 @@ export const authSharedStyles = css`
     transition: background-color 0.2s ease;
     font-family: inherit;
     width: 100%;
+    box-sizing: border-box;
   }
 
   .btn:disabled {
@@ -39,6 +40,17 @@ export const authSharedStyles = css`
 
   .btn-secondary:hover:not(:disabled) {
     background: var(--theme-color-background);
+  }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--theme-color-text-primary);
+    border: 1px solid var(--theme-color-border);
+  }
+
+  .btn-outline:hover:not(:disabled) {
+    background: var(--theme-color-surface);
+    border-color: var(--theme-color-text-secondary);
   }
 
   .form-field {

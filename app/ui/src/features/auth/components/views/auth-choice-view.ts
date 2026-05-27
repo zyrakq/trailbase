@@ -55,7 +55,7 @@ export class AuthChoiceView extends LitElement {
             >
               <img
                 class="oauth-icon"
-                src="/_/auth/oauth2/${p.imgName}"
+                src="/oauth2/${p.imgName}"
                 alt=${p.displayName}
               />
               <span>${p.displayName}</span>
