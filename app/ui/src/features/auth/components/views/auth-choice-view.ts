@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { msg, str } from '@lit/localize';
 import { localized } from '@/features/localization';
@@ -16,6 +16,7 @@ import { authSharedStyles } from '../auth-shared.styles';
 @customElement('auth-choice-view')
 @localized()
 export class AuthChoiceView extends LitElement {
+  @property({ type: Boolean }) passwordAuthEnabled = true;
   @property({ type: Boolean }) registrationEnabled = true;
   @property({ type: Array }) oauthProviders: OAuthProviderConfig[] = [];
 
@@ -63,22 +64,26 @@ export class AuthChoiceView extends LitElement {
           `
         )}
 
-        ${this.oauthProviders.length > 0
+        ${this.oauthProviders.length > 0 && this.passwordAuthEnabled
           ? html`<div class="divider"></div>`
-          : ''}
+          : nothing}
 
-        <button class="btn btn-primary" @click=${() => this.navigate('password')}>
-          ${msg('Sign in with email and password')}
-        </button>
+        ${this.passwordAuthEnabled
+          ? html`
+            <button class="btn btn-primary" @click=${() => this.navigate('password')}>
+              ${msg('Sign in with email and password')}
+            </button>
+          `
+          : nothing}
 
-        ${this.registrationEnabled
+        ${this.passwordAuthEnabled && this.registrationEnabled
           ? html`
             <div class="divider"></div>
             <button class="btn btn-secondary" @click=${() => this.navigate('register')}>
               ${msg('Create an account')}
             </button>
           `
-          : ''}
+          : nothing}
       </div>
     `;
   }

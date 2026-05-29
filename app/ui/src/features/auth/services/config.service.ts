@@ -12,11 +12,14 @@ export interface OAuthProviderConfig {
 }
 
 export interface PublicConfig {
+  /** Whether password-based login, registration, and OTP UI should be shown. */
+  passwordAuthEnabled: boolean;
   registrationEnabled: boolean;
   oauthProviders: OAuthProviderConfig[];
 }
 
 const DEFAULT_CONFIG: PublicConfig = {
+  passwordAuthEnabled: true,
   registrationEnabled: true,
   oauthProviders: [],
 };

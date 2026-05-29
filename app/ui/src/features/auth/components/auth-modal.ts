@@ -32,6 +32,7 @@ export class AuthModal extends LitElement {
   // Shared state passed down to sub-components as properties.
   @state() private sharedEmail = '';
   @state() private mfaToken = '';
+  @state() private passwordAuthEnabled = true;
   @state() private registrationEnabled = true;
   @state() private oauthProviders: OAuthProviderConfig[] = [];
   @state() private registerSuccessEmailSent = false;
@@ -43,6 +44,7 @@ export class AuthModal extends LitElement {
     this.registerSuccessEmailSent = false;
 
     configService.fetchConfig().then((config) => {
+      this.passwordAuthEnabled = config.passwordAuthEnabled;
       this.registrationEnabled = config.registrationEnabled;
       this.oauthProviders = config.oauthProviders;
     });
@@ -163,6 +165,7 @@ export class AuthModal extends LitElement {
     switch (this.view) {
       case 'choice':
         return html`<auth-choice-view
+          .passwordAuthEnabled=${this.passwordAuthEnabled}
           .registrationEnabled=${this.registrationEnabled}
           .oauthProviders=${this.oauthProviders}
         ></auth-choice-view>`;

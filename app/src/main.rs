@@ -5,7 +5,7 @@ mod preflight;
 mod routes;
 mod settings;
 
-use settings::Settings;
+use settings::{PasswordAuthEnabled, Settings};
 use std::path::PathBuf;
 use tracing::info;
 
@@ -38,10 +38,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     })
     .await?;
 
+    let password_auth_enabled =
+        PasswordAuthEnabled(settings.frontend.password_auth_enabled.unwrap_or(true));
+
     let router = axum::Router::new()
         .merge(routes::build(state))
         .merge(main_router.1)
-        .fallback_service(routes::static_files(&settings.frontend, &manifest_dir));
+        .fallback_service(routes::static_files(&settings.frontend, &manifest_dir))
+        .layer(axum::Extension(password_auth_enabled));
 
     info!("Server running at http://{}", settings.server.address);
     trailbase::api::serve((main_router.0, router), admin_router, tls).await?;

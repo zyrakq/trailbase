@@ -24,7 +24,12 @@ pub struct FrontendSettings {
     pub watch: bool,
     /// Empty string means "derive from CARGO_MANIFEST_DIR at runtime in main.rs".
     pub public_dir: String,
+    pub password_auth_enabled: Option<bool>,
 }
+
+/// Newtype wrapper so `axum::Extension<PasswordAuthEnabled>` is unambiguous.
+#[derive(Clone, Copy)]
+pub struct PasswordAuthEnabled(pub bool);
 
 // ---------------------------------------------------------------------------
 // Methods
@@ -176,5 +181,42 @@ mod tests {
         // Empty overlay simulates a missing optional file - must not error
         let result = settings_from_toml(BASE_TOML, "");
         assert!(result.is_ok(), "missing optional overlay must not panic or error");
+    }
+
+    #[test]
+    fn password_auth_enabled_defaults_to_none_when_absent() {
+        let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
+        assert!(
+            s.frontend.password_auth_enabled.is_none(),
+            "password_auth_enabled should be None when absent from config"
+        );
+    }
+
+    #[test]
+    fn password_auth_enabled_parses_true_from_toml() {
+        let overlay = indoc! {r#"
+            [frontend]
+            password_auth_enabled = true
+        "#};
+        let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+        assert_eq!(
+            s.frontend.password_auth_enabled,
+            Some(true),
+            "password_auth_enabled should be Some(true) when set in config"
+        );
+    }
+
+    #[test]
+    fn password_auth_enabled_parses_false_from_toml() {
+        let overlay = indoc! {r#"
+            [frontend]
+            password_auth_enabled = false
+        "#};
+        let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+        assert_eq!(
+            s.frontend.password_auth_enabled,
+            Some(false),
+            "password_auth_enabled should be Some(false) when explicitly set to false"
+        );
     }
 }

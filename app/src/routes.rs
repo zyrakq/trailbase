@@ -8,7 +8,7 @@ use axum::{extract::State, routing::get, Router};
 use tower_http::services::{ServeDir, ServeFile};
 use trailbase::AppState;
 
-use crate::settings::FrontendSettings;
+use crate::settings::{FrontendSettings, PasswordAuthEnabled};
 
 /// Build the custom API router.
 ///
@@ -50,8 +50,12 @@ async fn hello_handler() -> axum::Json<serde_json::Value> {
 /// Reads `disable_password_auth` and `oauth_providers` from the live TrailBase
 /// config. Changes made through the admin panel are reflected immediately without
 /// a server restart.
+///
+/// `passwordAuthEnabled` reflects the app-level setting from `appsettings.toml`
+/// and controls whether password-based login, registration, and OTP UI is shown.
 async fn public_config_handler(
     State(state): State<AppState>,
+    axum::Extension(PasswordAuthEnabled(password_auth_enabled)): axum::Extension<PasswordAuthEnabled>,
 ) -> axum::Json<serde_json::Value> {
     let (registration_enabled, oauth_providers) = state.access_config(|c| {
         let registration_enabled = !c.auth.disable_password_auth.unwrap_or(false);
@@ -78,6 +82,7 @@ async fn public_config_handler(
     });
 
     axum::Json(serde_json::json!({
+        "passwordAuthEnabled": password_auth_enabled,
         "registrationEnabled": registration_enabled,
         "oauthProviders": oauth_providers,
     }))
