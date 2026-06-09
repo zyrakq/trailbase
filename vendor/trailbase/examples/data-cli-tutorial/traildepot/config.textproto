@@ -1,0 +1,19 @@
+# Auto-generated config.Config textproto
+email {}
+server {
+  application_name: "TrailBase-Tutorial"
+  site_url: "http://localhost:4000"
+  logs_retention_sec: 604800
+}
+auth {
+  auth_token_ttl_sec: 86400
+  refresh_token_ttl_sec: 2592000
+}
+record_apis: [
+  {
+    name: "movies"
+    table_name: "movies"
+    acl_world: [READ]
+    acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+  }
+]

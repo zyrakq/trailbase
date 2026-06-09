@@ -1,0 +1,20 @@
+[package]
+name = "trailbase-sqlvalue"
+version = "0.1.0"
+edition = "2024"
+license = "OSL-3.0"
+description = "Common data structures for TrailBase"
+homepage = "https://trailbase.io"
+repository = "https://github.com/trailbaseio/trailbase"
+readme = "../../README.md"
+
+[features]
+default = []
+rusqlite = ["dep:trailbase-sqlite"]
+
+[dependencies]
+base64 = { workspace = true }
+serde = { workspace = true }
+thiserror = "2.0.12"
+ts-rs = { workspace = true }
+trailbase-sqlite = { workspace = true, optional = true }

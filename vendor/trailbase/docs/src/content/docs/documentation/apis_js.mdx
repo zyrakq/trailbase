@@ -1,0 +1,69 @@
+---
+title: Custom APIs
+---
+
+import { Aside, Code } from "@astrojs/starlight/components";
+import { githubPath } from "@/lib/github.ts"
+
+On startup TrailBase will automatically load any WASM component, i.e. `*.wasm`
+files, that it finds in `<traildepot>/wasm`.
+This can be used to implement arbitrary HTTP APIs with custom handlers.
+
+
+## Examples
+
+At this point the documentation is embarrassingly "thin", take a look at the examples
+for further context. Some are provided here, more can be found in `/examples` including
+project templates:
+
+
+
+ * TypeScript: <a href={githubPath("examples/wasm-guest-ts")}><code>/examples/wasm-guest-ts</code></a>
+ * JavaScript: <a href={githubPath("examples/wasm-guest-js")}><code>/examples/wasm-guest-js</code></a>
+ * Rust: <a href={githubPath("examples/wasm-guest-rust")}><code>/examples/wasm-guest-rust</code></a>
+
+### (Java|Type)Script
+
+The following example demonstrates how to:
+
+* register a parameterized route with `{table}`,
+* query the database,
+* return a string body or HTTP error.
+
+import tsDocsExample from "@examples/wasm-guest-ts/src/index.ts?raw";
+
+<Code
+  code={tsDocsExample}
+  lang="typescript"
+  title={"docs/examples/wasm-guest-ts/src/index.ts"}
+  mark={[]}
+/>
+
+Another example reading query parameters and producing a JSON response.
+
+import tsCoffeeExample from "@root/examples/coffee-vector-search/guests/typescript/src/index.ts?raw";
+
+<Code
+  code={tsCoffeeExample}
+  lang="typescript"
+  title={"examples/coffee-vector-search/guests/typescript/src/index.ts"}
+  mark={[]}
+/>
+
+### Rust
+
+The following example demonstrates how to:
+
+* register an HTTP route,
+* read query parameters,
+* query the database,
+* and return a JSON response or errors.
+
+import rustExample from "@root/examples/coffee-vector-search/guests/rust/src/lib.rs?raw";
+
+<Code
+  code={rustExample}
+  lang="rust"
+  title={"examples/coffee-vector-search/guests/rust/src/lib.rs"}
+  mark={[]}
+/>

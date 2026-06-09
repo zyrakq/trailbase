@@ -1,0 +1,81 @@
+use axum::extract::{Json, Query, State};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Redirect, Response};
+use serde::Deserialize;
+use tower_cookies::Cookies;
+use ts_rs::TS;
+use utoipa::{IntoParams, ToSchema};
+
+use crate::AppState;
+use crate::auth::AuthError;
+use crate::auth::user::User;
+use crate::auth::util::{
+  delete_all_sessions_for_user, delete_session, remove_all_cookies, validate_redirect,
+};
+
+#[derive(Debug, Default, Deserialize, IntoParams)]
+pub struct LogoutQuery {
+  redirect_uri: Option<String>,
+}
+
+/// Logs out the current user and delete **all** pending sessions for that user.
+///
+/// Relies on the client to drop any auth tokens. We delete the session to avoid refresh tokens
+/// bringing a logged out session back to live.
+#[utoipa::path(
+  get,
+  path = "/logout",
+  tag = "auth",
+  params(LogoutQuery),
+  responses(
+    (status = 200, description = "Auth & refresh tokens.")
+  )
+)]
+pub async fn logout_handler(
+  State(state): State<AppState>,
+  Query(query): Query<LogoutQuery>,
+  user: Option<User>,
+  cookies: Cookies,
+) -> Result<Response, AuthError> {
+  let redirect_uri = validate_redirect(&state, query.redirect_uri)?;
+
+  remove_all_cookies(&cookies);
+
+  if let Some(user) = user {
+    delete_all_sessions_for_user(state.session_conn(), user.uuid).await?;
+  }
+
+  return if let Some(redirect) = redirect_uri {
+    Ok(Redirect::to(&redirect).into_response())
+  } else if state.public_dir().is_some() {
+    Ok(Redirect::to("/").into_response())
+  } else {
+    Ok((StatusCode::OK, "logged out").into_response())
+  };
+}
+
+#[derive(Clone, Debug, Deserialize, ToSchema, TS)]
+#[ts(export)]
+pub struct LogoutRequest {
+  pub refresh_token: String,
+}
+
+/// Logs out the current user and deletes the specific session for the given refresh token.
+///
+/// Relies on the client to drop any auth tokens.
+#[utoipa::path(
+  post,
+  path = "/logout",
+  tag = "auth",
+  request_body = LogoutRequest,
+  responses(
+    (status = 200, description = "Auth & refresh tokens.")
+  )
+)]
+pub async fn post_logout_handler(
+  State(state): State<AppState>,
+  Json(request): Json<LogoutRequest>,
+) -> Result<Response, AuthError> {
+  delete_session(&state, request.refresh_token).await?;
+  return Ok(StatusCode::OK.into_response());
+}

@@ -1,0 +1,28 @@
+{
+  "name": "coffee-vector-search-guest",
+  "version": "0.1.0",
+  "keywords": [],
+  "author": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build:wasm": "jco componentize dist/index.mjs -w ../../../../guests/typescript/wit -o dist/component.wasm",
+    "build:wasm:aot": "jco componentize  dist/index.mjs -w ../../../../guests/typescript/wit --aot -o dist/component.wasm",
+    "build": "vite build && npm run build:wasm",
+    "check": "tsc --noEmit --skipLibCheck && vite build && eslint",
+    "deploy": "npm run build && cp dist/component.wasm ../../traildepot/wasm/coffee_vector_search_guest.wasm",
+    "format": "prettier -w src"
+  },
+  "dependencies": {
+    "trailbase-wasm": "workspace:*"
+  },
+  "devDependencies": {
+    "@bytecodealliance/jco": "^1.20.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.1",
+    "eslint": "^10.4.1",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.1",
+    "vite": "^8.0.16"
+  }
+}

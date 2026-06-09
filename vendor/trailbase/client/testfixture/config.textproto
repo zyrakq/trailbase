@@ -1,0 +1,84 @@
+# Auto-generated config.Config textproto
+email {}
+server {
+  application_name: "TrailBase"
+  site_url: "http://localhost.trailbase.io:4000"
+  logs_retention_sec: 604800
+  enable_record_transactions: true
+}
+auth {
+  enable_otp_signin: true
+  oauth_providers: [{
+    key: "discord"
+    value {
+      client_id: "invalid_discord_id"
+      client_secret: "<REDACTED>"
+      provider_id: DISCORD
+    }
+  }, {
+    key: "oidc0"
+    value {
+      client_id: "invalid_client_id"
+      client_secret: "<REDACTED>"
+      provider_id: OIDC0
+      display_name: "My OIDC"
+      auth_url: "http://localhost:9088/authorize"
+      token_url: "http://localhost:9088/token"
+      user_api_url: "http://localhost:9088/userinfo"
+    }
+  }]
+  redirect_uri_allowlist: ["https://allowlisted.example.com"]
+}
+jobs {}
+databases: [{
+  name: "other"
+}]
+record_apis: [{
+  name: "simple_strict_table"
+  table_name: "simple_strict_table"
+  acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+  enable_subscriptions: true
+}, {
+  name: "simple_complete_view"
+  table_name: "simple_complete_view"
+  acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+}, {
+  name: "simple_subset_view"
+  table_name: "simple_subset_view"
+  acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+}, {
+  name: "movies"
+  table_name: "movies"
+  acl_world: [READ]
+  acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+}, {
+  name: "comment"
+  table_name: "comment"
+  acl_world: [READ]
+  expand: ["author", "post"]
+}, {
+  name: "file_upload_table"
+  table_name: "file_upload_table"
+  acl_world: [CREATE, READ, DELETE]
+  acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+}, {
+  name: "other_file_upload_table"
+  table_name: "other.file_upload_table"
+  attached_databases: ["other"]
+  acl_world: [CREATE, READ, DELETE]
+  acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+}, {
+  name: "simple_schema_table"
+  table_name: "simple_schema_table"
+  acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+  create_access_rule: "EXISTS(\n  SELECT 1 FROM _user\n  WHERE \n    email = \'admin@localhost\' AND\n    id = _USER_.id\n)"
+}, {
+  name: "geometry"
+  table_name: "geometry"
+  acl_world: [READ]
+  acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+}]
+schemas: [{
+  name: "simple_schema"
+  schema: "{  \"type\": \"object\",  \"properties\": {    \"name\": { \"type\": \"string\" },    \"obj\": { \"type\": \"object\" }  },  \"required\": [\"name\"]}"
+}]
