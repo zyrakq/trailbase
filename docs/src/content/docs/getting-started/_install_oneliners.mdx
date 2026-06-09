@@ -1,0 +1,28 @@
+import { Code, Tabs, TabItem } from '@astrojs/starlight/components';
+
+export const installMacLinux = `curl -sSL https://trailbase.io/install.sh | bash`;
+export const installWindows = `iwr https://trailbase.io/install.ps1 | iex`;
+export const installDocker= `
+# Mimic "install" with Docker. Add the alias to your shell's rc to persist.
+alias trail='
+  mkdir -p traildepot && \\
+  docker run \\
+      -p 4000:4000 \\
+      -e ADDRESS=0.0.0.0:4000 \\
+      --mount type=bind,source="$PWD"/traildepot,target=/app/traildepot \\
+      trailbase/trailbase /app/trail'
+`;
+
+<Tabs>
+  <TabItem label="Linux/MacOS">
+    <Code lang="sh" code={installMacLinux} frame="none" />
+  </TabItem>
+
+  <TabItem label="Windows">
+    <Code lang="sh" code={installWindows} frame="none" />
+  </TabItem>
+
+  <TabItem label="Docker">
+    <Code lang="sh" code={installDocker} frame="none" />
+  </TabItem>
+</Tabs>

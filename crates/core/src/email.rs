@@ -1,0 +1,527 @@
+use lettre::address::AddressError;
+use lettre::message::{Body, Mailbox, Message, header::ContentType};
+use lettre::transport::smtp;
+use lettre::{AsyncSendmailTransport, AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
+use log::*;
+use minijinja::{Environment, context};
+use std::sync::Arc;
+use thiserror::Error;
+
+use crate::AppState;
+use crate::config::proto::{Config, EmailConfig, SmtpEncryption};
+use crate::constants::AUTH_API_PATH;
+
+#[derive(Debug, Error)]
+pub enum EmailError {
+  #[error("EmailAddress: {0}")]
+  Address(#[from] AddressError),
+  #[error("Missing: {0}")]
+  Missing(&'static str),
+  #[error("Send: {0}")]
+  Send(#[from] lettre::error::Error),
+  #[error("SMTP: {0}")]
+  Smtp(#[from] lettre::transport::smtp::Error),
+  #[error("Sendmail: {0}")]
+  Sendmail(#[from] lettre::transport::sendmail::Error),
+  #[error("Template: {0}")]
+  Template(#[from] minijinja::Error),
+  #[error("Internal: {0}")]
+  Internal(Box<dyn std::error::Error + Send + Sync>),
+}
+
+pub struct Email {
+  mailer: Mailer,
+  dev: bool,
+
+  from: Mailbox,
+  to: Mailbox,
+
+  subject: String,
+  body: String,
+}
+
+impl Email {
+  pub fn new(
+    state: &AppState,
+    to: &str,
+    subject: String,
+    body: String,
+  ) -> Result<Self, EmailError> {
+    return Self::new_internal(state, to.parse()?, subject, body);
+  }
+
+  fn new_internal(
+    state: &AppState,
+    to: Mailbox,
+    subject: String,
+    body: String,
+  ) -> Result<Self, EmailError> {
+    return Ok(Self {
+      mailer: state.mailer(),
+      dev: state.dev_mode(),
+      from: get_sender(state)?,
+      to,
+      subject,
+      body,
+    });
+  }
+
+  pub async fn send(&self) -> Result<(), EmailError> {
+    let Email {
+      mailer,
+      #[allow(unused)]
+      dev,
+      from,
+      to,
+      subject,
+      body,
+    } = self;
+
+    let email = Message::builder()
+      .to(to.clone())
+      .from(from.clone())
+      .subject(subject.clone())
+      .header(ContentType::TEXT_HTML)
+      .body(Body::new(body.clone()))?;
+
+    #[cfg(not(test))]
+    if *dev {
+      log::info!(
+        "\
+            [dev] Skip sending email:\
+            \nFROM: {from}\
+            \nTO: {to}\
+            \nSUBJECT: {subject}\
+            \nBODY: {body}\
+            "
+      );
+      return Ok(());
+    }
+
+    match mailer {
+      Mailer::Smtp(mailer) => {
+        mailer.send(email).await?;
+      }
+      Mailer::Local(mailer) => {
+        mailer.send(email).await?;
+      }
+    };
+
+    return Ok(());
+  }
+
+  pub(crate) fn verification_email(
+    state: &AppState,
+    email_address: &str,
+    email_verification_token: &str,
+    redirect_uri: Option<&str>,
+  ) -> Result<Self, EmailError> {
+    let to: Mailbox = email_address.parse()?;
+
+    let config = state.get_config();
+    let template = &config.email.user_verification_template;
+
+    let subject_template = template
+      .as_ref()
+      .and_then(|t| t.subject.as_deref())
+      .unwrap_or(trailbase_assets::email::DEFAULT_EMAIL_VERIFICATION_SUBJECT);
+    let body_template = template
+      .as_ref()
+      .and_then(|t| t.body.as_deref())
+      .unwrap_or(trailbase_assets::email::DEFAULT_EMAIL_VERIFICATION_BODY);
+
+    let site_url = get_site_url(state);
+    let verification_url = site_url
+      .join(&if let Some(ref redirect_uri) = redirect_uri {
+        format!("/{AUTH_API_PATH}/verify_email/confirm/{email_verification_token}?redirect_uri={redirect_uri}")
+      } else {
+        format!("/{AUTH_API_PATH}/verify_email/confirm/{email_verification_token}")
+      })
+      .map_err(|_err| EmailError::Internal("Invalid URL".into()))?;
+
+    let env = Environment::empty();
+    let subject = env
+      .template_from_named_str("subject", subject_template)?
+      .render(context! {
+        APP_NAME => &config.server.application_name,
+        EMAIL => email_address,
+      })?;
+    let body = env
+      .template_from_named_str("body", body_template)?
+      .render(context! {
+        APP_NAME => &config.server.application_name,
+        CODE => email_verification_token,
+        EMAIL => email_address,
+        REDIRECT_URI => redirect_uri,
+        SITE_URL => site_url.origin().ascii_serialization(),
+        TOKEN => email_verification_token,
+        VERIFICATION_URL => verification_url,
+      })?;
+
+    return Email::new_internal(state, to, subject, body);
+  }
+
+  pub(crate) fn change_email_address_email(
+    state: &AppState,
+    email_address: &str,
+    email_verification_token: &str,
+    redirect_uri: Option<&str>,
+  ) -> Result<Self, EmailError> {
+    let to: Mailbox = email_address.parse()?;
+    let config = state.get_config();
+    let template = &config.email.change_email_template;
+
+    let subject_template = template
+      .as_ref()
+      .and_then(|t| t.subject.as_deref())
+      .unwrap_or(trailbase_assets::email::DEFAULT_EMAIL_CHANGE_ADDRESS_SUBJECT);
+    let body_template = template
+      .as_ref()
+      .and_then(|t| t.body.as_deref())
+      .unwrap_or(trailbase_assets::email::DEFAULT_EMAIL_CHANGE_ADDRESS_BODY);
+
+    let site_url = get_site_url(state);
+    let verification_url = site_url
+      .join(&if let Some(ref redirect_uri)  = redirect_uri {
+        format!("/{AUTH_API_PATH}/change_email/confirm/{email_verification_token}?redirect_uri={redirect_uri}")
+      } else {
+        format!("/{AUTH_API_PATH}/change_email/confirm/{email_verification_token}")
+      })
+      .map_err(|_err| EmailError::Internal("Invalid URL".into()))?;
+
+    let env = Environment::empty();
+    let subject = env
+      .template_from_named_str("subject", subject_template)?
+      .render(context! {
+        APP_NAME => &config.server.application_name,
+        EMAIL => email_address,
+      })?;
+    let body = env
+      .template_from_named_str("body", body_template)?
+      .render(context! {
+        APP_NAME => &config.server.application_name,
+        CODE => email_verification_token,
+        EMAIL => email_address,
+        REDIRECT_URI => redirect_uri,
+        SITE_URL => site_url.origin().ascii_serialization(),
+        TOKEN => email_verification_token,
+        VERIFICATION_URL => verification_url,
+      })?;
+
+    return Email::new_internal(state, to, subject, body);
+  }
+
+  pub(crate) fn password_reset_email(
+    state: &AppState,
+    email_address: &str,
+    password_reset_token: &str,
+  ) -> Result<Self, EmailError> {
+    let to: Mailbox = email_address.parse()?;
+    let config = state.get_config();
+    let template = &config.email.password_reset_template;
+
+    let subject_template = template
+      .as_ref()
+      .and_then(|t| t.subject.as_deref())
+      .unwrap_or(trailbase_assets::email::DEFAULT_EMAIL_PASSWORD_RESET_SUBJECT);
+    let body_template = template
+      .as_ref()
+      .and_then(|t| t.body.as_deref())
+      .unwrap_or(trailbase_assets::email::DEFAULT_EMAIL_PASSWORD_RESET_BODY);
+
+    // NOTE: Unlike verify_email and change_email, we're linking to page for users to input their
+    // new password.
+    let site_url = get_site_url(state);
+
+    let env = Environment::empty();
+    let subject = env
+      .template_from_named_str("subject", subject_template)?
+      .render(context! {
+        APP_NAME => &config.server.application_name,
+        EMAIL => email_address,
+      })?;
+    let body = env
+      .template_from_named_str("body", body_template)?
+      .render(context! {
+        APP_NAME => &config.server.application_name,
+        CODE => password_reset_token,
+        EMAIL => email_address,
+        SITE_URL => site_url.origin().ascii_serialization(),
+        TOKEN => password_reset_token,
+      })?;
+
+    return Email::new_internal(state, to, subject, body);
+  }
+
+  pub(crate) fn otp_email(
+    state: &AppState,
+    email_address: &str,
+    otp_code: &str,
+    redirect_uri: Option<&str>,
+  ) -> Result<Self, EmailError> {
+    let to: Mailbox = email_address.parse()?;
+    let config = state.get_config();
+    let template = &config.email.otp_template;
+
+    let subject_template = template
+      .as_ref()
+      .and_then(|t| t.subject.as_deref())
+      .unwrap_or(trailbase_assets::email::DEFAULT_EMAIL_OTP_SUBJECT);
+    let body_template = template
+      .as_ref()
+      .and_then(|t| t.body.as_deref())
+      .unwrap_or(trailbase_assets::email::DEFAULT_EMAIL_OTP_BODY);
+    let site_url = get_site_url(state);
+
+    let env = Environment::empty();
+    let subject = env
+      .template_from_named_str("subject", subject_template)?
+      .render(context! {
+        APP_NAME => &config.server.application_name,
+        EMAIL => email_address,
+      })?;
+    let body = env
+      .template_from_named_str("body", body_template)?
+      .render(context! {
+        APP_NAME => &config.server.application_name,
+        CODE => otp_code,
+        EMAIL => email_address,
+        REDIRECT_URI => redirect_uri,
+        SITE_URL => site_url.origin().ascii_serialization(),
+      })?;
+    return Email::new_internal(state, to, subject, body);
+  }
+}
+
+fn get_sender(state: &AppState) -> Result<Mailbox, EmailError> {
+  let config = state.get_config();
+  let address = config
+    .email
+    .sender_address
+    .clone()
+    .unwrap_or_else(|| fallback_sender(&state.site_url()));
+
+  if let Some(ref name) = config.email.sender_name {
+    return Ok(format!("{name} <{address}>").parse::<Mailbox>()?);
+  }
+  return Ok(address.parse::<Mailbox>()?);
+}
+
+fn fallback_sender(site_url: &Option<url::Url>) -> String {
+  if let Some(host) = site_url.as_ref().and_then(|u| u.host()) {
+    return format!("noreply@{host}");
+  }
+
+  warn!(
+    "No 'site_url' configured, falling back to sender 'noreply@localhost'. This may be ok for development environments but otherwise will result in your emails being filtered."
+  );
+
+  return "noreply@localhost".to_string();
+}
+
+#[derive(Clone)]
+pub(crate) enum Mailer {
+  Smtp(Arc<dyn AsyncTransport<Ok = smtp::response::Response, Error = smtp::Error> + Send + Sync>),
+  Local(Arc<AsyncSendmailTransport<Tokio1Executor>>),
+}
+
+impl Mailer {
+  fn new_smtp(
+    host: &str,
+    port: u16,
+    user: Option<String>,
+    pass: Option<String>,
+    encryption: SmtpEncryption,
+  ) -> Result<Mailer, EmailError> {
+    let transport = match encryption {
+      SmtpEncryption::None => {
+        let mut transport =
+          AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(host).port(port);
+        if let (Some(user), Some(pass)) = (user, pass) {
+          warn!("Encryption is None. SMTP password will be sent in plain text");
+          transport = transport.credentials(smtp::authentication::Credentials::new(user, pass));
+        }
+
+        transport
+      }
+      SmtpEncryption::Starttls | SmtpEncryption::Undefined => {
+        AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(host)?
+          .port(port)
+          .credentials(smtp::authentication::Credentials::new(
+            user.ok_or(EmailError::Missing("SMTP username"))?,
+            pass.ok_or(EmailError::Missing("SMTP password"))?,
+          ))
+      }
+      SmtpEncryption::Tls => AsyncSmtpTransport::<Tokio1Executor>::relay(host)?
+        .port(port)
+        .credentials(smtp::authentication::Credentials::new(
+          user.ok_or(EmailError::Missing("SMTP username"))?,
+          pass.ok_or(EmailError::Missing("SMTP password"))?,
+        )),
+    };
+
+    return Ok(Mailer::Smtp(Arc::new(transport.build())));
+  }
+
+  fn new_local() -> Mailer {
+    return Mailer::Local(Arc::new(AsyncSendmailTransport::<Tokio1Executor>::new()));
+  }
+
+  pub(crate) fn new_from_config(config: &Config) -> Mailer {
+    fn smtp_from_config(email: &EmailConfig) -> Result<Mailer, EmailError> {
+      let host = email
+        .smtp_host
+        .as_deref()
+        .ok_or(EmailError::Missing("SMTP host"))?;
+      let port = email
+        .smtp_port
+        .and_then(|port| u16::try_from(port).ok())
+        .ok_or(EmailError::Missing("SMTP port"))?;
+
+      return Mailer::new_smtp(
+        host,
+        port,
+        email.smtp_username.clone(),
+        email.smtp_password.clone(),
+        email.smtp_encryption(),
+      );
+    }
+
+    return match smtp_from_config(&config.email) {
+      Ok(mailer) => mailer,
+      Err(err) => {
+        info!("Falling back to local sendmail: {err}");
+        Self::new_local()
+      }
+    };
+  }
+}
+
+fn get_site_url(state: &AppState) -> url::Url {
+  return match *state.site_url() {
+    Some(ref site_url) => site_url.clone(),
+    None => {
+      // TODO: We should forward the actual server address.
+      warn!(
+        "No 'site_url' configured, falling back to 'http://localhost:4000'. This may be ok for development but will result in invalid auth links otherwise."
+      );
+
+      url::Url::parse("http://localhost:4000").expect("invariant")
+    }
+  };
+}
+
+#[cfg(test)]
+pub mod testing {
+  use lettre::AsyncTransport;
+  use lettre::address::Envelope;
+  use lettre::transport::smtp::response::{Category, Code, Detail, Response, Severity};
+  use parking_lot::Mutex;
+  use std::sync::Arc;
+
+  use super::*;
+  use crate::app_state::test_state;
+
+  #[derive(Clone)]
+  pub struct TestAsyncSmtpTransport {
+    response: Response,
+    log: Arc<Mutex<Vec<(Envelope, String)>>>,
+  }
+
+  impl TestAsyncSmtpTransport {
+    pub fn new() -> TestAsyncSmtpTransport {
+      let code = Code::new(
+        Severity::PositiveCompletion,
+        Category::Information,
+        Detail::Zero,
+      );
+
+      return TestAsyncSmtpTransport {
+        response: Response::new(code, vec![]),
+        log: Arc::new(Mutex::new(Vec::new())),
+      };
+    }
+
+    pub fn get_logs(&self) -> Vec<(Envelope, String)> {
+      return self.log.lock().clone();
+    }
+  }
+
+  #[async_trait::async_trait]
+  impl AsyncTransport for TestAsyncSmtpTransport {
+    type Ok = lettre::transport::smtp::response::Response;
+    type Error = lettre::transport::smtp::Error;
+
+    async fn send_raw(&self, envelope: &Envelope, email: &[u8]) -> Result<Self::Ok, Self::Error> {
+      self
+        .log
+        .lock()
+        .push((envelope.clone(), String::from_utf8_lossy(email).into()));
+
+      return Ok(self.response.clone());
+    }
+  }
+
+  #[tokio::test]
+  async fn test_template_rendering() {
+    let state = test_state(None).await.unwrap();
+
+    let code = "verification_code0123.";
+    {
+      let email = Email::verification_email(&state, "foo@bar.org", code, Some("/target")).unwrap();
+      assert_eq!(email.subject, "Verify your Email Address for TrailBase");
+      assert!(email.body.contains("Welcome foo@bar.org"));
+      assert!(email.body.contains(&format!(
+        "https://test.org/api/auth/v1/verify_email/confirm/{code}?redirect_uri=/target"
+      )));
+    }
+
+    {
+      let email =
+        Email::change_email_address_email(&state, "foo@bar.org", code, Some("/target")).unwrap();
+      assert_eq!(email.subject, "Change your Email Address for TrailBase");
+      assert!(
+        email.body.contains(&format!(
+          "https://test.org/api/auth/v1/change_email/confirm/{code}?redirect_uri=/target"
+        )),
+        "{}",
+        email.body
+      );
+    }
+
+    {
+      let email = Email::password_reset_email(&state, "foo@bar.org", code).unwrap();
+      assert_eq!(email.subject, "Reset your Password for TrailBase");
+      assert!(
+        email.body.contains(&format!(
+          "https://test.org/_/auth/reset_password/update/{code}"
+        )),
+        "{}",
+        email.body
+      );
+    }
+
+    {
+      let email = Email::otp_email(&state, "foo@bar.org", "12345678", None).unwrap();
+      assert_eq!(email.subject, "OTP Sign-in for TrailBase");
+      assert!(email.body.contains(&format!("&code=12345678")));
+      assert!(!email.body.contains(&format!("redirect_uri")));
+      assert!(email.body.contains("https://test.org/_/auth/otp/login"));
+    }
+
+    {
+      let email = Email::otp_email(&state, "foo@bar.org", "12345678", Some("/go/to")).unwrap();
+      assert_eq!(email.subject, "OTP Sign-in for TrailBase");
+      assert!(email.body.contains(&format!("&code=12345678")));
+      assert!(email.body.contains(&format!("&redirect_uri=/go/to")));
+      assert!(email.body.contains("https://test.org/_/auth/otp/login"));
+    }
+  }
+
+  #[test]
+  fn test_fallback_sender() {
+    let url = Some(url::Url::parse("https://test.org").unwrap());
+    let sender = fallback_sender(&url);
+    assert_eq!("noreply@test.org", sender);
+  }
+}

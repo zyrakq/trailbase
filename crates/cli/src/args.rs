@@ -1,0 +1,307 @@
+use clap::{Args, Parser, Subcommand, ValueEnum};
+
+use trailbase::DataDir;
+use trailbase::api::JsonSchemaMode;
+
+#[derive(ValueEnum, Clone, Copy, Debug)]
+pub enum JsonSchemaModeArg {
+  /// Insert mode.
+  Insert,
+  /// Read/Select mode.
+  Select,
+  /// Update mode.
+  Update,
+}
+
+impl From<JsonSchemaModeArg> for JsonSchemaMode {
+  fn from(value: JsonSchemaModeArg) -> Self {
+    match value {
+      JsonSchemaModeArg::Insert => Self::Insert,
+      JsonSchemaModeArg::Select => Self::Select,
+      JsonSchemaModeArg::Update => Self::Update,
+    }
+  }
+}
+
+/// Command line arguments for TrailBase's CLI.
+///
+/// NOTE: a good rule of thumb for thinking of proto config vs CLI options: if it requires a
+/// server restart, it should probably be a CLI option and a config option otherwise.
+#[derive(Parser, Debug, Clone, Default)]
+#[command(version, about, long_about = None, disable_version_flag = true)]
+pub struct CommandLineArgs {
+  /// Directory for runtime files including the database. Will be created by TrailBase if dir
+  /// doesn't exist.
+  #[arg(long, env, default_value = DataDir::DEFAULT)]
+  pub data_dir: std::path::PathBuf,
+
+  /// Public url used to access TrailBase. This is necessary for sending valid auth emails and
+  /// OAuth2 redirects, i.e. after users authenticating externally.
+  #[arg(long, env)]
+  pub public_url: Option<url::Url>,
+
+  /// Print `trail` version.
+  #[arg(long)]
+  pub version: bool,
+
+  #[command(subcommand)]
+  pub cmd: Option<SubCommands>,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum SubCommands {
+  /// Starts the HTTP server.
+  Run(ServerArgs),
+  /// Export JSON Schema definitions.
+  Schema(JsonSchemaArgs),
+  /// Export OpenAPI definitions.
+  #[command(name = "openapi")]
+  OpenApi {
+    #[command(subcommand)]
+    cmd: Option<OpenApiSubCommands>,
+  },
+  /// Creates new empty migration file.
+  Migration {
+    /// Optional suffix used for the generated migration file: U<timetamp>__<suffix>.sql.
+    suffix: Option<String>,
+    /// Optional database name
+    db: Option<String>,
+  },
+  /// Manage admin users (list, demote, promote).
+  Admin {
+    #[command(subcommand)]
+    cmd: Option<AdminSubCommands>,
+  },
+  /// Manage users. Unlike the admin UI this will also let you change admin users.
+  User {
+    #[command(subcommand)]
+    cmd: Option<UserSubCommands>,
+  },
+  /// Programmatically send emails.
+  Email(EmailArgs),
+  /// Manage WASM components
+  Components {
+    #[command(subcommand)]
+    cmd: Option<ComponentSubCommands>,
+  },
+}
+
+#[derive(Args, Clone, Debug)]
+pub struct ServerArgs {
+  /// Authority (<host>:<port>) the HTTP server binds to (Default: localhost:4000).
+  #[arg(short, long, env, default_value = "localhost:4000")]
+  pub address: String,
+
+  /// When set, UI and admin APIs will be served separately.
+  #[arg(long, env)]
+  pub admin_address: Option<String>,
+
+  /// Optional path to static assets that will be served at the HTTP root.
+  #[arg(long, env)]
+  pub public_dir: Option<String>,
+
+  /// Enable SPA fallback: serve index.html for routes (paths without file extensions).
+  /// File requests (e.g., /favicon.ico) will still return 404 if not found.
+  /// Use with --public-dir.
+  #[arg(long, env, default_value_t = false)]
+  pub spa: bool,
+
+  /// Optional path to sandboxed FS root for WASM runtime.
+  #[arg(long, env)]
+  pub runtime_root_fs: Option<String>,
+
+  /// Optional path to MaxmindDB geoip database. Can be used to map logged IPs to a geo location.
+  #[arg(long, env)]
+  pub geoip_db_path: Option<String>,
+
+  /// Use permissive CORS and cookies to allow for cross-origin requests when developing the UI
+  /// using externally hosted UI, e.g. using a dev server.
+  #[arg(long)]
+  pub dev: bool,
+
+  /// In demo mode, PII will be redacted from the logs.
+  #[arg(long)]
+  pub demo: bool,
+
+  #[arg(long, default_value_t = false)]
+  pub stderr_logging: bool,
+
+  /// Limit the set of allowed origins the HTTP server will answer to.
+  #[arg(long, default_value = "*")]
+  pub cors_allowed_origins: Vec<String>,
+
+  /// Number of threads the WASM runtime uses (Default: #cpus).
+  #[arg(long, env)]
+  pub runtime_threads: Option<usize>,
+
+  #[arg(long, env)]
+  pub experimental_pg: Option<String>,
+}
+
+#[derive(Args, Clone, Debug)]
+pub struct JsonSchemaArgs {
+  /// Name of the table to infer the JSON Schema from.
+  pub api: String,
+
+  /// Use-case for the type that determines which columns/fields will be required [Default:
+  /// Insert].
+  #[arg(long, env)]
+  pub mode: Option<JsonSchemaModeArg>,
+}
+
+#[derive(Args, Clone, Debug)]
+pub struct EmailArgs {
+  /// Receiver address, e.g. foo@bar.baz.
+  #[arg(long, env)]
+  pub to: String,
+
+  /// Subject line of the email to be sent.
+  #[arg(long, env)]
+  pub subject: String,
+
+  /// Email body, i.e. the actual message.
+  #[arg(long, env)]
+  pub body: String,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum OpenApiSubCommands {
+  Print,
+  #[cfg(feature = "swagger")]
+  Run {
+    /// Authority (<host>:<port>) the HTTP server binds to (Default: localhost:4000).
+    #[arg(short, long, env, default_value = "localhost:4004")]
+    address: String,
+  },
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum AdminSubCommands {
+  /// Lists admin users.
+  List,
+  /// Demotes admin user to normal user.
+  Demote {
+    /// Admin in question, either email or UUID.
+    user: String,
+  },
+  /// Promotes user to admin.
+  Promote {
+    /// User in question, either email or UUID.
+    user: String,
+  },
+}
+
+// TODO: Add "create user" (low priority since users can be created via the UI).
+#[derive(Subcommand, Debug, Clone)]
+pub enum UserSubCommands {
+  /// Change a user's password.
+  ChangePassword {
+    /// User in question, either email or UUID.
+    user: String,
+    /// New password to set for user.
+    password: String,
+  },
+  /// Change a user's email.
+  ChangeEmail {
+    /// User in question, either email or UUID.
+    user: String,
+    /// New email address to set for user.
+    new_email: String,
+  },
+  /// Adds a new and verified user.
+  Add {
+    /// Email address of the new user.
+    email: String,
+    /// Password - not checked against policies.
+    password: String,
+  },
+  /// Delete a user.
+  Delete {
+    /// User in question, either email or UUID.
+    user: String,
+  },
+  /// Change a user's verification state.
+  Verify {
+    /// User in question, either email or UUID.
+    user: String,
+    /// User's verification state to set.
+    #[arg(default_value = "true")]
+    verified: bool,
+  },
+  /// Invalidate user session, thus requiring them to re-auth when their auth token expires.
+  InvalidateSession {
+    /// User in question, either email or UUID.
+    user: String,
+  },
+  /// Mint auth token for the given user.
+  MintToken {
+    /// User in question, either email or UUID.
+    user: String,
+  },
+  // Import users from a file.
+  Import {
+    /// In dry-run mode users will only be validated and not imported.
+    #[arg(long, short = 'n', default_value_t = false)]
+    dry_run: bool,
+    /// Path to Auth0 exported users as ND JSON file.
+    #[arg(long)]
+    auth0_json: Option<String>,
+  },
+}
+
+#[derive(Clone, Debug)]
+pub enum ComponentReference {
+  Path(std::path::PathBuf),
+  Url(url::Url),
+  Name(String),
+}
+
+impl TryFrom<&str> for ComponentReference {
+  type Error = String;
+
+  fn try_from(reference: &str) -> Result<Self, Self::Error> {
+    if let Ok(url) = url::Url::parse(reference) {
+      if url.scheme() != "https" {
+        return Err("Only HTTPS supported".into());
+      }
+
+      return Ok(ComponentReference::Url(url));
+    }
+
+    let path = std::path::PathBuf::from(reference);
+    if let Some(ext) = path.extension() {
+      match &*ext.to_string_lossy() {
+        "wasm" | "zip" => {
+          return Ok(ComponentReference::Path(path));
+        }
+        _ => {}
+      }
+    }
+
+    if reference
+      .chars()
+      .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '/')
+    {
+      return Ok(ComponentReference::Name(reference.into()));
+    }
+
+    return Err("Failed to parse component reference".into());
+  }
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum ComponentSubCommands {
+  /// Add new WASM component.
+  Add {
+    /// File-system path or url for wasm component to install.
+    reference: String,
+  },
+  /// Remove/delete WASM component.
+  Remove { reference: String },
+  /// List available first-party components.
+  List,
+  /// List installed components.
+  Installed,
+  /// Update all installed first-party components.
+  Update,
+}

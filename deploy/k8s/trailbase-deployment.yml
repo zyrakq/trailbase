@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trailbase-deployment
+  labels:
+    app: trailbase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trailbase
+  strategy:
+    type: Recreate
+
+  template:
+    metadata:
+      labels:
+        app: trailbase
+    spec:
+      containers:
+        - name: trailbase
+          image: docker.io/trailbase/trailbase:latest
+          ports:
+          - containerPort: 4000
+          # - hostPort: 4000
+          env:
+          - name: RUST_BACKTRACE
+            value: "1"
+          volumeMounts:
+            - name: trailbase-storage
+              mountPath: /app/traildepot
+
+      restartPolicy: Always
+
+      volumes:
+        - name: trailbase-storage
+          persistentVolumeClaim:
+            claimName: trailbase-storage
+        # Alternatively one can bind mount a local path. Podman may need `--userns=keep-id`
+        # for user ids to line up and FS permissions to work.
+        # - name: trailbase-storage
+        #   hostPath:
+        #     path: ./traildepot/

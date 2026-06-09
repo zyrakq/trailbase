@@ -1,0 +1,51 @@
+---
+import Form from "@/components/Form.astro";
+import Button from "@/components/Button.astro";
+import TextFieldInput from "@/components/TextFieldInput.astro";
+import TextFieldLabel from "@/components/TextFieldLabel.astro";
+
+import { textFieldInputStyle } from "@/components/ui/text-field";
+import { buttonVariants } from "@/components/ui/button";
+import { AUTH_API } from "@/lib/constants";
+
+const base = import.meta.env.BASE_URL;
+const loginPageUrl = `${base}/login`;
+---
+
+<Form title="Reset Password">
+  <form
+    id="reset-request-form"
+    class="flex flex-col gap-2"
+    action={`${AUTH_API}/reset_password/request`}
+    method="post"
+    enctype="application/x-www-form-urlencoded"
+  >
+    <div class="hidden" set:html={`{{ state | escape("none") }}`} />
+
+    <div
+      class="my-4 grid grid-cols-2 items-center gap-4"
+      style={{ "grid-template-columns": "auto 1fr" }}
+    >
+      <TextFieldLabel>Email:</TextFieldLabel>
+      <TextFieldInput
+        required
+        tabindex={1}
+        class={textFieldInputStyle}
+        type="email"
+        name="email"
+        placeholder="Password"
+      />
+    </div>
+
+    <div class="flex w-full justify-between">
+      <a
+        class:list={buttonVariants({ variant: "outline" })}
+        href={loginPageUrl}
+      >
+        Back
+      </a>
+
+      <Button tabindex={2} type="submit">Send Email</Button>
+    </div>
+  </form>
+</Form>
