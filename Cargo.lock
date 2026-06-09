@@ -1002,6 +1002,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
+name = "crossfire"
+version = "3.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d8c4de3db833e7ef74050bae09d5f3fa8f9d1507d3c2689c6e8c50b71208b18"
+dependencies = [
+ "crossbeam-utils",
+ "embed-collections",
+ "futures-core",
+ "parking_lot",
+ "smallvec",
+ "tokio",
+]
+
+[[package]]
 name = "crunchy"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1273,6 +1287,12 @@ checksum = "e079f19b08ca6239f47f8ba8509c11cf3ea30095831f7fed61441475edd8c449"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "embed-collections"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b9ac53891f56267deec18b66e7775be60318278a33217268bd42bfe9ef48eb8"
 
 [[package]]
 name = "encoding_rs"
@@ -1788,6 +1808,9 @@ name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+dependencies = [
+ "foldhash 0.2.0",
+]
 
 [[package]]
 name = "hashlink"
@@ -1796,6 +1819,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea0b22561a9c04a7cb1a302c013e0259cd3b4bb619f145b32f72b8b4bcbed230"
 dependencies = [
  "hashbrown 0.16.1",
+]
+
+[[package]]
+name = "hashlink"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5081f264ed7adee96ea4b4778b6bb9da0a7228b084587aa3bd3ff05da7c5a3b"
+dependencies = [
+ "hashbrown 0.17.1",
 ]
 
 [[package]]
@@ -2451,9 +2483,9 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.37.0"
+version = "0.38.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f111c8c41e7c61a49cd34e44c7619462967221a6443b0ec299e0ac30cfb9b1"
+checksum = "f6c19a05435c21ac299d71b6a9c13db3e3f47c520517d58990a462a1397a61db"
 dependencies = [
  "bindgen",
  "cc",
@@ -2894,9 +2926,9 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "opentelemetry"
-version = "0.31.0"
+version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b84bcd6ae87133e903af7ef497404dda70c60d0ea14895fc8a5e6722754fc2a0"
+checksum = "b0142c63252a9e054e68a4c61a5778f7b14f576274d593f8ce883d191a099682"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -2907,9 +2939,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-semantic-conventions"
-version = "0.31.0"
+version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e62e29dfe041afb8ed2a6c9737ab57db4907285d999ef8ad3a59092a36bdc846"
+checksum = "6ca2f98a0437b427b4b08f19f1caa3c44db885a202bc12cfea13d6c702243d68"
 
 [[package]]
 name = "ordered-float"
@@ -3911,28 +3943,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "rsqlite-vfs"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c51c9ae4df8a7fba42103df5c621fa3c37eccf3a3c650879e90fc48b11cc192c"
-dependencies = [
- "hashbrown 0.16.1",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "rusqlite"
-version = "0.39.0"
+version = "0.40.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0d2b0146dd9661bf67bb107c0bb2a55064d556eeb3fc314151b957f313bcd4e"
+checksum = "11438310b19e3109b6446c33d1ed5e889428cf2e278407bc7896bc4aaea43323"
 dependencies = [
  "bitflags",
  "fallible-iterator",
  "fallible-streaming-iterator",
- "hashlink",
+ "hashlink 0.12.0",
  "libsqlite3-sys",
  "smallvec",
- "sqlite-wasm-rs",
 ]
 
 [[package]]
@@ -4184,6 +4205,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "self_cell"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b12e76d157a900eb52e81bc6e9f3069344290341720e9178cde2407113ac8d89"
+
+[[package]]
 name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4306,7 +4333,7 @@ dependencies = [
 [[package]]
 name = "serde_rusqlite"
 version = "0.38.0"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "rusqlite",
  "serde",
@@ -4543,18 +4570,6 @@ checksum = "0705994df478b895f05b8e290e0d46e53187b26f8d889d37b2a0881234922d94"
 dependencies = [
  "unicode_categories",
  "winnow 0.7.15",
-]
-
-[[package]]
-name = "sqlite-wasm-rs"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdd578e94101503d97e2b286bbf8db2135035ca24b2ce4cbf3f9e2fb2bbf1eee"
-dependencies = [
- "cc",
- "js-sys",
- "rsqlite-vfs",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -4993,9 +5008,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-opentelemetry"
-version = "0.32.1"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ac28f2d093c6c477eaa76b23525478f38de514fa9aeb1285738d4b97a9552fc"
+checksum = "adbc64cba7137545b8044cb1fe9814f7aacf3c6b5f9b45be8bb5db538befdb26"
 dependencies = [
  "js-sys",
  "opentelemetry",
@@ -5009,9 +5024,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-opentelemetry-instrumentation-sdk"
-version = "0.32.5"
+version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8f2540011f6d5ac30e1fc9ff169573b4559406498ac27e0242549d9bf527ed1"
+checksum = "0b7bd1956e9850c5d6b73ae8a8d651987e0140bb048341c1188171e116266567"
 dependencies = [
  "opentelemetry",
  "opentelemetry-semantic-conventions",
@@ -5047,7 +5062,7 @@ dependencies = [
 [[package]]
 name = "trailbase"
 version = "0.2.0"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "aes-gcm-siv",
  "argon2",
@@ -5133,7 +5148,7 @@ dependencies = [
 [[package]]
 name = "trailbase-assets"
 version = "0.2.0"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "axum",
  "itertools 0.14.0",
@@ -5146,7 +5161,7 @@ dependencies = [
 [[package]]
 name = "trailbase-build"
 version = "0.1.1"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "env_logger 0.11.10",
  "log",
@@ -5158,7 +5173,7 @@ dependencies = [
 [[package]]
 name = "trailbase-extension"
 version = "0.3.0"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "arc-swap",
  "argon2",
@@ -5180,7 +5195,7 @@ dependencies = [
 [[package]]
 name = "trailbase-qs"
 version = "0.1.1"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "base64",
  "itertools 0.14.0",
@@ -5194,7 +5209,7 @@ dependencies = [
 [[package]]
 name = "trailbase-reactive"
 version = "0.1.0"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "futures-util",
  "parking_lot",
@@ -5205,7 +5220,7 @@ dependencies = [
 [[package]]
 name = "trailbase-refinery"
 version = "0.1.0"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -5222,7 +5237,7 @@ dependencies = [
 [[package]]
 name = "trailbase-schema"
 version = "0.1.0"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "base64",
  "fallible-iterator",
@@ -5248,13 +5263,15 @@ dependencies = [
 [[package]]
 name = "trailbase-sqlite"
 version = "0.3.0"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
- "flume",
+ "crossfire",
  "log",
  "parking_lot",
  "rusqlite",
+ "self_cell",
  "serde",
+ "serde_json",
  "serde_rusqlite",
  "smallvec",
  "thiserror 2.0.18",
@@ -5264,7 +5281,7 @@ dependencies = [
 [[package]]
 name = "trailbase-sqlvalue"
 version = "0.1.0"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "base64",
  "serde",
@@ -5276,7 +5293,7 @@ dependencies = [
 [[package]]
 name = "trailbase-wasm-common"
 version = "0.2.0"
-source = "git+https://github.com/trailbaseio/trailbase#8054fee64b6e2fc2702d28091683bf51ad308a61"
+source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "serde",
  "trailbase-sqlvalue",
@@ -6088,7 +6105,7 @@ checksum = "631a50d867fafb7093e709d75aaee9e0e0d5deb934021fcea25ac2fe09edc51e"
 dependencies = [
  "arraydeque",
  "encoding_rs",
- "hashlink",
+ "hashlink 0.11.0",
 ]
 
 [[package]]
