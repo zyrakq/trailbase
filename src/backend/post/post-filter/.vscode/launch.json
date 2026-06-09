@@ -1,0 +1,35 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'post-filter'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=post-filter",
+                    "--package=post-filter"
+                ],
+                "filter": {
+                    "name": "post-filter",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            //"preLaunchTask": "bridge-to-kubernetes.resource"
+            "env": {
+                "ISSUER": "https://keycloak.argiago.test/realms/argiago-test",
+
+                "DB_URL": "mongodb://root:root@192.168.49.2:32017",
+                "DB_NAME": "post_store",
+                "COLLECTION_NAME": "post",
+                "AMQP_ADDR": "amqp://guest:guest@192.168.49.2:32672",
+            }
+        }
+    ]
+}

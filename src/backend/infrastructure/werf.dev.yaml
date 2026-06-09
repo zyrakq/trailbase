@@ -1,0 +1,6 @@
+configVersion: 1
+project: infrastructure
+
+deploy:
+  namespace: argiago
+  namespaceSlug: false

@@ -1,0 +1,30 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "src/keycloak"
+		},
+		{
+			"path": "src/web"
+		},
+		{
+			"path": "src/backend/infrastructure"
+		},
+		{
+			"path": "src/backend/avatar/avatar-downloader"
+		},
+		{
+			"path": "src/backend/avatar/avatar-uploader"
+		},
+		{
+			"path": "src/backend/author/author-switcher"
+		},
+	],
+	"settings": {
+		"rust-analyzer.linkedProjects": [
+			"./Cargo.toml"
+		]
+	}
+}

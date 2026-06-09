@@ -1,0 +1,10 @@
+configVersion: 1
+project: avatar-downloader
+
+deploy:
+  namespace: argiago
+  namespaceSlug: false
+---
+image: avatar_downloader
+dockerfile: Dockerfile
+context: .

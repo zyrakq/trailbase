@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-manager-issuer
+    kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+    kompose.service.expose: comment-requester.argiago.test
+    kompose.service.expose.ingress-class-name: nginx
+    kompose.service.expose.tls-secret: comment-requester-secret
+    kompose.version: 1.28.0 (HEAD)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: comment-requester
+  name: comment-requester
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: comment-requester.argiago.test
+      http:
+        paths:
+          - backend:
+              service:
+                name: comment-requester
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - comment-requester.argiago.test
+      secretName: comment-requester-secret
+status:
+  loadBalancer: {}

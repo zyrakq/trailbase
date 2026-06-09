@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "src/backend/avatar/avatar-downloader",
+    "src/backend/avatar/avatar-uploader",
+    "src/backend/author/author-switcher",
+    "src/backend/post/post-filter",
+    "src/backend/post/post-commander",
+    "src/backend/post/post-worker",
+    "src/backend/post/post-requester",
+    "src/backend/comment/comment-filter",
+    "src/backend/comment/comment-commander",
+    "src/backend/comment/comment-worker",
+    "src/backend/comment/comment-requester",
+    "src/backend/comment/comment-user-filter",
+]
+
+[patch.crates-io]
+aliri = { version = "0.6.1", git = "https://github.com/erritis/aliri", branch = "develop" }
+aliri_actix = { version = "0.8.0", git = "https://github.com/erritis/aliri", branch = "develop" }
+aliri_oauth2 = { version = "0.9.0", git = "https://github.com/erritis/aliri", branch = "develop" }
+
+aliri_reqwest = { version = "0.4.1", git = "https://github.com/erritis/aliri", branch = "develop" }
+aliri_tokens = { version = "0.2.0", git = "https://github.com/erritis/aliri", branch = "develop" }
+aliri_clock = { version = "0.1.4", features = ["serde"], git = "https://github.com/erritis/aliri", branch = "develop" }

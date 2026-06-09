@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  avatar-uploader:
+    container_name: avatar-uploader
+    image: "{{ .Values.werf.image.avatar_uploader }}"
+    labels:
+      kompose.service.expose: "avatar-uploader.argiago.test"
+      kompose.service.expose.tls-secret: "avatar-uploader-secret"
+      cert-manager.io/cluster-issuer: cert-manager-issuer
+      kompose.service.expose.ingress-class-name: "nginx"
+      kompose.volume.type: hostPath
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/healthcheck" ]
+      interval: 20s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+    environment:
+      SITE: https://avatar-downloader.argiago.test
+      ISSUER: http://keycloak.argiago.test/realms/argiago-test
+      TOKEN_URL: http://keycloak.argiago.test/realms/argiago-test/protocol/openid-connect/token
+      CLIENT_ID: avatar-uploader
+      CLIENT_SECRET: mDNK0q0EbNNQTdWQJ9TLLj9RfHuwsngq
+      AUDIENCE: avatar-uploader
+      REQWEST_CONTENT_TYPE: form
+      HOST_URL: http://keycloak.argiago.test
+      REALM: argiago-test
+    volumes:
+      - /tmp/static:/tmp/static
+    ports:
+      - "80:8080"
+    networks:
+      - argiago-network
+  
+networks:
+  argiago-network:
+    name: argiago-network
+    external: true
+      

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+    kompose.version: 1.28.0 (HEAD)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: post-worker
+  name: post-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: post-worker
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+        kompose.version: 1.28.0 (HEAD)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/argiago-network: "true"
+        io.kompose.service: post-worker
+    spec:
+      containers:
+        - env:
+            - name: AMQP_ADDR
+              value: amqp://guest:guest@${RABBITMQ_SERVICE_HOST}:5672
+            - name: COLLECTION_NAME
+              value: post
+            - name: DB_NAME
+              value: post_event_store
+            - name: DB_URL
+              value: mongodb://root:root@${MONGO_SERVICE_HOST}:${MONGO_SERVICE_PORT}
+            - name: VIEW_COLLECTION_NAME
+              value: post
+            - name: VIEW_DB_NAME
+              value: post_store
+            - name: VIEW_DB_URL
+              value: mongodb://root:root@${MONGO_SERVICE_HOST}:${MONGO_SERVICE_PORT}
+          image: {{ .Values.werf.image.post_worker }}
+          name: post-worker
+          resources: {}
+      restartPolicy: Always
+status: {}

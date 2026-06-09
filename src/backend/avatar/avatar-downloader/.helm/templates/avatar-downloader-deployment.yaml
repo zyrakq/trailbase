@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-manager-issuer
+    kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+    kompose.service.expose: avatar-downloader.argiago.test
+    kompose.service.expose.ingress-class-name: nginx
+    kompose.service.expose.tls-secret: avatar-downloader-secret
+    kompose.version: 1.28.0 (HEAD)
+    kompose.volume.type: hostPath
+  creationTimestamp: null
+  labels:
+    io.kompose.service: avatar-downloader
+  name: avatar-downloader
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: avatar-downloader
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        cert-manager.io/cluster-issuer: cert-manager-issuer
+        kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+        kompose.service.expose: avatar-downloader.argiago.test
+        kompose.service.expose.ingress-class-name: nginx
+        kompose.service.expose.tls-secret: avatar-downloader-secret
+        kompose.version: 1.28.0 (HEAD)
+        kompose.volume.type: hostPath
+      creationTimestamp: null
+      labels:
+        io.kompose.network/argiago-network: "true"
+        io.kompose.service: avatar-downloader
+    spec:
+      containers:
+        - image: {{ .Values.werf.image.avatar_downloader }}
+          livenessProbe:
+            exec:
+              command:
+                - curl
+                - -f
+                - http://localhost:8080/healthcheck
+            failureThreshold: 5
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 10
+          name: avatar-downloader
+          ports:
+            - containerPort: 8080
+          resources: {}
+          volumeMounts:
+            - mountPath: /tmp/static
+              name: avatar-downloader-hostpath0
+      restartPolicy: Always
+      volumes:
+        - hostPath:
+            path: /tmp/static
+          name: avatar-downloader-hostpath0
+status: {}

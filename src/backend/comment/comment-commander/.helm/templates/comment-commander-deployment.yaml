@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-manager-issuer
+    kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+    kompose.service.expose: comment-commander.argiago.test
+    kompose.service.expose.ingress-class-name: nginx
+    kompose.service.expose.tls-secret: comment-commander-secret
+    kompose.version: 1.28.0 (HEAD)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: comment-commander
+  name: comment-commander
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: comment-commander
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        cert-manager.io/cluster-issuer: cert-manager-issuer
+        kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+        kompose.service.expose: comment-commander.argiago.test
+        kompose.service.expose.ingress-class-name: nginx
+        kompose.service.expose.tls-secret: comment-commander-secret
+        kompose.version: 1.28.0 (HEAD)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/argiago-network: "true"
+        io.kompose.service: comment-commander
+    spec:
+      containers:
+        - env:
+            - name: AMQP_ADDR
+              value: amqp://guest:guest@${RABBITMQ_SERVICE_HOST}:5672
+            - name: COLLECTION_NAME
+              value: comment
+            - name: DB_NAME
+              value: comment_event_store
+            - name: DB_URL
+              value: mongodb://root:root@${MONGO_SERVICE_HOST}:${MONGO_SERVICE_PORT}
+            - name: ISSUER
+              value: https://keycloak.argiago.test/realms/argiago-test
+            - name: SITE
+              value: https://${COMMENT_REQUESTER_SERVICE_HOST}:${COMMENT_REQUESTER_SERVICE_PORT}
+          image: {{ .Values.werf.image.comment_commander }}
+          livenessProbe:
+            exec:
+              command:
+                - curl
+                - -f
+                - http://localhost:8080/healthcheck
+            failureThreshold: 5
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 10
+          name: comment-commander
+          ports:
+            - containerPort: 8080
+          resources: {}
+      restartPolicy: Always
+status: {}

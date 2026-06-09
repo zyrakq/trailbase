@@ -1,0 +1,10 @@
+configVersion: 1
+project: post-filter
+
+deploy:
+  namespace: argiago
+  namespaceSlug: false
+---
+image: post_filter
+dockerfile: Dockerfile
+context: .

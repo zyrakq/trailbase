@@ -1,0 +1,10 @@
+configVersion: 1
+project: post-requester
+
+deploy:
+  namespace: argiago
+  namespaceSlug: false
+---
+image: post_requester
+dockerfile: Dockerfile
+context: .

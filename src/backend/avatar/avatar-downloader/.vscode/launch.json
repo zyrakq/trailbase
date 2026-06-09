@@ -1,0 +1,29 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Cargo launch 'avatar-downloader'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=avatar-downloader",
+                    "--package=avatar-downloader"
+                ],
+                "filter": {
+                    "name": "avatar-downloader",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            //"preLaunchTask": "bridge-to-kubernetes.resource"
+            "env": {
+                "AUTHORITY": "https://keycloak.argiago.test/realms/argiago-test"
+            }
+        }
+    ]
+}
