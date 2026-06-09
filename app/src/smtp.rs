@@ -6,34 +6,71 @@
 
 use axum::{Router, http::StatusCode, response::Html};
 use mailcrab_backend::MailcrabHandle;
-use std::net::IpAddr;
 use tracing::info;
 
 use crate::settings::EmailSettings;
 
-/// URL prefix where the mailcrab UI is served.
-pub const EMAIL_PATH: &str = "/emails";
-
-const SMTP_HOST: &str = "127.0.0.1";
-const SMTP_PORT: u16 = 1025;
-
 /// Holds the router and background-task handle for the email interceptor.
 pub struct Interceptor {
+    path: String,
     router: Router,
     handle: MailcrabHandle,
 }
 
-/// Nest the mailcrab router into `app_router` at [`EMAIL_PATH`].
+/// Set up the mailcrab SMTP interceptor if `dev_intercept` is enabled.
+///
+/// Returns `None` when running in production (`dev_intercept = false`).
+///
+/// When the mailcrab WASM frontend has not been compiled into the binary
+/// (i.e. `vendor/mailcrab/frontend/dist/` was empty at compile time), a
+/// fallback handler is attached so that requests to the email path always
+/// return a helpful page instead of falling through to the SPA.
+pub fn setup(settings: &EmailSettings) -> Option<Interceptor> {
+    if !settings.dev_intercept {
+        return None;
+    }
+
+    let smtp_host = settings
+        .smtp_host
+        .parse()
+        .unwrap_or_else(|_| panic!("invalid email.smtp_host: {}", settings.smtp_host));
+
+    let (router, handle) =
+        mailcrab_backend::mailcrab_router(&settings.path, smtp_host, settings.smtp_port);
+
+    // build_router() only registers GET "/" when index.html is embedded.
+    // If the WASM frontend was not compiled into the binary, attach a fallback
+    // so the browser always gets a useful response instead of a 404.
+    let router = if mailcrab_backend::Asset::get("index.html").is_none() {
+        router.fallback(frontend_not_built)
+    } else {
+        router
+    };
+
+    info!(
+        "Mailcrab email interceptor active at {} (SMTP :{})",
+        settings.path, settings.smtp_port
+    );
+
+    Some(Interceptor {
+        path: settings.path.clone(),
+        router,
+        handle,
+    })
+}
+
+/// Nest the mailcrab router into `app_router` at the configured path.
 ///
 /// Returns the combined router and an optional shutdown handle.
 /// When `interceptor` is `None` (production), the router is returned unchanged.
-pub fn mount(interceptor: Option<Interceptor>, app_router: Router) -> (Router, Option<MailcrabHandle>) {
+pub fn mount(
+    interceptor: Option<Interceptor>,
+    app_router: Router,
+) -> (Router, Option<MailcrabHandle>) {
     match interceptor {
         None => (app_router, None),
         Some(ic) => {
-            let router = Router::new()
-                .nest(EMAIL_PATH, ic.router)
-                .merge(app_router);
+            let router = Router::new().nest(&ic.path, ic.router).merge(app_router);
             (router, Some(ic.handle))
         }
     }
@@ -49,41 +86,6 @@ pub fn shutdown(handle: Option<MailcrabHandle>) {
     }
 }
 
-/// Set up the mailcrab SMTP interceptor if `dev_intercept` is enabled.
-///
-/// Returns `None` when running in production (`dev_intercept = false`).
-///
-/// When the mailcrab WASM frontend has not been compiled into the binary
-/// (i.e. `vendor/mailcrab/frontend/dist/` was empty at compile time), a
-/// fallback handler is attached so that `GET /emails` always returns a
-/// helpful page instead of falling through to the SPA.
-pub fn setup(settings: &EmailSettings) -> Option<Interceptor> {
-    if !settings.dev_intercept {
-        return None;
-    }
-
-    let smtp_host: IpAddr = SMTP_HOST.parse().expect("valid loopback address");
-    let (router, handle) =
-        mailcrab_backend::mailcrab_router(EMAIL_PATH, smtp_host, SMTP_PORT);
-
-    // build_router() only registers GET "/" when index.html is embedded.
-    // Without a route for "/", a request to /emails would fall through to the
-    // SPA fallback, which would then fail on the client side.  Attach a
-    // fallback so the browser always gets a non-SPA response.
-    let router = if mailcrab_backend::Asset::get("index.html").is_none() {
-        router.fallback(frontend_not_built)
-    } else {
-        router
-    };
-
-    info!(
-        "Mailcrab email interceptor active at {} (SMTP :{})",
-        EMAIL_PATH, SMTP_PORT
-    );
-
-    Some(Interceptor { router, handle })
-}
-
 /// Placeholder shown when the mailcrab WASM frontend has not been compiled.
 async fn frontend_not_built() -> impl axum::response::IntoResponse {
     (
@@ -91,15 +93,13 @@ async fn frontend_not_built() -> impl axum::response::IntoResponse {
         Html(
             "<!DOCTYPE html>\
              <html><head><title>Mailcrab</title></head><body>\
-             <h1>Mailcrab — frontend not built</h1>\
+             <h1>Mailcrab \u{2014} frontend not built</h1>\
              <p>The SMTP interceptor is running, but the web UI was not compiled \
              into this binary.</p>\
              <p>To build it, install \
              <a href=\"https://trunkrs.dev\">Trunk</a> and run:</p>\
-             <pre>cd vendor/mailcrab/frontend &amp;&amp; trunk build</pre>\
+             <pre>cd vendor/mailcrab/frontend &amp;&amp; trunk build --release</pre>\
              <p>Then recompile the server.</p>\
-             <p>The raw API is available at \
-             <a href=\"/emails/api/messages\">/emails/api/messages</a>.</p>\
              </body></html>",
         ),
     )

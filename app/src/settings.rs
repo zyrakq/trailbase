@@ -30,9 +30,15 @@ pub struct FrontendSettings {
 
 #[derive(Debug, Deserialize)]
 pub struct EmailSettings {
-    /// When true, start the mailcrab SMTP interceptor and serve its UI under /emails.
+    /// When true, start the mailcrab SMTP interceptor and serve its UI under `path`.
     /// Should only be true in development environments.
     pub dev_intercept: bool,
+    /// URL prefix under which the mailcrab UI and API are served.
+    pub path: String,
+    /// IP address the SMTP listener binds to.
+    pub smtp_host: String,
+    /// Port the SMTP listener binds to.
+    pub smtp_port: u16,
 }
 
 /// Newtype wrapper so `axum::Extension<PasswordAuthEnabled>` is unambiguous.
@@ -130,6 +136,9 @@ mod tests {
 
         [email]
         dev_intercept = false
+        path = "/emails"
+        smtp_host = "127.0.0.1"
+        smtp_port = 1025
     "#};
 
     const DEV_TOML: &str = indoc! {r#"
@@ -244,6 +253,9 @@ mod tests {
 
             [email]
             dev_intercept = false
+            path = "/emails"
+            smtp_host = "127.0.0.1"
+            smtp_port = 1025
         "#};
         let s = settings_from_toml(base, "").expect("should deserialize");
         assert!(!s.email.dev_intercept);
@@ -262,6 +274,9 @@ mod tests {
 
             [email]
             dev_intercept = false
+            path = "/emails"
+            smtp_host = "127.0.0.1"
+            smtp_port = 1025
         "#};
         let overlay = indoc! {r#"
             [email]

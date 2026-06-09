@@ -8,3 +8,6 @@ public_dir = ""
 
 [email]
 dev_intercept = false
+path = "/emails"
+smtp_host = "127.0.0.1"
+smtp_port = 1025

@@ -9,7 +9,7 @@ Primary documentation is in two canonical files:
 
 ## Essential Constraints
 
-- `vendor/react/` and `vendor/trailbase/` are **read-only** reference folders — never modify
+- `vendor/react/src/web` and `vendor/trailbase/` are **read-only** reference folders — never modify
 - `vendor/mailcrab/backend/` has a minimal lib-target patch — do not add further
   modifications beyond what is already in `src/lib.rs` and `src/app_state.rs`
 - Use **bun** for frontend tasks, **cargo** for backend
@@ -25,6 +25,7 @@ The logging setup is a two-system arrangement that must not be broken:
   its `LogTracer` bridge tries to call `log::set_logger()` a second time and **panics**
 
 **Never:**
+
 - Remove or replace `pretty_env_logger` — it is the only `log` output for non-tracing crates
 - Call `tracing_subscriber::...init()` or `tracing_subscriber::...try_init()` anywhere in
   argiago code — TrailBase owns that

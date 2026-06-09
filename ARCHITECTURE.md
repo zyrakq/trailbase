@@ -7,25 +7,25 @@ migrated from React to Lit web components. The backend is a Rust/Axum server tha
 **TrailBase** — an open-source database + auth backend. The frontend is built with **Lit 3**,
 Vite, and TypeScript following a feature-based modular architecture.
 
-> **Migration status**: The `vendor/react/` folder is legacy reference code — read-only,
+> **Migration status**: The `vendor/react/src/web` folder is legacy reference code — read-only,
 > do not modify. The active codebase lives entirely in `app/`.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend framework | Lit 3.x (web components) |
-| Build tool | Vite 7 + bun |
-| Language | TypeScript 5.9 (strict mode) |
-| Routing | `@lit-labs/router` |
-| i18n | `@lit/localize` (XLIFF, no page reload) |
-| Backend language | Rust (edition 2021) |
-| Backend framework | Axum 0.8 |
-| Database + Auth | TrailBase (embedded, git dep) |
-| HTTP server | Tokio + tower-http |
-| Containerization | Docker + docker-compose |
+| Layer              | Technology                              |
+| ------------------ | --------------------------------------- |
+| Frontend framework | Lit 3.x (web components)                |
+| Build tool         | Vite 7 + bun                            |
+| Language           | TypeScript 5.9 (strict mode)            |
+| Routing            | `@lit-labs/router`                      |
+| i18n               | `@lit/localize` (XLIFF, no page reload) |
+| Backend language   | Rust (edition 2021)                     |
+| Backend framework  | Axum 0.8                                |
+| Database + Auth    | TrailBase (embedded, git dep)           |
+| HTTP server        | Tokio + tower-http                      |
+| Containerization   | Docker + docker-compose                 |
 
 ---
 
@@ -86,13 +86,13 @@ app/ui/
 
 ### Path Aliases
 
-| Alias | Resolves to |
-|---|---|
-| `@/` | `src/` |
+| Alias          | Resolves to      |
+| -------------- | ---------------- |
+| `@/`           | `src/`           |
 | `@/features/*` | `src/features/*` |
-| `@/pages/*` | `src/pages/*` |
-| `@/shared/*` | `src/shared/*` |
-| `@/assets/*` | `src/assets/*` |
+| `@/pages/*`    | `src/pages/*`    |
+| `@/shared/*`   | `src/shared/*`   |
+| `@/assets/*`   | `src/assets/*`   |
 
 ---
 
@@ -109,11 +109,11 @@ app/ui/
 
 **Route table**:
 
-| Path | Component | Guard |
-|---|---|---|
-| `/` | `<welcome-page>` | `authService.init()` → always allow |
-| `/auth/callback` | `<oauth-callback>` | None |
-| `/dashboard` | `<dashboard-page>` | `authService.init()` → redirect to `/` if not authenticated |
+| Path             | Component          | Guard                                                       |
+| ---------------- | ------------------ | ----------------------------------------------------------- |
+| `/`              | `<welcome-page>`   | `authService.init()` → always allow                         |
+| `/auth/callback` | `<oauth-callback>` | None                                                        |
+| `/dashboard`     | `<dashboard-page>` | `authService.init()` → redirect to `/` if not authenticated |
 
 Navigation: `this._router.goto(path)` for programmatic nav; `@lit-labs/router` intercepts `<a>` clicks and `popstate` automatically.
 
@@ -141,37 +141,37 @@ features/<name>/
 
 Authentication via TrailBase OAuth (OIDC) and password login (form-encoded POST for cookie persistence).
 
-| File | Role |
-|---|---|
-| `config/auth-providers.ts` | Static OIDC provider list (`OIDC_PROVIDERS`) |
-| `services/trailbase.service.ts` | HTTP adapter for TrailBase REST API; uses `trailbase` npm SDK internally |
-| `services/auth.service.ts` | App-level auth state manager, singleton with init-once guard |
-| `components/auth-modal.ts` | Login modal: OIDC buttons + password form |
-| `components/auth-status.ts` | Sign-in card / "Go to Dashboard" button |
-| `components/oauth-callback.ts` | Handles `/auth/callback` after OIDC or password redirect; calls `authService.refresh()` |
-| `types/auth.types.ts` | `User`, `AuthState` interfaces |
-| `types/auth-error.ts` | `AuthErrorCode` const, `AuthError extends Error` |
+| File                            | Role                                                                                    |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| `config/auth-providers.ts`      | Static OIDC provider list (`OIDC_PROVIDERS`)                                            |
+| `services/trailbase.service.ts` | HTTP adapter for TrailBase REST API; uses `trailbase` npm SDK internally                |
+| `services/auth.service.ts`      | App-level auth state manager, singleton with init-once guard                            |
+| `components/auth-modal.ts`      | Login modal: OIDC buttons + password form                                               |
+| `components/auth-status.ts`     | Sign-in card / "Go to Dashboard" button                                                 |
+| `components/oauth-callback.ts`  | Handles `/auth/callback` after OIDC or password redirect; calls `authService.refresh()` |
+| `types/auth.types.ts`           | `User`, `AuthState` interfaces                                                          |
+| `types/auth-error.ts`           | `AuthErrorCode` const, `AuthError extends Error`                                        |
 
 **TrailBase SDK Client — available methods** (`app/ui/node_modules/trailbase/dist/index.d.ts`):
 
 Before adding a raw `fetch()` call to `trailbase.service.ts` or any auth-related service,
 check the SDK `Client` interface first. The following methods are already implemented:
 
-| SDK method | Purpose |
-|---|---|
-| `client.login(email, password)` | JSON login → tokens in memory (no cookie, session lost on reload) |
-| `client.loginSecond({ mfaToken, totpCode })` | Complete MFA login (TOTP second factor) |
-| `client.requestOtp(email)` | Request email OTP code |
-| `client.loginOtp(email, code)` | Login with email OTP code |
-| `client.logout()` | Invalidate session |
-| `client.registerTOTP({ png })` | Start TOTP setup, returns `{ url, png }` |
-| `client.confirmTOTP(totpUrl, totp)` | Confirm TOTP setup (saves secret) |
-| `client.unregisterTOTP(totp)` | Disable TOTP |
-| `client.deleteUser()` | Delete the authenticated user |
-| `client.checkCookies()` | Re-read HttpOnly session cookie |
-| `client.refreshAuthToken()` | Force token refresh |
-| `client.user()` | Current user: `{ id, email, admin?, mfa? }` |
-| `client.records(name)` | CRUD API for data tables |
+| SDK method                                   | Purpose                                                           |
+| -------------------------------------------- | ----------------------------------------------------------------- |
+| `client.login(email, password)`              | JSON login → tokens in memory (no cookie, session lost on reload) |
+| `client.loginSecond({ mfaToken, totpCode })` | Complete MFA login (TOTP second factor)                           |
+| `client.requestOtp(email)`                   | Request email OTP code                                            |
+| `client.loginOtp(email, code)`               | Login with email OTP code                                         |
+| `client.logout()`                            | Invalidate session                                                |
+| `client.registerTOTP({ png })`               | Start TOTP setup, returns `{ url, png }`                          |
+| `client.confirmTOTP(totpUrl, totp)`          | Confirm TOTP setup (saves secret)                                 |
+| `client.unregisterTOTP(totp)`                | Disable TOTP                                                      |
+| `client.deleteUser()`                        | Delete the authenticated user                                     |
+| `client.checkCookies()`                      | Re-read HttpOnly session cookie                                   |
+| `client.refreshAuthToken()`                  | Force token refresh                                               |
+| `client.user()`                              | Current user: `{ id, email, admin?, mfa? }`                       |
+| `client.records(name)`                       | CRUD API for data tables                                          |
 
 > **Cookie caveat**: `client.login()` uses a JSON POST which returns tokens in SDK memory
 > only — no HttpOnly cookie is set, so session is lost on page reload. Use the form-encoded
@@ -183,12 +183,12 @@ check the SDK `Client` interface first. The following methods are already implem
 
 **TrailBase endpoints used**:
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/auth/v1/oauth/{provider}/login` | Initiate OAuth (browser redirect) |
-| `POST /api/auth/v1/login` | Password login (form-encoded, sets HttpOnly cookie via 303) |
-| `GET /api/auth/v1/status` | Check session / restore from cookie |
-| `POST /api/auth/v1/logout` | Invalidate session |
+| Endpoint                                  | Purpose                                                     |
+| ----------------------------------------- | ----------------------------------------------------------- |
+| `GET /api/auth/v1/oauth/{provider}/login` | Initiate OAuth (browser redirect)                           |
+| `POST /api/auth/v1/login`                 | Password login (form-encoded, sets HttpOnly cookie via 303) |
+| `GET /api/auth/v1/status`                 | Check session / restore from cookie                         |
+| `POST /api/auth/v1/logout`                | Invalidate session                                          |
 
 **Auth state**: In-memory only. Persisted via HttpOnly cookie set by TrailBase. On every page load,
 `authService.init()` calls `initClientFromCookies()` (SDK) → `GET /api/auth/v1/status` to reconstruct state.
@@ -201,26 +201,26 @@ with a `redirect_uri`; JSON POST returns tokens in the response body only (no co
 
 Zero-dependency light/dark theme management.
 
-| File | Role |
-|---|---|
-| `services/theme.service.ts` | Singleton: reads/writes theme to `localStorage`, detects system preference |
-| `services/favicon.service.ts` | Swaps favicon based on theme; auto-initializes on import |
-| `controllers/theme.controller.ts` | Lit `ReactiveController` — subscribes to theme, triggers host re-render |
-| `components/theme-toggler.ts` | Toggle button UI |
-| `styles/theme-variables.css` | All CSS custom properties for light and dark themes |
-| `utils/prevent-fart.ts` | Sets `theme` attribute on `<html>` before first paint (anti-FART) |
+| File                              | Role                                                                       |
+| --------------------------------- | -------------------------------------------------------------------------- |
+| `services/theme.service.ts`       | Singleton: reads/writes theme to `localStorage`, detects system preference |
+| `services/favicon.service.ts`     | Swaps favicon based on theme; auto-initializes on import                   |
+| `controllers/theme.controller.ts` | Lit `ReactiveController` — subscribes to theme, triggers host re-render    |
+| `components/theme-toggler.ts`     | Toggle button UI                                                           |
+| `styles/theme-variables.css`      | All CSS custom properties for light and dark themes                        |
+| `utils/prevent-fart.ts`           | Sets `theme` attribute on `<html>` before first paint (anti-FART)          |
 
 ### `features/localization/`
 
 Runtime i18n with `@lit/localize`. Locale switch without page reload.
 
-| File | Role |
-|---|---|
+| File                               | Role                                                                              |
+| ---------------------------------- | --------------------------------------------------------------------------------- |
 | `services/localization.service.ts` | Initializes `@lit/localize`, persists locale to `localStorage`, syncs across tabs |
-| `controllers/locale.controller.ts` | Lit `ReactiveController` — exposes current locale, triggers re-render on change |
-| `components/locale-switcher.ts` | Dropdown UI to switch locale |
-| `data/` | Static locale metadata (code, native name, flag, text direction) |
-| `generated/` | Auto-generated locale modules (output of `bun i18n:build`) |
+| `controllers/locale.controller.ts` | Lit `ReactiveController` — exposes current locale, triggers re-render on change   |
+| `components/locale-switcher.ts`    | Dropdown UI to switch locale                                                      |
+| `data/`                            | Static locale metadata (code, native name, flag, text direction)                  |
+| `generated/`                       | Auto-generated locale modules (output of `bun i18n:build`)                        |
 
 Supported locales: `en` (source), `ru`, `es`, `zh-Hans`.
 
@@ -228,12 +228,12 @@ Supported locales: `en` (source), `ru`, `es`, `zh-Hans`.
 
 In-app toast notification system.
 
-| File | Role |
-|---|---|
+| File                               | Role                                                     |
+| ---------------------------------- | -------------------------------------------------------- |
 | `services/notification.service.ts` | Dispatches `CustomEvent('notification-add')` on `window` |
-| `components/toast-container.ts` | Listens for events, renders active toasts |
-| `components/toast-notification.ts` | Individual toast item |
-| `components/notification-modal.ts` | Modal-style notification dialog |
+| `components/toast-container.ts`    | Listens for events, renders active toasts                |
+| `components/toast-notification.ts` | Individual toast item                                    |
+| `components/notification-modal.ts` | Modal-style notification dialog                          |
 
 **Decoupled dispatch**: Services that cannot import `notificationService` directly (circular dep risk) dispatch `CustomEvent('notification-add')` on `window` manually with the same payload shape.
 
@@ -271,11 +271,11 @@ pages/
         └── error-state.ts
 ```
 
-| Folder | Route | Description |
-|---|---|---|
-| `welcome/` | `/` | Public landing page with `<auth-status>` |
-| `dashboard/` | `/dashboard` | Authenticated user dashboard (user info, notification tests) |
-| `profile/` | `/profile` | User profile and TOTP security settings |
+| Folder            | Route             | Description                                                      |
+| ----------------- | ----------------- | ---------------------------------------------------------------- |
+| `welcome/`        | `/`               | Public landing page with `<auth-status>`                         |
+| `dashboard/`      | `/dashboard`      | Authenticated user dashboard (user info, notification tests)     |
+| `profile/`        | `/profile`        | User profile and TOTP security settings                          |
 | `reset-password/` | `/reset-password` | Password reset flow (form, success, invalid-token, error states) |
 
 **`index.ts` responsibilities**:
@@ -305,10 +305,10 @@ pages/
 
 ## Shared Components (`src/shared/`)
 
-| File | Description |
-|---|---|
-| `components/app-header.ts` | App-wide header: logo, theme toggler, locale switcher |
-| `components/footer-info.ts` | App footer |
+| File                        | Description                                           |
+| --------------------------- | ----------------------------------------------------- |
+| `components/app-header.ts`  | App-wide header: logo, theme toggler, locale switcher |
+| `components/footer-info.ts` | App footer                                            |
 
 ---
 
@@ -316,15 +316,15 @@ pages/
 
 Rust/Axum server that embeds TrailBase and serves the compiled frontend.
 
-| File | Role |
-|---|---|
-| `main.rs` | Entry point: initializes logging, loads settings, starts Axum server; conditionally mounts mailcrab under `/emails` |
-| `routes.rs` | HTTP route definitions |
-| `components.rs` | Backend component registrations |
-| `frontend.rs` | Serves `app/ui/dist/` as static files |
-| `settings.rs` | Config loading (TOML + env vars via `config` + `dotenvy`) |
-| `logging.rs` | `pretty_env_logger` setup |
-| `preflight.rs` | Startup validation checks |
+| File            | Role                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `main.rs`       | Entry point: initializes logging, loads settings, starts Axum server; conditionally mounts mailcrab under `/emails` |
+| `routes.rs`     | HTTP route definitions                                                                                              |
+| `components.rs` | Backend component registrations                                                                                     |
+| `frontend.rs`   | Serves `app/ui/dist/` as static files                                                                               |
+| `settings.rs`   | Config loading (TOML + env vars via `config` + `dotenvy`)                                                           |
+| `logging.rs`    | `pretty_env_logger` setup                                                                                           |
+| `preflight.rs`  | Startup validation checks                                                                                           |
 
 **TrailBase** is embedded as a git dependency from `https://github.com/trailbaseio/trailbase`.
 It provides: SQLite database, REST API, OAuth/OIDC auth, file uploads, WASM modules.
@@ -370,34 +370,34 @@ Any code → notificationService.error('msg')
 
 ## Migration Context (React → Lit)
 
-The `vendor/react/` folder is a **read-only reference** for what features need to be built.
+The `vendor/react/src/web` folder is a **read-only reference** for what features need to be built.
 The React code was never refactored and should not be used as a structural guide.
 
 ### Features to Migrate (from React reference)
 
-| Feature | Status |
-|---|---|
-| Auth (login/logout/OAuth callback) | ✅ Done |
-| Theme (light/dark toggle) | ✅ Done |
-| Localization (i18n, locale switcher) | ✅ Done |
-| Notifications (toasts) | ✅ Done |
-| Welcome page | ✅ Done |
-| Dashboard page (basic) | ✅ Done (stub) |
-| Home page (landing) | Pending |
-| Profile page (author + posts + subscriptions) | Pending |
-| Post detail page (single post + comments) | Pending |
-| New post page (rich text editor + drafts) | Pending |
-| Account settings (avatar upload + currency) | Pending |
-| 404 / 403 error pages | Pending |
-| Header (subscriptions drawer, profile menu) | Partial (basic header done) |
-| Footer | Partial |
-| Post card (rich text, access gating) | Pending |
-| Comment / Reply system | Pending |
-| Subscription tier cards | Pending |
-| Follow / Unfollow button | Pending |
-| Draft management | Pending |
-| Post access control UI | Pending |
-| Currency selector | Pending |
+| Feature                                       | Status                      |
+| --------------------------------------------- | --------------------------- |
+| Auth (login/logout/OAuth callback)            | ✅ Done                     |
+| Theme (light/dark toggle)                     | ✅ Done                     |
+| Localization (i18n, locale switcher)          | ✅ Done                     |
+| Notifications (toasts)                        | ✅ Done                     |
+| Welcome page                                  | ✅ Done                     |
+| Dashboard page (basic)                        | ✅ Done (stub)              |
+| Home page (landing)                           | Pending                     |
+| Profile page (author + posts + subscriptions) | Pending                     |
+| Post detail page (single post + comments)     | Pending                     |
+| New post page (rich text editor + drafts)     | Pending                     |
+| Account settings (avatar upload + currency)   | Pending                     |
+| 404 / 403 error pages                         | Pending                     |
+| Header (subscriptions drawer, profile menu)   | Partial (basic header done) |
+| Footer                                        | Partial                     |
+| Post card (rich text, access gating)          | Pending                     |
+| Comment / Reply system                        | Pending                     |
+| Subscription tier cards                       | Pending                     |
+| Follow / Unfollow button                      | Pending                     |
+| Draft management                              | Pending                     |
+| Post access control UI                        | Pending                     |
+| Currency selector                             | Pending                     |
 
 ### Mock Data Strategy
 

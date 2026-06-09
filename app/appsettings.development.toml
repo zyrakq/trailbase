@@ -4,3 +4,6 @@ password_auth_enabled = true
 
 [email]
 dev_intercept = true
+path = "/emails"
+smtp_host = "127.0.0.1"
+smtp_port = 1025
