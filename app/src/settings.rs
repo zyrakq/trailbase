@@ -11,6 +11,7 @@ use serde::Deserialize;
 pub struct Settings {
     pub server: ServerSettings,
     pub frontend: FrontendSettings,
+    pub email: EmailSettings,
 }
 
 #[derive(Debug, Deserialize)]
@@ -25,6 +26,13 @@ pub struct FrontendSettings {
     /// Empty string means "derive from CARGO_MANIFEST_DIR at runtime in main.rs".
     pub public_dir: String,
     pub password_auth_enabled: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EmailSettings {
+    /// When true, start the mailcrab SMTP interceptor and serve its UI under /emails.
+    /// Should only be true in development environments.
+    pub dev_intercept: bool,
 }
 
 /// Newtype wrapper so `axum::Extension<PasswordAuthEnabled>` is unambiguous.
@@ -119,6 +127,9 @@ mod tests {
         build = false
         watch = false
         public_dir = ""
+
+        [email]
+        dev_intercept = false
     "#};
 
     const DEV_TOML: &str = indoc! {r#"
@@ -218,5 +229,45 @@ mod tests {
             Some(false),
             "password_auth_enabled should be Some(false) when explicitly set to false"
         );
+    }
+
+    #[test]
+    fn email_dev_intercept_defaults_to_false() {
+        let base = indoc! {r#"
+            [server]
+            address = "0.0.0.0:4000"
+
+            [frontend]
+            build = false
+            watch = false
+            public_dir = ""
+
+            [email]
+            dev_intercept = false
+        "#};
+        let s = settings_from_toml(base, "").expect("should deserialize");
+        assert!(!s.email.dev_intercept);
+    }
+
+    #[test]
+    fn email_dev_intercept_can_be_enabled() {
+        let base = indoc! {r#"
+            [server]
+            address = "0.0.0.0:4000"
+
+            [frontend]
+            build = false
+            watch = false
+            public_dir = ""
+
+            [email]
+            dev_intercept = false
+        "#};
+        let overlay = indoc! {r#"
+            [email]
+            dev_intercept = true
+        "#};
+        let s = settings_from_toml(base, overlay).expect("should deserialize");
+        assert!(s.email.dev_intercept);
     }
 }

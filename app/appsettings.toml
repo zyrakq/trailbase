@@ -5,3 +5,6 @@ address = "0.0.0.0:4000"
 build = false
 watch = false
 public_dir = ""
+
+[email]
+dev_intercept = false

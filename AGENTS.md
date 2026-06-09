@@ -9,7 +9,9 @@ Primary documentation is in two canonical files:
 
 ## Essential Constraints
 
-- `react/` and `trailbase/` are **read-only** reference folders — never modify
+- `vendor/react/` and `vendor/trailbase/` are **read-only** reference folders — never modify
+- `vendor/mailcrab/backend/` has a minimal lib-target patch — do not add further
+  modifications beyond what is already in `src/lib.rs` and `src/app_state.rs`
 - Use **bun** for frontend tasks, **cargo** for backend
 - All comments and documentation must be in **English**
 

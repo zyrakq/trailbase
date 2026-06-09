@@ -1,3 +1,6 @@
 [frontend]
 watch = true
 password_auth_enabled = true
+
+[email]
+dev_intercept = true

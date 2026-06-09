@@ -279,12 +279,11 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     }
 }
 
-pub async fn web_server(
-    host: IpAddr,
-    port: u16,
-    app_state: Arc<AppState>,
-    token: CancellationToken,
-) -> AppResult<()> {
+/// Build the Axum router with all mailcrab routes attached.
+///
+/// Does NOT bind a TCP listener — call `web_server()` for the standalone binary,
+/// or use this directly when embedding into another Axum server.
+pub(crate) fn build_router(app_state: Arc<AppState>) -> Router {
     let mut router = Router::new()
         .route("/ws", get(ws_handler))
         .route("/api/messages", get(messages_handler))
@@ -308,11 +307,21 @@ pub async fn web_server(
         router = router.route("/", get(index));
     }
 
+    router.layer(Extension(app_state))
+}
+
+pub async fn web_server(
+    host: IpAddr,
+    port: u16,
+    app_state: Arc<AppState>,
+    token: CancellationToken,
+) -> AppResult<()> {
+    let inner = build_router(app_state.clone());
+
     let app = match app_state.prefix.as_str() {
-        "/" | "" => router,
-        prefix => Router::new().nest(prefix, router.clone()),
-    }
-    .layer(Extension(app_state.clone()));
+        "/" | "" => inner,
+        prefix => Router::new().nest(prefix, inner),
+    };
 
     let addr = SocketAddr::from((host, port));
     let listener = TcpListener::bind(&addr).await?;

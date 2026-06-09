@@ -6,7 +6,7 @@ mod routes;
 mod settings;
 
 use settings::{PasswordAuthEnabled, Settings};
-use std::path::PathBuf;
+use std::{net::IpAddr, path::PathBuf, str::FromStr};
 use tracing::info;
 
 #[tokio::main]
@@ -41,14 +41,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let password_auth_enabled =
         PasswordAuthEnabled(settings.frontend.password_auth_enabled.unwrap_or(true));
 
-    let router = axum::Router::new()
+    // Conditionally embed the mailcrab email-intercept UI under /emails.
+    // Only active when settings.email.dev_intercept = true (development only).
+    let (mailcrab_nest, mailcrab_handle) = if settings.email.dev_intercept {
+        let smtp_host = IpAddr::from_str("127.0.0.1").expect("valid loopback address");
+        let smtp_port: u16 = 1025;
+        let (router, handle) =
+            mailcrab_backend::mailcrab_router("/emails", smtp_host, smtp_port);
+        info!("Mailcrab email interceptor active at /emails (SMTP :{})", smtp_port);
+        (Some(router), Some(handle))
+    } else {
+        (None, None)
+    };
+
+    let mut router = axum::Router::new()
         .merge(routes::build(state))
         .merge(main_router.1)
         .fallback_service(routes::static_files(&settings.frontend, &manifest_dir))
         .layer(axum::Extension(password_auth_enabled));
 
+    if let Some(mc_router) = mailcrab_nest {
+        router = axum::Router::new()
+            .nest("/emails", mc_router)
+            .merge(router);
+    }
+
     info!("Server running at http://{}", settings.server.address);
     trailbase::api::serve((main_router.0, router), admin_router, tls).await?;
+
+    // Cancel mailcrab background tasks after the server has shut down.
+    if let Some(handle) = mailcrab_handle {
+        handle.token.cancel();
+    }
 
     Ok(())
 }

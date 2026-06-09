@@ -7,6 +7,10 @@ license = "Apache-2.0 OR MIT"
 repository = "https://github.com/tweedegolf/mailcrab"
 description = "Email test server for development, written in Rust"
 
+[lib]
+name = "mailcrab_backend"
+path = "src/lib.rs"
+
 [dependencies]
 axum = { version = "0.8", features = ["ws"] }
 mailcrab = { path = "../mailcrab" }
@@ -17,7 +21,7 @@ tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
 tower-http = { version = "0.6", features = ["fs", "trace"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "std"] }
 uuid = { version = "1.19", features = ["v4", "serde"] }
 
 [dev-dependencies]

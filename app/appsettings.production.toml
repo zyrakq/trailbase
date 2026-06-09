@@ -1,2 +1,5 @@
 [frontend]
 build = true
+
+[email]
+dev_intercept = false

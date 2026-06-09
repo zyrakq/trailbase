@@ -1,42 +1,26 @@
-use mailcrab::{Error, MailMessage, MessageId, Result, mail_server};
-use rust_embed::{EmbeddedFile, RustEmbed};
+use mailcrab::{MailMessage, mail_server};
 use std::{
-    collections::HashMap,
     env,
     net::IpAddr,
     process,
     str::FromStr,
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
-use tokio::{signal, sync::broadcast::Receiver, task::JoinSet, time::Duration};
+use tokio::{signal, task::JoinSet, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};
 
 use crate::{storage::storage, web_server::web_server};
 
+mod app_state;
 mod storage;
 mod web_server;
 
 #[cfg(test)]
 mod tests;
 
-/// retrieve the version from Cargo.toml, note that this will yield an error
-/// when compiling without cargo
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-/// application state, holds all messages, a message queue and configuration
-pub struct AppState {
-    rx: Receiver<MailMessage>,
-    storage: RwLock<HashMap<MessageId, MailMessage>>,
-    prefix: String,
-    index: Option<String>,
-    retention_period: Duration,
-}
-
-#[derive(RustEmbed)]
-#[folder = "../frontend/dist"]
-pub struct Asset;
+use app_state::{AppState, Asset, VERSION, load_index};
 
 /// get a configuration from the environment or return default value
 fn parse_env_var<T: FromStr>(name: &'static str, default: T) -> T {
@@ -44,22 +28,6 @@ fn parse_env_var<T: FromStr>(name: &'static str, default: T) -> T {
         .unwrap_or_default()
         .parse::<T>()
         .unwrap_or(default)
-}
-
-/// preload the HTML for the index, replace dynamic values
-fn load_index(path_prefix: &str) -> Result<String> {
-    let index: EmbeddedFile = Asset::get("index.html")
-        .ok_or_else(|| Error::WebServer("Could not load index.html".to_owned()))?;
-    let index = String::from_utf8_lossy(&index.data);
-    let path_prefix = if path_prefix == "/" { "" } else { path_prefix };
-
-    // add path prefix to asset includes
-    Ok(index
-        .replace("href=\"/", &format!("href=\"{path_prefix}/static/"))
-        .replace(
-            "'/mailcrab-frontend",
-            &format!("'{path_prefix}/static/mailcrab-frontend"),
-        ))
 }
 
 async fn run() -> i32 {

@@ -7,8 +7,8 @@ migrated from React to Lit web components. The backend is a Rust/Axum server tha
 **TrailBase** — an open-source database + auth backend. The frontend is built with **Lit 3**,
 Vite, and TypeScript following a feature-based modular architecture.
 
-> **Migration status**: The `react/` folder is legacy reference code — read-only, do not modify.
-> The active codebase lives entirely in `app/`.
+> **Migration status**: The `vendor/react/` folder is legacy reference code — read-only,
+> do not modify. The active codebase lives entirely in `app/`.
 
 ---
 
@@ -45,11 +45,16 @@ argiago/
 │   ├── traildepot/         # TrailBase data dir (DB, migrations, secrets)
 │   ├── ui/                 # Frontend application (Lit + Vite)
 │   └── Cargo.toml
-├── react/                  # Legacy React code — READ ONLY, do not modify
-├── trailbase/              # Cloned TrailBase repo — READ ONLY, reference only
-│   └── crates/
-│       ├── auth-ui/        # Official TrailBase auth UI — reference for auth flow internals
-│       └── core/           # Core API handlers (e.g. auth/api/login.rs)
+├── vendor/
+│   ├── react/              # Legacy React code — READ ONLY, do not modify
+│   ├── trailbase/          # Cloned TrailBase repo — READ ONLY, reference only
+│   │   └── crates/
+│   │       ├── auth-ui/    # Official TrailBase auth UI — reference for auth flow internals
+│   │       └── core/       # Core API handlers (e.g. auth/api/login.rs)
+│   └── mailcrab/           # Mailcrab submodule (backend/ has lib target patch)
+│       ├── backend/        # Patched: exposes mailcrab_router() as a library
+│       ├── frontend/       # Pre-built Yew WASM UI (embedded via rust-embed)
+│       └── mailcrab/       # SMTP library crate
 ├── Cargo.toml              # Workspace root
 ├── Cargo.lock
 ├── docker-compose.yml
@@ -313,7 +318,7 @@ Rust/Axum server that embeds TrailBase and serves the compiled frontend.
 
 | File | Role |
 |---|---|
-| `main.rs` | Entry point: initializes logging, loads settings, starts Axum server |
+| `main.rs` | Entry point: initializes logging, loads settings, starts Axum server; conditionally mounts mailcrab under `/emails` |
 | `routes.rs` | HTTP route definitions |
 | `components.rs` | Backend component registrations |
 | `frontend.rs` | Serves `app/ui/dist/` as static files |
@@ -365,7 +370,7 @@ Any code → notificationService.error('msg')
 
 ## Migration Context (React → Lit)
 
-The `react/` folder is a **read-only reference** for what features need to be built.
+The `vendor/react/` folder is a **read-only reference** for what features need to be built.
 The React code was never refactored and should not be used as a structural guide.
 
 ### Features to Migrate (from React reference)

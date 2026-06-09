@@ -1,0 +1,3 @@
+[workspace]
+members = ["mailcrab", "backend"]
+resolver = "2"

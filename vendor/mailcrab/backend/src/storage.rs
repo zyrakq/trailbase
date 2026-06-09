@@ -8,7 +8,7 @@ use crate::AppState;
 
 /// storage task, stores all messages from the queue and optionally
 /// deletes old messages
-pub(crate) async fn storage(
+pub async fn storage(
     mut storage_rx: Receiver<MailMessage>,
     state: Arc<AppState>,
     token: CancellationToken,
