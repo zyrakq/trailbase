@@ -43,30 +43,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         PasswordAuthEnabled(settings.frontend.password_auth_enabled.unwrap_or(true));
 
     let interceptor = smtp::setup(&settings.email);
-    let (mc_router, mc_handle) = match interceptor {
-        Some(ic) => (Some(ic.router), Some(ic.handle)),
-        None => (None, None),
-    };
 
-    let mut router = axum::Router::new()
+    let base_router = axum::Router::new()
         .merge(routes::build(state))
         .merge(main_router.1)
         .fallback_service(routes::static_files(&settings.frontend, &manifest_dir))
         .layer(axum::Extension(password_auth_enabled));
 
-    if let Some(mc_router) = mc_router {
-        router = axum::Router::new()
-            .nest(smtp::EMAIL_PATH, mc_router)
-            .merge(router);
-    }
+    let (router, smtp_handle) = smtp::mount(interceptor, base_router);
 
     info!("Server running at http://{}", settings.server.address);
     trailbase::api::serve((main_router.0, router), admin_router, tls).await?;
 
-    // Cancel mailcrab background tasks after the server has shut down.
-    if let Some(handle) = mc_handle {
-        handle.token.cancel();
-    }
+    smtp::shutdown(smtp_handle);
 
     Ok(())
 }

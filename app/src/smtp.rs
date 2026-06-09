@@ -19,8 +19,34 @@ const SMTP_PORT: u16 = 1025;
 
 /// Holds the router and background-task handle for the email interceptor.
 pub struct Interceptor {
-    pub router: Router,
-    pub handle: MailcrabHandle,
+    router: Router,
+    handle: MailcrabHandle,
+}
+
+/// Nest the mailcrab router into `app_router` at [`EMAIL_PATH`].
+///
+/// Returns the combined router and an optional shutdown handle.
+/// When `interceptor` is `None` (production), the router is returned unchanged.
+pub fn mount(interceptor: Option<Interceptor>, app_router: Router) -> (Router, Option<MailcrabHandle>) {
+    match interceptor {
+        None => (app_router, None),
+        Some(ic) => {
+            let router = Router::new()
+                .nest(EMAIL_PATH, ic.router)
+                .merge(app_router);
+            (router, Some(ic.handle))
+        }
+    }
+}
+
+/// Cancel mailcrab background tasks.
+///
+/// Call this after the HTTP server has shut down.
+/// Does nothing when `handle` is `None`.
+pub fn shutdown(handle: Option<MailcrabHandle>) {
+    if let Some(h) = handle {
+        h.token.cancel();
+    }
 }
 
 /// Set up the mailcrab SMTP interceptor if `dev_intercept` is enabled.
