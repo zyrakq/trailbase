@@ -23,6 +23,7 @@ export class ProfilePage extends LitElement {
   @state() private disableCode = '';
   @state() private totpError = '';
   @state() private passwordAuthEnabled = true;
+  @state() private otpEnabled = true;
   @state() private signOutLoading = false;
 
   async connectedCallback() {
@@ -32,6 +33,7 @@ export class ProfilePage extends LitElement {
     this.totpState = authState.hasMfa ? 'enabled' : 'idle';
     const config = await configService.fetchConfig();
     this.passwordAuthEnabled = config.passwordAuthEnabled;
+    this.otpEnabled = config.otpEnabled;
   }
 
   private async handleSignOut() {
@@ -154,7 +156,7 @@ export class ProfilePage extends LitElement {
           <div class="profile-container">
             <profile-user-card .user=${this.user}></profile-user-card>
 
-            ${this.passwordAuthEnabled
+            ${this.passwordAuthEnabled && this.otpEnabled
               ? html`
                 <profile-security-card
                   .totpState=${this.totpState}

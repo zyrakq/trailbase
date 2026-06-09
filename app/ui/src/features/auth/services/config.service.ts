@@ -15,12 +15,15 @@ export interface PublicConfig {
   /** Whether password-based login, registration, and OTP UI should be shown. */
   passwordAuthEnabled: boolean;
   registrationEnabled: boolean;
+  /** Whether OTP/TOTP two-factor authentication is enabled server-side. */
+  otpEnabled: boolean;
   oauthProviders: OAuthProviderConfig[];
 }
 
 const DEFAULT_CONFIG: PublicConfig = {
   passwordAuthEnabled: true,
   registrationEnabled: true,
+  otpEnabled: true,
   oauthProviders: [],
 };
 

@@ -57,8 +57,9 @@ async fn public_config_handler(
     State(state): State<AppState>,
     axum::Extension(PasswordAuthEnabled(password_auth_enabled)): axum::Extension<PasswordAuthEnabled>,
 ) -> axum::Json<serde_json::Value> {
-    let (registration_enabled, oauth_providers) = state.access_config(|c| {
+    let (registration_enabled, otp_enabled, oauth_providers) = state.access_config(|c| {
         let registration_enabled = !c.auth.disable_password_auth.unwrap_or(false);
+        let otp_enabled = c.auth.enable_otp_signin();
 
         let oauth_providers: Vec<serde_json::Value> = c
             .auth
@@ -78,12 +79,13 @@ async fn public_config_handler(
             })
             .collect();
 
-        (registration_enabled, oauth_providers)
+        (registration_enabled, otp_enabled, oauth_providers)
     });
 
     axum::Json(serde_json::json!({
         "passwordAuthEnabled": password_auth_enabled,
         "registrationEnabled": registration_enabled,
+        "otpEnabled": otp_enabled,
         "oauthProviders": oauth_providers,
     }))
 }

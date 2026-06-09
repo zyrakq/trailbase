@@ -7,7 +7,6 @@ server {
 }
 auth {
   disable_password_auth: true
-  enable_otp_signin: true
   oauth_providers: [{
     key: "oidc0"
     value {
