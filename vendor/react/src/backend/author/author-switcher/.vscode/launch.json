@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Cargo launch 'author-switcher'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=author-switcher",
+                    "--package=author-switcher"
+                ],
+                "filter": {
+                    "name": "author-switcher",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "preLaunchTask": "bridge-to-kubernetes.resource",
+            // "env": {
+            //     "ISSUER": "http://keycloak.argiago.test/realms/argiago-test",
+            //     "TOKEN_URL": "http://keycloak.argiago.test/realms/aliri/protocol/openid-connect/token",
+            //     "CLIENT_ID": "author-switcher",
+            //     "CLIENT_SECRET": "yOwSTFjisTsYgknDeIt2lBWgRMKIWhjZ",
+            //     "AUDIENCE": "author-switcher",
+            //     "REQWEST_CONTENT_TYPE": "form",
+            //     "HOST_URL": "https://keycloak.argiago.test",
+            //     "REALM": "argiago-test"
+            // }
+        }
+    ]
+}

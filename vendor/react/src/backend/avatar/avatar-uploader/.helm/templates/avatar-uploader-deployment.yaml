@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-manager-issuer
+    kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+    kompose.service.expose: avatar-uploader.argiago.test
+    kompose.service.expose.ingress-class-name: nginx
+    kompose.service.expose.tls-secret: avatar-uploader-secret
+    kompose.version: 1.28.0 (HEAD)
+    kompose.volume.type: hostPath
+  creationTimestamp: null
+  labels:
+    io.kompose.service: avatar-uploader
+  name: avatar-uploader
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: avatar-uploader
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        cert-manager.io/cluster-issuer: cert-manager-issuer
+        kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+        kompose.service.expose: avatar-uploader.argiago.test
+        kompose.service.expose.ingress-class-name: nginx
+        kompose.service.expose.tls-secret: avatar-uploader-secret
+        kompose.version: 1.28.0 (HEAD)
+        kompose.volume.type: hostPath
+      creationTimestamp: null
+      labels:
+        io.kompose.network/argiago-network: "true"
+        io.kompose.service: avatar-uploader
+    spec:
+      containers:
+        - env:
+            - name: AUDIENCE
+              value: avatar-uploader
+            - name: CLIENT_ID
+              value: avatar-uploader
+            - name: CLIENT_SECRET
+              value: mDNK0q0EbNNQTdWQJ9TLLj9RfHuwsngq
+            - name: HOST_URL
+              value: http://keycloak.argiago.test
+            - name: ISSUER
+              value: http://keycloak.argiago.test/realms/argiago-test
+            - name: REALM
+              value: argiago-test
+            - name: REQWEST_CONTENT_TYPE
+              value: form
+            - name: SITE
+              value: https://avatar-downloader.argiago.test
+            - name: TOKEN_URL
+              value: http://keycloak.argiago.test/realms/argiago-test/protocol/openid-connect/token
+          image: {{ .Values.werf.image.avatar_uploader }}
+          livenessProbe:
+            exec:
+              command:
+                - curl
+                - -f
+                - http://localhost:8080/healthcheck
+            failureThreshold: 5
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 10
+          name: avatar-uploader
+          ports:
+            - containerPort: 8080
+          resources: {}
+          volumeMounts:
+            - mountPath: /tmp/static
+              name: avatar-uploader-hostpath0
+      restartPolicy: Always
+      volumes:
+        - hostPath:
+            path: /tmp/static
+          name: avatar-uploader-hostpath0
+status: {}

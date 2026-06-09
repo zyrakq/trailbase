@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  post-worker:
+    container_name: post-worker
+    image: "{{ .Values.werf.image.post_worker }}"
+    environment:
+      AMQP_ADDR: amqp://guest:guest@${RABBITMQ_SERVICE_HOST}:5672
+      DB_URL: mongodb://root:root@${MONGO_SERVICE_HOST}:${MONGO_SERVICE_PORT}
+      DB_NAME: post_event_store
+      COLLECTION_NAME: post
+      VIEW_DB_URL: mongodb://root:root@${MONGO_SERVICE_HOST}:${MONGO_SERVICE_PORT}
+      VIEW_DB_NAME: post_store
+      VIEW_COLLECTION_NAME: post
+    networks:
+      - argiago-network
+  
+networks:
+  argiago-network:
+    name: argiago-network
+    external: true
+      

@@ -1,0 +1,121 @@
+{
+  "header": {
+    "lang": {
+      "label": "Language"
+    },
+    "login": "Log in",
+    "logout": "Log out",
+    "account_settings": "Account Settings",
+    "my_page": "My page",
+    "my_subscriptions": "My subscriptions",
+    "become_author": "Become a creator"
+  },
+  "footer": {
+    "our_blog": "Our blog",
+    "terms_of_use": "Terms of use",
+    "privacy_policy": "Privacy policy",
+    "support": "Support"
+  },
+  "home_page": {
+    "title": "Home page is under construction",
+    "description": "This page has not been created yet."
+  },
+  "not_found_page": {
+    "title": "Page does not exist",
+    "description": "The page you requested does not exist. It may have been outdated, removed, or the wrong address was entered in the address bar."
+  },
+  "forbidden_page": {
+    "title": "Permission denied",
+    "description": "Sorry, you are not authorized to access this page."
+  },
+  "account_settings_page":{
+    "label": "Account Settings",
+    "profile": "Profile"
+  },
+  "avatar": {
+    "edit": "Edit photo",
+    "upload": "Upload a photo",
+    "uploaded": "Photo updated",
+    "delete": "Delete photo",
+    "deleted": "Photo deleted",
+    "drag": "Drag your photo into this area",
+    "thumb_selection": "Thumbnail selection"
+  },
+  "post_list": {
+    "placeholder": {
+      "title": "There are no posts on this wall yet",
+      "description": "Create posts and share them with your audience"
+    },
+    "show_more": "Show more"
+  },
+  "comment_list": {
+    "show_more_comments": "Show more comments",
+    "show_more_replies": "Show more replies",
+    "leave_comment": "Leave a comment",
+    "deleted": "Comment has been deleted",
+    "restore": "Restore?",
+    "reply": "Reply",
+    "to_post_comments": ", to post comments",
+    "comment_changed": "changed"
+  },
+  "new_post": {
+    "title": "New post",
+    "created": "Post created",
+    "saved_drafts_interval": "(1)[No saved drafts];(2)[saved draft];(3-5)[saved drafts];",
+    "available": {
+      "everyone": "Available to everyone",
+      "payment_only": "One-time payment only",
+      "subscribers_only": "Subscribers only",
+      "one-time_or_subscription": "Subscribers or one-time payment"
+    },
+    "sections": {
+      "post": "Post",
+      "tags": {
+        "title": "Post tags",
+        "placeholder": "Вводите теги через Enter (не более 10)"
+      },
+      "teaser": "Post teaser"
+    }
+  },
+  "actions": {
+    "back": "Back",
+    "to_main": "To main",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "publish": "Publish",
+    "open": "Open",
+    "load_more": "Load more",
+    "report": "Report"
+  },
+  "profile": {
+    "follow": "Follow",
+    "following": "Following",
+    "stop_following": "Stop following",
+    "followers_interval": "(1)[no subscribers];(2)[subscriber];(3-5)[subscribers];",
+    "login": "Log in",
+    "write_post": "New post"
+  },
+  "subscription_types": {
+    "button": {
+      "buy": "Buy",
+      "unlock_post": "Unlock post",
+      "subscribe": "Subscribe"
+    },
+    "available": {
+      "everyone": "Available to everyone",
+      "payment_only": "One-time payment only",
+      "subscribers_only": "For subscribers only",
+      "one-time_or_subscription": "For subscribers and one-time payment"
+    },
+    "title": "Subscription types",
+    "per_month": "per month",
+
+    "placeholder": "No subscription types",
+    "required": "Subscription required",
+    "after_purchase": "Post is available after purchase"
+  },
+  "something_went_wrong": "Something went wrong"
+
+}

@@ -1,0 +1,10 @@
+configVersion: 1
+project: comment-filter
+
+deploy:
+  namespace: argiago
+  namespaceSlug: false
+---
+image: comment_filter
+dockerfile: Dockerfile
+context: .

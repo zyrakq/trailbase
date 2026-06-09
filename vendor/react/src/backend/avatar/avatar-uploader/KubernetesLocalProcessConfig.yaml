@@ -1,0 +1,4 @@
+version: 0.1
+env:
+  - name: AUTHORITY
+    value: https://keycloak.argiago.test/realms/argiago-test

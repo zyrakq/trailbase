@@ -1,0 +1,10 @@
+configVersion: 1
+project: argiago-keycloak
+
+deploy:
+  namespace: argiago
+  namespaceSlug: false
+---
+image: argiago_keycloak
+dockerfile: Dockerfile
+context: .

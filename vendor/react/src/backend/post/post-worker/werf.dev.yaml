@@ -1,0 +1,10 @@
+configVersion: 1
+project: post-worker
+
+deploy:
+  namespace: argiago
+  namespaceSlug: false
+---
+image: post_worker
+dockerfile: Dockerfile
+context: .

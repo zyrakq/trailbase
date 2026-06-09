@@ -1,0 +1,60 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "src/keycloak"
+		},
+		{
+			"path": "src/web"
+		},
+		{
+			"path": "src/backend/infrastructure"
+		},
+		{
+			"path": "src/backend/avatar/avatar-downloader"
+		},
+		{
+			"path": "src/backend/avatar/avatar-uploader"
+		},
+		{
+			"path": "src/backend/author/author-switcher"
+		},
+		{
+			"path": "src/backend/post/post-filter"
+		},
+		{
+			"path": "src/backend/post/post-commander"
+		},
+		{
+			"path": "src/backend/post/post-worker"
+		},
+		{
+			"path": "src/backend/post/post-requester"
+		},
+		{
+			"path": "src/backend/comment/comment-filter"
+		},
+		{
+			"path": "src/backend/comment/comment-commander"
+		},
+		{
+			"path": "src/backend/comment/comment-worker"
+		},
+		{
+			"path": "src/backend/comment/comment-requester"
+		},
+		{
+			"path": "src/backend/comment/comment-user-filter"
+		},
+		{
+			"path": "../../../Github/react/react-comments-section"
+		}
+	],
+	"settings": {
+		"rust-analyzer.linkedProjects": [
+			"./Cargo.toml"
+		]
+	}
+}

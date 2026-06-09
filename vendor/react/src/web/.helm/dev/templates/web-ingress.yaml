@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-manager-issuer
+    kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/dev/templates -n argiago
+    kompose.service.expose: argiago.test
+    kompose.service.expose.ingress-class-name: nginx
+    kompose.service.expose.tls-secret: web-secret
+    kompose.version: 1.31.0 (HEAD)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: web
+  name: web
+  namespace: argiago
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: argiago.test
+      http:
+        paths:
+          - backend:
+              service:
+                name: web
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - argiago.test
+      secretName: web-secret
+status:
+  loadBalancer: {}

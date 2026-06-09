@@ -1,0 +1,13 @@
+﻿.helm/
+.origin/
+node_modules/
+
+**/.docker-compose.yml
+**/.docker-compose.*.yml
+**/.dockerignore
+**/.env
+**/.git
+**/.gitignore
+**/.vscode
+LICENSE
+README.md

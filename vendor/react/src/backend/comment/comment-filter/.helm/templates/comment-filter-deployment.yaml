@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-manager-issuer
+    kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+    kompose.service.expose: comment-filter.argiago.test
+    kompose.service.expose.ingress-class-name: nginx
+    kompose.service.expose.tls-secret: comment-filter-secret
+    kompose.version: 1.28.0 (HEAD)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: comment-filter
+  name: comment-filter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: comment-filter
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        cert-manager.io/cluster-issuer: cert-manager-issuer
+        kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+        kompose.service.expose: comment-filter.argiago.test
+        kompose.service.expose.ingress-class-name: nginx
+        kompose.service.expose.tls-secret: comment-filter-secret
+        kompose.version: 1.28.0 (HEAD)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/argiago-network: "true"
+        io.kompose.service: comment-filter
+    spec:
+      containers:
+        - env:
+            - name: AUDIENCE
+              value: comment-filter
+            - name: CLIENT_ID
+              value: comment-filter
+            - name: CLIENT_SECRET
+              value: YrApd3TM9LTh4YsumN3dAvnU3BMEcnQL
+            - name: COLLECTION_NAME
+              value: comment
+            - name: DB_NAME
+              value: comment_store
+            - name: DB_URL
+              value: mongodb://root:root@${MONGO_SERVICE_HOST}:${MONGO_SERVICE_PORT}
+            - name: HOST_URL
+              value: https://comment-user-filter.argiago.test
+            - name: ISSUER
+              value: https://keycloak.argiago.test/realms/argiago-test
+            - name: POST_SITE
+              value: https://${POST_REQUESTER_SERVICE_HOST}:${POST_REQUESTER_SERVICE_PORT}
+            - name: REALM
+              value: argiago-test
+            - name: REQWEST_CONTENT_TYPE
+              value: form
+            - name: TOKEN_URL
+              value: https://keycloak.argiago.test/realms/argiago-test/protocol/openid-connect/token
+          image: {{ .Values.werf.image.comment_filter }}
+          livenessProbe:
+            exec:
+              command:
+                - curl
+                - -f
+                - http://localhost:8080/healthcheck
+            failureThreshold: 5
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 10
+          name: comment-filter
+          ports:
+            - containerPort: 8080
+          resources: {}
+      restartPolicy: Always
+status: {}

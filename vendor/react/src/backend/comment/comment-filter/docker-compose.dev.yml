@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  comment-filter:
+    container_name: comment-filter
+    image: "{{ .Values.werf.image.comment_filter }}"
+    labels:
+      kompose.service.expose: "comment-filter.argiago.test"
+      kompose.service.expose.tls-secret: "comment-filter-secret"
+      cert-manager.io/cluster-issuer: cert-manager-issuer
+      kompose.service.expose.ingress-class-name: "nginx"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/healthcheck" ]
+      interval: 20s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+    environment:
+      POST_SITE: https://${POST_REQUESTER_SERVICE_HOST}:${POST_REQUESTER_SERVICE_PORT}
+      ISSUER: https://keycloak.argiago.test/realms/argiago-test
+
+      TOKEN_URL: https://keycloak.argiago.test/realms/argiago-test/protocol/openid-connect/token
+      CLIENT_ID: comment-filter
+      CLIENT_SECRET: YrApd3TM9LTh4YsumN3dAvnU3BMEcnQL
+      AUDIENCE: comment-filter
+      REQWEST_CONTENT_TYPE: form
+      HOST_URL: https://comment-user-filter.argiago.test
+      REALM: argiago-test
+
+      DB_URL: mongodb://root:root@${MONGO_SERVICE_HOST}:${MONGO_SERVICE_PORT}
+      DB_NAME: comment_store
+      COLLECTION_NAME: comment
+    ports:
+      - "80:8080"
+    networks:
+      - argiago-network
+  
+networks:
+  argiago-network:
+    name: argiago-network
+    external: true
+      

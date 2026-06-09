@@ -1,0 +1,10 @@
+configVersion: 1
+project: comment-requester
+
+deploy:
+  namespace: argiago
+  namespaceSlug: false
+---
+image: comment_requester
+dockerfile: Dockerfile
+context: .

@@ -1,0 +1,28 @@
+import { FC } from "react";
+import { Col, Row } from "antd";
+import { LeftCard } from "./LeftCard";
+import { RightCard } from "./RightCard";
+import { PostListWidget } from "@/widgets/Author/PostListWidget";
+import { SubscriptionTypeListWidget } from "@/widgets/Author/SubscriptionTypeListWidget";
+
+export const ProfilePage: FC = () => {
+  return (
+    <SubscriptionTypeListWidget>
+      <Row
+        gutter={[16, 16]}
+        style={{ width: "100%", padding: "24px 16px" }}
+        wrap={false}
+      >
+        <Col flex="323px">
+          <LeftCard />
+        </Col>
+        <Col flex="646px">
+          <PostListWidget />
+        </Col>
+        <Col flex="323px">
+          <RightCard />
+        </Col>
+      </Row>
+    </SubscriptionTypeListWidget>
+  );
+};

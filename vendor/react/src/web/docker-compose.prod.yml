@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  web:
+    container_name: web
+    image: "{{ .Values.werf.image.argiago_web }}"
+    labels:
+      kompose.service.expose: "argiago.ru"
+      kompose.service.expose.tls-secret: "argiago-web-prod-secret"
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      kompose.service.expose.ingress-class-name: "nginx"
+      kompose.image-pull-secret: registry-auth-client-secret
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 20s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+    ports:
+      - "80:3000"
+    networks:
+      - argiago-network
+
+networks:
+  argiago-network:
+    name: argiago-network

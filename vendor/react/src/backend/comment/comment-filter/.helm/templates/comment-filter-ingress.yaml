@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-manager-issuer
+    kompose.cmd: kompose convert -f docker-compose.dev.yml -o ./.helm/templates
+    kompose.service.expose: comment-filter.argiago.test
+    kompose.service.expose.ingress-class-name: nginx
+    kompose.service.expose.tls-secret: comment-filter-secret
+    kompose.version: 1.28.0 (HEAD)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: comment-filter
+  name: comment-filter
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: comment-filter.argiago.test
+      http:
+        paths:
+          - backend:
+              service:
+                name: comment-filter
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - comment-filter.argiago.test
+      secretName: comment-filter-secret
+status:
+  loadBalancer: {}

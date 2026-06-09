@@ -1,0 +1,10 @@
+configVersion: 1
+project: comment-worker
+
+deploy:
+  namespace: argiago
+  namespaceSlug: false
+---
+image: comment_worker
+dockerfile: Dockerfile
+context: .

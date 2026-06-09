@@ -1,0 +1,43 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'comment-filter'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=comment-filter",
+                    "--package=comment-filter"
+                ],
+                "filter": {
+                    "name": "comment-filter",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            //"preLaunchTask": "bridge-to-kubernetes.resource"
+            "env": {
+                "POST_SITE": "https://post-filter.argiago.test",
+                "ISSUER": "https://keycloak.argiago.test/realms/argiago-test",
+
+                "TOKEN_URL": "http://keycloak.argiago.test/realms/aliri/protocol/openid-connect/token",
+                "CLIENT_ID": "comment-filter",
+                "CLIENT_SECRET": "YrApd3TM9LTh4YsumN3dAvnU3BMEcnQL",
+                "AUDIENCE": "comment-filter",
+                "REQWEST_CONTENT_TYPE": "form",
+                "HOST_URL": "https://comment-user-filter.argiago.test",
+                "REALM": "argiago-test",
+
+                "DB_URL": "mongodb://root:root@192.168.49.2:32017",
+                "DB_NAME": "comment_store",
+                "COLLECTION_NAME": "comment",
+            }
+        }
+    ]
+}

@@ -1,0 +1,33 @@
+[package]
+name = "post-worker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = "1.24.2"
+
+futures-lite = "1.12.0"
+futures = "0.3"
+
+tracing = "0.1.37"
+tracing-subscriber = "0.3.16"
+
+clap = { version = "4.2.1", features = ["derive", "env"] }
+envmnt = "0.10.4"
+
+thiserror = "1.0"
+anyhow = "1.0.66"
+
+lapin = "2.1.1"
+
+mongodb-macro = "1.0.3"
+# mongodb_macro = { path = "/home/erritis/Projects/Erritis/Libraries/mongodb_macro" }
+mongodb = { version = "2.4.0" }
+bson = { version = "2.5.0", features = ["uuid-1", "chrono-0_4"] }
+
+serde = { version = "1", features = ["derive"] }
+chrono = { version = "0.4.23", features = ["serde"] }
+uuid = { version = "1.2.2", features = [ "v4"] }
+itertools = "0.10.5"

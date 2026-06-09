@@ -1,0 +1,16 @@
+configVersion: 1
+project: argiago-web
+
+deploy:
+  namespace: argiago
+  namespaceSlug: false
+  helmChartDir: .helm/prod
+---
+image: argiago_web
+dockerfile: Dockerfile
+context: .
+args: {
+  VITE_APP_KEYCLOAK_CLIENT_ID: web,
+  VITE_APP_KEYCLOAK_URL: https://keycloak.argiago.ru/realms/argiago-test,
+  VITE_ENVIRONMENT_NAME: production
+}
