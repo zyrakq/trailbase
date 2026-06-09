@@ -4,9 +4,10 @@ mod logging;
 mod preflight;
 mod routes;
 mod settings;
+mod smtp;
 
 use settings::{PasswordAuthEnabled, Settings};
-use std::{net::IpAddr, path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 use tracing::info;
 
 #[tokio::main]
@@ -41,17 +42,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let password_auth_enabled =
         PasswordAuthEnabled(settings.frontend.password_auth_enabled.unwrap_or(true));
 
-    // Conditionally embed the mailcrab email-intercept UI under /emails.
-    // Only active when settings.email.dev_intercept = true (development only).
-    let (mailcrab_nest, mailcrab_handle) = if settings.email.dev_intercept {
-        let smtp_host = IpAddr::from_str("127.0.0.1").expect("valid loopback address");
-        let smtp_port: u16 = 1025;
-        let (router, handle) =
-            mailcrab_backend::mailcrab_router("/emails", smtp_host, smtp_port);
-        info!("Mailcrab email interceptor active at /emails (SMTP :{})", smtp_port);
-        (Some(router), Some(handle))
-    } else {
-        (None, None)
+    let interceptor = smtp::setup(&settings.email);
+    let (mc_router, mc_handle) = match interceptor {
+        Some(ic) => (Some(ic.router), Some(ic.handle)),
+        None => (None, None),
     };
 
     let mut router = axum::Router::new()
@@ -60,9 +54,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .fallback_service(routes::static_files(&settings.frontend, &manifest_dir))
         .layer(axum::Extension(password_auth_enabled));
 
-    if let Some(mc_router) = mailcrab_nest {
+    if let Some(mc_router) = mc_router {
         router = axum::Router::new()
-            .nest("/emails", mc_router)
+            .nest(smtp::EMAIL_PATH, mc_router)
             .merge(router);
     }
 
@@ -70,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     trailbase::api::serve((main_router.0, router), admin_router, tls).await?;
 
     // Cancel mailcrab background tasks after the server has shut down.
-    if let Some(handle) = mailcrab_handle {
+    if let Some(handle) = mc_handle {
         handle.token.cancel();
     }
 
