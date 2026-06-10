@@ -350,7 +350,11 @@ class TrailBaseService {
 
     if (response.status === 400) {
       const lower = text3.toLowerCase();
-      if (lower.includes('token') || lower.includes('invalid') || lower.includes('expired')) {
+      if (
+        lower.includes('token') ||
+        lower.includes('invalid') ||
+        lower.includes('expired')
+      ) {
         throw new AuthError(AuthErrorCode.UNKNOWN, 'invalid-token');
       }
       // Password policy violation — surface server message verbatim
@@ -410,13 +414,50 @@ class TrailBaseService {
 
     // Wrong TOTP: TrailBase returns raw 401 on the form path (not redirected).
     if (response.status === 401) {
-      throw new AuthError(AuthErrorCode.INVALID_CREDENTIALS, 'Invalid MFA code');
+      throw new AuthError(
+        AuthErrorCode.INVALID_CREDENTIALS,
+        'Invalid MFA code'
+      );
     }
 
     throw new AuthError(
       AuthErrorCode.UNKNOWN,
       `MFA login failed: ${response.status}`
     );
+  }
+
+  /**
+   * Fetch profile flags from the auth-ui WASM component.
+   *
+   * Returns `{ showOtpSection }` for the currently authenticated user.
+   * The server decides whether to show the OTP/TOTP section based on whether
+   * the account is OAuth-based and whether password auth is enabled.
+   *
+   * Returns null on 401 (not authenticated) or any non-OK response.
+   *
+   * @throws AuthError(NETWORK_ERROR) on fetch failure
+   */
+  async fetchUserProfile(): Promise<{
+    showOtpSection: boolean;
+  } | null> {
+    let response: Response;
+    try {
+      response = await fetch('/_/auth/api/profile', { credentials: 'include' });
+    } catch {
+      throw new AuthError(
+        AuthErrorCode.NETWORK_ERROR,
+        'Network error fetching profile'
+      );
+    }
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      show_otp_section: boolean;
+    };
+    return { showOtpSection: data.show_otp_section };
   }
 
   /**

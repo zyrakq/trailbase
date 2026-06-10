@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let settings = Settings::load()?;
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-    components::ensure_auth_ui(&manifest_dir)?;
+    components::ensure_auth_ui(&manifest_dir, settings.components.vendor_auth_ui)?;
 
     let _bun_watch = frontend::start(&settings.frontend, &manifest_dir.join("ui"))?;
 

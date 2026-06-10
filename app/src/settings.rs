@@ -15,11 +15,25 @@ pub struct Settings {
     /// Bootstrap settings applied to TrailBase on first start only.
     /// Ignored when `app/traildepot/config.textproto` already exists.
     pub trailbase: TrailbaseBootstrap,
+    /// WASM component loading settings.
+    #[serde(default)]
+    pub components: ComponentSettings,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ServerSettings {
     pub address: String,
+}
+
+/// Settings for TrailBase WASM component management.
+#[derive(Debug, Default, Deserialize)]
+pub struct ComponentSettings {
+    /// When true, copy auth_ui from the local vendor build instead of downloading
+    /// via `trail components add`. Requires the WASM to be built first:
+    ///   cargo build --target wasm32-wasip2 --release -p auth-ui
+    /// in the `vendor/trailbase` workspace.
+    #[serde(default)]
+    pub vendor_auth_ui: bool,
 }
 
 #[derive(Debug, Deserialize)]

@@ -2,9 +2,8 @@ import { LitElement, css, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
-import { authService, totpService, AuthError, AuthErrorCode } from '@/features/auth';
+import { authService, trailbaseService, totpService, AuthError, AuthErrorCode } from '@/features/auth';
 import type { TotpSetupData } from '@/features/auth';
-import { configService } from '@/features/auth';
 import { notificationService } from '@/features/notifications';
 import type { TotpSetupState, TotpActionPayload } from './blocks/security-card.ts';
 import type { User } from '@/features/auth';
@@ -22,8 +21,7 @@ export class ProfilePage extends LitElement {
   @state() private verifyCode = '';
   @state() private disableCode = '';
   @state() private totpError = '';
-  @state() private passwordAuthEnabled = true;
-  @state() private otpEnabled = true;
+  @state() private showOtpSection = false;
   @state() private signOutLoading = false;
 
   async connectedCallback() {
@@ -31,9 +29,10 @@ export class ProfilePage extends LitElement {
     const authState = authService.getAuthState();
     this.user = authState.user;
     this.totpState = authState.hasMfa ? 'enabled' : 'idle';
-    const config = await configService.fetchConfig();
-    this.passwordAuthEnabled = config.passwordAuthEnabled;
-    this.otpEnabled = config.otpEnabled;
+    // Fetch profile flags from auth-ui WASM. Falls back to false on any error
+    // so the security card stays hidden (safe default for OAuth users).
+    const profile = await trailbaseService.fetchUserProfile().catch(() => null);
+    this.showOtpSection = profile?.showOtpSection ?? false;
   }
 
   private async handleSignOut() {
@@ -156,7 +155,7 @@ export class ProfilePage extends LitElement {
           <div class="profile-container">
             <profile-user-card .user=${this.user}></profile-user-card>
 
-            ${this.passwordAuthEnabled && this.otpEnabled
+            ${this.showOtpSection
               ? html`
                 <profile-security-card
                   .totpState=${this.totpState}

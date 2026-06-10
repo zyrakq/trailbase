@@ -1,5 +1,6 @@
 [workspace]
-members = ["app"]
+members = ["app", "vendor/trailbase/crates/auth-ui"]
+default-members = ["app"]
 exclude = ["vendor/trailbase", "vendor/mailcrab"]
 resolver = "2"
 
@@ -15,6 +16,12 @@ tokio-rustls = "0.26"
 pretty_env_logger = "0.5"
 dotenvy = "0.15"
 config = { version = "0.15", features = ["toml"] }
+
+# Dependencies required by vendor/trailbase/crates/auth-ui (built as workspace member).
+askama = { version = "0.16.0", default-features = false, features = ["derive", "std", "config"] }
+rust-embed = { version = "8.4.0", default-features = false, features = ["mime-guess"] }
+trailbase-wasm = { path = "./vendor/trailbase/crates/wasm-runtime-guest" }
+trailbase-build = { path = "./vendor/trailbase/crates/build" }
 
 trailbase = { git = "https://github.com/trailbaseio/trailbase", tag = "v0.28.3" }
 mailcrab = { path = "vendor/mailcrab/mailcrab" }
