@@ -66,7 +66,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (router, smtp_handle) = smtp::mount(interceptor, base_router);
 
     info!("Server running at http://{}", settings.server.address);
-    trailbase::api::serve((main_router.0, router), admin_router, tls).await?;
+    let (cleanup_sender, _cleanup_receiver) = tokio::sync::oneshot::channel::<()>();
+    trailbase::api::serve((main_router.0, router), admin_router, tls, cleanup_sender).await?;
 
     smtp::shutdown(smtp_handle);
 

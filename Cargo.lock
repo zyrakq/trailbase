@@ -4129,6 +4129,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsqlite-vfs"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c51c9ae4df8a7fba42103df5c621fa3c37eccf3a3c650879e90fc48b11cc192c"
+dependencies = [
+ "hashbrown 0.16.1",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "rusqlite"
 version = "0.40.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4140,6 +4150,7 @@ dependencies = [
  "hashlink 0.12.0",
  "libsqlite3-sys",
  "smallvec",
+ "sqlite-wasm-rs",
 ]
 
 [[package]]
@@ -4527,11 +4538,12 @@ dependencies = [
 
 [[package]]
 name = "serde_rusqlite"
-version = "0.38.0"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
+version = "0.43.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44f51ff08953caf83bbd0d9be7ee58d41f1d1adc19a2e84c43f83ca50258571e"
 dependencies = [
  "rusqlite",
- "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -4766,6 +4778,18 @@ checksum = "0705994df478b895f05b8e290e0d46e53187b26f8d889d37b2a0881234922d94"
 dependencies = [
  "unicode_categories",
  "winnow 0.7.15",
+]
+
+[[package]]
+name = "sqlite-wasm-rs"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc3efc0da82635d7e1ced0053bbbfa8c7ab9645d0bf36ceb4f7127bb85315d75"
+dependencies = [
+ "cc",
+ "js-sys",
+ "rsqlite-vfs",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -5280,7 +5304,6 @@ dependencies = [
 [[package]]
 name = "trailbase"
 version = "0.2.0"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "aes-gcm-siv",
  "argon2",
@@ -5366,7 +5389,6 @@ dependencies = [
 [[package]]
 name = "trailbase-assets"
 version = "0.2.0"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "axum",
  "itertools 0.14.0",
@@ -5379,7 +5401,6 @@ dependencies = [
 [[package]]
 name = "trailbase-build"
 version = "0.1.1"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "env_logger 0.11.10",
  "log",
@@ -5391,7 +5412,6 @@ dependencies = [
 [[package]]
 name = "trailbase-extension"
 version = "0.3.0"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "arc-swap",
  "argon2",
@@ -5413,7 +5433,6 @@ dependencies = [
 [[package]]
 name = "trailbase-qs"
 version = "0.1.1"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "base64",
  "itertools 0.14.0",
@@ -5427,7 +5446,6 @@ dependencies = [
 [[package]]
 name = "trailbase-reactive"
 version = "0.1.0"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "futures-util",
  "parking_lot",
@@ -5438,7 +5456,6 @@ dependencies = [
 [[package]]
 name = "trailbase-refinery"
 version = "0.1.0"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -5455,7 +5472,6 @@ dependencies = [
 [[package]]
 name = "trailbase-schema"
 version = "0.1.0"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "base64",
  "fallible-iterator",
@@ -5481,7 +5497,6 @@ dependencies = [
 [[package]]
 name = "trailbase-sqlite"
 version = "0.3.0"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "crossfire",
  "log",
@@ -5499,7 +5514,6 @@ dependencies = [
 [[package]]
 name = "trailbase-sqlvalue"
 version = "0.1.0"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "base64",
  "serde",
@@ -5511,7 +5525,6 @@ dependencies = [
 [[package]]
 name = "trailbase-wasm-common"
 version = "0.2.0"
-source = "git+https://github.com/trailbaseio/trailbase?tag=v0.28.3#45dea06048012115dafc42067445a1bd7d4ee6ed"
 dependencies = [
  "serde",
  "trailbase-sqlvalue",
