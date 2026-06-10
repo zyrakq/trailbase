@@ -62,6 +62,13 @@ pub struct PasswordAuthEnabled(pub bool);
 pub struct TrailbaseBootstrap {
     pub server: TrailbaseBootstrapServer,
     pub auth: TrailbaseBootstrapAuth,
+    /// Explicit SMTP settings for TrailBase outgoing mail.
+    ///
+    /// When `smtp_host` is set, these values take priority over the
+    /// `email.dev_intercept` auto-fill.  When `smtp_host` is empty the
+    /// section is ignored and the dev auto-fill applies (if enabled).
+    #[serde(default)]
+    pub smtp: TrailbaseBootstrapSmtp,
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,6 +103,79 @@ where
 {
     let opt = Option::<TrailbaseBootstrapOidc>::deserialize(deserializer)?;
     Ok(opt.filter(|s| !s.client_id.is_empty()))
+}
+
+/// SMTP encryption mode, accepted as a lowercase string in TOML.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SmtpEncryptionSetting {
+    None,
+    Starttls,
+    Tls,
+}
+
+impl Default for SmtpEncryptionSetting {
+    fn default() -> Self {
+        Self::Starttls
+    }
+}
+
+fn default_smtp_port() -> u16 {
+    587
+}
+
+/// Explicit SMTP settings for the TrailBase outgoing mail client.
+///
+/// When `smtp_host` is non-empty these values are applied and override the
+/// `email.dev_intercept` auto-fill.  When `smtp_host` is empty (the default)
+/// this section is inactive — the dev auto-fill path is used if enabled.
+#[derive(Debug, Deserialize)]
+pub struct TrailbaseBootstrapSmtp {
+    /// SMTP server hostname or IP.  Empty → section inactive.
+    #[serde(default)]
+    pub smtp_host: String,
+    /// SMTP port (default 587).
+    #[serde(default = "default_smtp_port")]
+    pub smtp_port: u16,
+    /// SMTP authentication username (optional).
+    #[serde(default)]
+    pub smtp_username: String,
+    /// SMTP authentication password (optional).
+    /// Supply via `APP_TRAILBASE__SMTP__SMTP_PASSWORD` to avoid storing
+    /// credentials in TOML files.
+    #[serde(default)]
+    pub smtp_password: String,
+    /// Encryption mode: `"none"` | `"starttls"` (default) | `"tls"`.
+    #[serde(default)]
+    pub smtp_encryption: SmtpEncryptionSetting,
+    /// Display name used in the `From:` header (optional).
+    #[serde(default)]
+    pub sender_name: String,
+    /// E-mail address used in the `From:` header (optional).
+    #[serde(default)]
+    pub sender_address: String,
+}
+
+impl Default for TrailbaseBootstrapSmtp {
+    fn default() -> Self {
+        Self {
+            smtp_host: String::new(),
+            smtp_port: default_smtp_port(),
+            smtp_username: String::new(),
+            smtp_password: String::new(),
+            smtp_encryption: SmtpEncryptionSetting::default(),
+            sender_name: String::new(),
+            sender_address: String::new(),
+        }
+    }
+}
+
+impl TrailbaseBootstrapSmtp {
+    /// Returns `true` when an explicit SMTP host has been configured.
+    /// When `false`, the section is treated as inactive.
+    pub fn is_configured(&self) -> bool {
+        !self.smtp_host.is_empty()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -387,5 +467,51 @@ mod tests {
         let oidc = s.trailbase.auth.oidc0.expect("oidc0 should be Some");
         assert_eq!(oidc.client_id, "argiago");
         assert_eq!(oidc.client_secret, "s3cr3t");
+    }
+
+    #[test]
+    fn trailbase_smtp_absent_gives_defaults() {
+        let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
+        assert!(
+            !s.trailbase.smtp.is_configured(),
+            "smtp.is_configured() should be false when [trailbase.smtp] is absent"
+        );
+        assert_eq!(s.trailbase.smtp.smtp_port, 587, "smtp_port default should be 587");
+    }
+
+    #[test]
+    fn trailbase_smtp_with_host_is_configured() {
+        let overlay = indoc! {r#"
+            [trailbase.smtp]
+            smtp_host = "mail.example.com"
+            smtp_port = 465
+            smtp_encryption = "tls"
+            sender_name = "Argiago"
+            sender_address = "noreply@argiago.ru"
+        "#};
+        let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+        assert!(s.trailbase.smtp.is_configured());
+        assert_eq!(s.trailbase.smtp.smtp_host, "mail.example.com");
+        assert_eq!(s.trailbase.smtp.smtp_port, 465);
+        assert!(matches!(
+            s.trailbase.smtp.smtp_encryption,
+            SmtpEncryptionSetting::Tls
+        ));
+        assert_eq!(s.trailbase.smtp.sender_name, "Argiago");
+        assert_eq!(s.trailbase.smtp.sender_address, "noreply@argiago.ru");
+    }
+
+    #[test]
+    fn trailbase_smtp_encryption_none_parses() {
+        let overlay = indoc! {r#"
+            [trailbase.smtp]
+            smtp_host = "127.0.0.1"
+            smtp_encryption = "none"
+        "#};
+        let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+        assert!(matches!(
+            s.trailbase.smtp.smtp_encryption,
+            SmtpEncryptionSetting::None
+        ));
     }
 }

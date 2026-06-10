@@ -9,12 +9,26 @@
 // The caller checks whether `config.textproto` existed before `Server::init()`
 // and only calls `apply_bootstrap` when it did not (first start).
 
-use crate::settings::{EmailSettings, TrailbaseBootstrap};
+use crate::settings::{EmailSettings, SmtpEncryptionSetting, TrailbaseBootstrap};
 use trailbase::config::proto::{
     EmailConfig, OAuthProviderConfig, OAuthProviderId, SmtpEncryption,
 };
 use trailbase::AppState;
 use tracing::{info, warn};
+
+/// Map a settings-layer encryption value to the proto i32.
+fn smtp_encryption_proto(enc: &SmtpEncryptionSetting) -> i32 {
+    match enc {
+        SmtpEncryptionSetting::None => SmtpEncryption::None as i32,
+        SmtpEncryptionSetting::Starttls => SmtpEncryption::Starttls as i32,
+        SmtpEncryptionSetting::Tls => SmtpEncryption::Tls as i32,
+    }
+}
+
+/// Return `Some(s.to_string())` when `s` is non-empty, otherwise `None`.
+fn non_empty(s: &str) -> Option<String> {
+    if s.is_empty() { None } else { Some(s.to_string()) }
+}
 
 /// Apply `[trailbase]` bootstrap settings to the live TrailBase config.
 ///
@@ -23,8 +37,10 @@ use tracing::{info, warn};
 /// updates the in-memory reactive config and rewrites `config.textproto`
 /// and `vault.textproto` on disk.
 ///
-/// When `email.dev_intercept` is `true` the TrailBase email block is
-/// auto-filled with mailcrab's SMTP settings (host, port, no TLS).
+/// **Email priority** (highest first):
+/// 1. `[trailbase.smtp]` with `smtp_host` set — explicit settings, always used
+/// 2. `email.dev_intercept = true` — auto-fills mailcrab host/port/no-TLS
+/// 3. Neither — email block left at TrailBase defaults
 pub async fn apply_bootstrap(
     state: &AppState,
     bootstrap: &TrailbaseBootstrap,
@@ -65,14 +81,31 @@ pub async fn apply_bootstrap(
         config.auth.oauth_providers.insert("oidc0".to_string(), provider);
     }
 
-    // Email block — auto-fill with mailcrab settings in dev environments.
-    if email.dev_intercept {
+    // Email block.
+    //
+    // Priority: explicit [trailbase.smtp] (smtp_host set) > dev_intercept auto-fill.
+    // When neither is active the email block is left at TrailBase defaults.
+    if bootstrap.smtp.is_configured() {
+        config.email = EmailConfig {
+            smtp_host: Some(bootstrap.smtp.smtp_host.clone()),
+            smtp_port: Some(u32::from(bootstrap.smtp.smtp_port)),
+            smtp_username: non_empty(&bootstrap.smtp.smtp_username),
+            smtp_password: non_empty(&bootstrap.smtp.smtp_password),
+            smtp_encryption: Some(smtp_encryption_proto(&bootstrap.smtp.smtp_encryption)),
+            sender_name: non_empty(&bootstrap.smtp.sender_name),
+            sender_address: non_empty(&bootstrap.smtp.sender_address),
+            ..Default::default()
+        };
+        info!("TrailBase bootstrap: explicit SMTP settings applied");
+    } else if email.dev_intercept {
+        // Auto-fill with mailcrab settings: no encryption, no auth.
         config.email = EmailConfig {
             smtp_host: Some(email.smtp_host.clone()),
             smtp_port: Some(u32::from(email.smtp_port)),
             smtp_encryption: Some(SmtpEncryption::None as i32),
             ..Default::default()
         };
+        info!("TrailBase bootstrap: mailcrab SMTP auto-fill applied");
     }
 
     state

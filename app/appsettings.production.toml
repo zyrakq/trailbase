@@ -8,3 +8,17 @@ site_url = "https://argiago.ru"
 [trailbase.auth]
 disable_password_auth = true
 enable_otp_signin = false
+
+# Production outgoing SMTP — supply credentials via env vars:
+#   APP_TRAILBASE__SMTP__SMTP_HOST=<host>
+#   APP_TRAILBASE__SMTP__SMTP_PASSWORD=<password>
+#   APP_TRAILBASE__SMTP__SENDER_ADDRESS=<address>
+# When smtp_host remains empty the email block is left at TrailBase defaults.
+# [trailbase.smtp]
+# smtp_host = ""
+# smtp_port = 587
+# smtp_username = ""
+# smtp_password = ""
+# smtp_encryption = "starttls"
+# sender_name = "Argiago"
+# sender_address = "noreply@argiago.ru"
