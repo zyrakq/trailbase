@@ -1,4 +1,4 @@
-import { createSignal, Switch, Show, Match } from "solid-js";
+import { createSignal, createResource, Switch, Show, Match } from "solid-js";
 import type { Signal } from "solid-js";
 import {
   TbFillUser,
@@ -175,6 +175,24 @@ function ProfileTable(props: { client: Client; user: User }) {
   const alert = () => new URL(location.href).searchParams.get("alert");
   const [deleteAccountOpen, setDeleteAccountOpen] = createSignal(false);
 
+  // Fetch OTP section visibility from the profile API. Default to false so the
+  // section is hidden until the server confirms it should be shown.
+  const [profileData] = createResource(
+    () => props.user,
+    async () => {
+      try {
+        const resp = await fetch("/_/auth/api/profile", {
+          credentials: "include",
+        });
+        if (!resp.ok) return null;
+        return (await resp.json()) as { show_otp_section: boolean };
+      } catch {
+        return null;
+      }
+    },
+  );
+  const showOtpSection = () => profileData()?.show_otp_section ?? false;
+
   return (
     <>
       <Card class="w-[80dvw] max-w-[540px] p-8">
@@ -240,7 +258,9 @@ function ProfileTable(props: { client: Client; user: User }) {
         </div>
 
         <div class="my-4 flex w-full flex-col items-end gap-2">
-          <TotpToggleButton {...props} />
+          <Show when={showOtpSection()}>
+            <TotpToggleButton {...props} />
+          </Show>
         </div>
       </Card>
 

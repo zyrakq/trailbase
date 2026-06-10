@@ -3,9 +3,10 @@
 #![warn(clippy::await_holding_lock, clippy::inefficient_to_string)]
 
 use askama::Template;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use trailbase_wasm::db;
 use trailbase_wasm::http::{
-  Html, HttpError, HttpRoute, IntoBody, IntoResponse, Redirect, Request, Response, StatusCode,
+  Html, HttpError, HttpRoute, IntoBody, IntoResponse, Json, Redirect, Request, Response, StatusCode,
   User, header, routing,
 };
 use trailbase_wasm::kv::Store;
@@ -98,6 +99,15 @@ impl Guest for Endpoints {
             .user()
             .ok_or_else(|| HttpError::status(StatusCode::UNAUTHORIZED))?;
           return ui_change_email_handler(req.query_parse()?, user).await;
+        },
+      ),
+      routing::get(
+        PROFILE_API,
+        async |req: Request| -> Result<Response, HttpError> {
+          let user = req
+            .user()
+            .ok_or_else(|| HttpError::status(StatusCode::UNAUTHORIZED))?;
+          return profile_capabilities_handler(user).await;
         },
       ),
       routing::get("/_/auth/{*wildcard}", async |req: Request| {
@@ -397,7 +407,6 @@ async fn ui_change_email_handler(
 }
 
 async fn static_assets_handler(path: &str) -> Result<Response, HttpError> {
-  // We want as little magic as possible. The only /_/auth/subpath that isn't SSR, is
   // profile, so we when hitting /profile or /profile, we want actually want to serve
   // the static profile/index.html.
   let file = match path {
@@ -422,6 +431,72 @@ fn internal(err: impl std::string::ToString) -> HttpError {
   return HttpError::message(StatusCode::INTERNAL_SERVER_ERROR, err);
 }
 
+/// Response body for `GET /_/auth/api/profile`.
+#[derive(Serialize)]
+struct ProfileResponse {
+  /// Whether to show the TOTP/MFA section in the profile UI.
+  ///
+  /// True when password authentication is enabled on this server and the user
+  /// is not an OAuth-only account. An account is considered OAuth-only when
+  /// `provider_id != 0` AND `password_hash` is empty. Admins may assign a
+  /// password to an OAuth user; in that case the account is treated as
+  /// password-capable and the OTP section is shown.
+  show_otp_section: bool,
+}
+
+/// Return per-user profile flags for the currently authenticated user.
+///
+/// Queries `provider_id` and `password_hash` from the `_user` table to
+/// determine whether the account is OAuth-only. An account is OAuth-only when
+/// it was created via an external OIDC provider (`provider_id != 0`) and has
+/// no password set (`password_hash` is empty). Admins can assign a password to
+/// an OAuth account, making it password-capable and eligible to see the OTP
+/// section.
+async fn profile_capabilities_handler(user: &User) -> Result<Response, HttpError> {
+  // Query both provider_id and password_hash to correctly detect OAuth-only
+  // accounts. An OAuth user who has been given a password by an admin is
+  // treated the same as a regular password account for TOTP purposes.
+  let rows = db::query(
+    r#"SELECT provider_id, password_hash FROM "_user" WHERE email = ?"#,
+    vec![db::Value::Text(user.email.clone())],
+  )
+  .await
+  .map_err(internal)?;
+
+  let is_oauth_only = rows
+    .first()
+    .and_then(|row| {
+      let is_oauth = match row.first()? {
+        db::Value::Integer(n) => *n != 0,
+        _ => false,
+      };
+      let no_password = match row.get(1)? {
+        db::Value::Text(s) => s.is_empty(),
+        _ => true,
+      };
+      Some(is_oauth && no_password)
+    })
+    .unwrap_or(false);
+
+  // Read auth config from the KV store written by TrailBase on startup.
+  let password_auth_enabled = {
+    let store = Store::open().map_err(internal)?;
+    match store.get("config:auth").map_err(internal)? {
+      Some(bytes) if !bytes.is_empty() => serde_json::from_slice::<auth::AuthConfig>(&bytes)
+        .map(|c| !c.disable_password_auth)
+        .unwrap_or(true),
+      _ => true,
+    }
+  };
+
+  return Ok(
+    Json(ProfileResponse {
+      show_otp_section: !is_oauth_only && password_auth_enabled,
+    })
+    .into_response(),
+  );
+}
+
 const AUTH_API: &str = "/api/auth/v1";
 
 const LOGIN_UI: &str = "/_/auth/login";
@@ -429,6 +504,7 @@ const LOGIN_MFA_UI: &str = "/_/auth/login_mfa";
 const OTP_REQUEST_UI: &str = "/_/auth/otp/request";
 const OTP_LOGIN_UI: &str = "/_/auth/otp/login";
 const PROFILE_UI: &str = "/_/auth/profile";
+const PROFILE_API: &str = "/_/auth/api/profile";
 const REGISTER_USER_UI: &str = "/_/auth/register";
 const CHANGE_PASSWORD_UI: &str = "/_/auth/change_password";
 const CHANGE_EMAIL_UI: &str = "/_/auth/change_email";
