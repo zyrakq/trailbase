@@ -6,7 +6,9 @@ uploads/
 wasm/
 scripts/
 
+# Runtime files owned by TrailBase — never commit.
 metadata.textproto
+config.textproto
 
 # Runtime files, will be overriden by `trail`.
 trailbase.d.ts
