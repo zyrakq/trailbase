@@ -39,7 +39,8 @@ fn non_empty(s: &str) -> Option<String> {
 ///
 /// **Email priority** (highest first):
 /// 1. `[trailbase.smtp]` with `smtp_host` set — explicit settings, always used
-/// 2. `email.dev_intercept = true` — auto-fills mailcrab host/port/no-TLS
+/// 2. `email.dev_intercept = true` — mailcrab transport auto-fill;
+///    `sender_name`/`sender_address` from `[trailbase.smtp]` applied on top
 /// 3. Neither — email block left at TrailBase defaults
 pub async fn apply_bootstrap(
     state: &AppState,
@@ -98,11 +99,14 @@ pub async fn apply_bootstrap(
         };
         info!("TrailBase bootstrap: explicit SMTP settings applied");
     } else if email.dev_intercept {
-        // Auto-fill with mailcrab settings: no encryption, no auth.
+        // Auto-fill transport from mailcrab; sender fields from [trailbase.smtp]
+        // if provided (partial override — smtp_host not required for this).
         config.email = EmailConfig {
             smtp_host: Some(email.smtp_host.clone()),
             smtp_port: Some(u32::from(email.smtp_port)),
             smtp_encryption: Some(SmtpEncryption::None as i32),
+            sender_name: non_empty(&bootstrap.smtp.sender_name),
+            sender_address: non_empty(&bootstrap.smtp.sender_address),
             ..Default::default()
         };
         info!("TrailBase bootstrap: mailcrab SMTP auto-fill applied");

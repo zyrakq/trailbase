@@ -514,4 +514,21 @@ mod tests {
             SmtpEncryptionSetting::None
         ));
     }
+
+    #[test]
+    fn trailbase_smtp_sender_only_without_host_is_not_configured() {
+        // sender fields alone do not activate the explicit SMTP path
+        let overlay = indoc! {r#"
+            [trailbase.smtp]
+            sender_name = "Argiago"
+            sender_address = "noreply@argiago.ru"
+        "#};
+        let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+        assert!(
+            !s.trailbase.smtp.is_configured(),
+            "smtp.is_configured() must be false when only sender fields are set"
+        );
+        assert_eq!(s.trailbase.smtp.sender_name, "Argiago");
+        assert_eq!(s.trailbase.smtp.sender_address, "noreply@argiago.ru");
+    }
 }

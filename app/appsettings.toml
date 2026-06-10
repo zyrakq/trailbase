@@ -39,16 +39,9 @@ token_url = "https://idm.argiago.ru/oauth2/token"
 user_api_url = "https://idm.argiago.ru/oauth2/openid/argiago/userinfo"
 
 # Outgoing SMTP for TrailBase (password resets, OTP emails, etc.).
-# When smtp_host is empty this section is inactive.
-#   • Explicit [trailbase.smtp] takes priority over dev_intercept auto-fill.
-#   • In dev environments leave smtp_host empty — mailcrab is auto-configured.
-#   • Supply smtp_password via env var to keep it out of TOML:
-#       APP_TRAILBASE__SMTP__SMTP_PASSWORD=<value>
-# [trailbase.smtp]
-# smtp_host = ""
-# smtp_port = 587
-# smtp_username = ""
-# smtp_password = ""
-# smtp_encryption = "starttls"   # "none" | "starttls" | "tls"
-# sender_name = ""
-# sender_address = ""
+# Priority: explicit smtp_host > dev_intercept auto-fill (transport from mailcrab).
+# sender_name / sender_address are applied in both cases when set here.
+# Supply smtp_password via env var:  APP_TRAILBASE__SMTP__SMTP_PASSWORD=<value>
+[trailbase.smtp]
+sender_name = "Argiago Notifications"
+sender_address = "notifications@argiago.ru"
