@@ -12,6 +12,9 @@ pub struct Settings {
     pub server: ServerSettings,
     pub frontend: FrontendSettings,
     pub email: EmailSettings,
+    /// Bootstrap settings applied to TrailBase on first start only.
+    /// Ignored when `app/traildepot/config.textproto` already exists.
+    pub trailbase: TrailbaseBootstrap,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +47,56 @@ pub struct EmailSettings {
 /// Newtype wrapper so `axum::Extension<PasswordAuthEnabled>` is unambiguous.
 #[derive(Clone, Copy)]
 pub struct PasswordAuthEnabled(pub bool);
+
+// ---------------------------------------------------------------------------
+// TrailBase bootstrap (first-start only)
+// ---------------------------------------------------------------------------
+
+/// Settings applied to `app/traildepot/config.textproto` on first start.
+///
+/// When the file already exists these values are ignored entirely — TrailBase
+/// owns the file after initial creation and must not be overwritten on every
+/// startup.  To re-apply bootstrap settings delete `config.textproto` and
+/// restart.
+#[derive(Debug, Deserialize)]
+pub struct TrailbaseBootstrap {
+    pub server: TrailbaseBootstrapServer,
+    pub auth: TrailbaseBootstrapAuth,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TrailbaseBootstrapServer {
+    pub application_name: String,
+    pub site_url: String,
+    pub logs_retention_sec: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TrailbaseBootstrapAuth {
+    pub disable_password_auth: bool,
+    pub enable_otp_signin: bool,
+    /// OIDC0 provider.  `None` when `client_id` is absent or empty — no provider
+    /// block is written and OIDC login is disabled until the value is supplied.
+    #[serde(default, deserialize_with = "deserialize_oidc0")]
+    pub oidc0: Option<TrailbaseBootstrapOidc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TrailbaseBootstrapOidc {
+    pub client_id: String,
+    pub client_secret: String,
+    pub auth_url: String,
+    pub token_url: String,
+    pub user_api_url: String,
+}
+
+fn deserialize_oidc0<'de, D>(deserializer: D) -> Result<Option<TrailbaseBootstrapOidc>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::<TrailbaseBootstrapOidc>::deserialize(deserializer)?;
+    Ok(opt.filter(|s| !s.client_id.is_empty()))
+}
 
 // ---------------------------------------------------------------------------
 // Methods
@@ -139,6 +192,15 @@ mod tests {
         path = "/emails"
         smtp_host = "127.0.0.1"
         smtp_port = 1025
+
+        [trailbase.server]
+        application_name = "Argiago"
+        site_url = "http://localhost:4000"
+        logs_retention_sec = 604800
+
+        [trailbase.auth]
+        disable_password_auth = false
+        enable_otp_signin = false
     "#};
 
     const DEV_TOML: &str = indoc! {r#"
@@ -242,22 +304,7 @@ mod tests {
 
     #[test]
     fn email_dev_intercept_defaults_to_false() {
-        let base = indoc! {r#"
-            [server]
-            address = "0.0.0.0:4000"
-
-            [frontend]
-            build = false
-            watch = false
-            public_dir = ""
-
-            [email]
-            dev_intercept = false
-            path = "/emails"
-            smtp_host = "127.0.0.1"
-            smtp_port = 1025
-        "#};
-        let s = settings_from_toml(base, "").expect("should deserialize");
+        let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
         assert!(!s.email.dev_intercept);
     }
 
@@ -277,6 +324,15 @@ mod tests {
             path = "/emails"
             smtp_host = "127.0.0.1"
             smtp_port = 1025
+
+            [trailbase.server]
+            application_name = "Argiago"
+            site_url = "http://localhost:4000"
+            logs_retention_sec = 604800
+
+            [trailbase.auth]
+            disable_password_auth = false
+            enable_otp_signin = false
         "#};
         let overlay = indoc! {r#"
             [email]
@@ -284,5 +340,52 @@ mod tests {
         "#};
         let s = settings_from_toml(base, overlay).expect("should deserialize");
         assert!(s.email.dev_intercept);
+    }
+
+    #[test]
+    fn trailbase_bootstrap_defaults_parse_without_oidc() {
+        let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
+        assert_eq!(s.trailbase.server.application_name, "Argiago");
+        assert_eq!(s.trailbase.server.site_url, "http://localhost:4000");
+        assert_eq!(s.trailbase.server.logs_retention_sec, 604800);
+        assert!(!s.trailbase.auth.disable_password_auth);
+        assert!(!s.trailbase.auth.enable_otp_signin);
+        assert!(
+            s.trailbase.auth.oidc0.is_none(),
+            "oidc0 should be None when absent from config"
+        );
+    }
+
+    #[test]
+    fn trailbase_oidc0_is_none_when_client_id_empty() {
+        let overlay = indoc! {r#"
+            [trailbase.auth.oidc0]
+            client_id = ""
+            client_secret = ""
+            auth_url = "https://idm.example.com/ui/oauth2"
+            token_url = "https://idm.example.com/oauth2/token"
+            user_api_url = "https://idm.example.com/oauth2/openid/app/userinfo"
+        "#};
+        let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+        assert!(
+            s.trailbase.auth.oidc0.is_none(),
+            "oidc0 should be None when client_id is empty"
+        );
+    }
+
+    #[test]
+    fn trailbase_oidc0_is_some_when_client_id_set() {
+        let overlay = indoc! {r#"
+            [trailbase.auth.oidc0]
+            client_id = "argiago"
+            client_secret = "s3cr3t"
+            auth_url = "https://idm.example.com/ui/oauth2"
+            token_url = "https://idm.example.com/oauth2/token"
+            user_api_url = "https://idm.example.com/oauth2/openid/argiago/userinfo"
+        "#};
+        let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+        let oidc = s.trailbase.auth.oidc0.expect("oidc0 should be Some");
+        assert_eq!(oidc.client_id, "argiago");
+        assert_eq!(oidc.client_secret, "s3cr3t");
     }
 }

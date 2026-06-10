@@ -332,6 +332,63 @@ Data lives in `app/traildepot/`.
 
 ---
 
+## Configuration
+
+Argiago uses a **two-tier configuration system**: runtime settings that apply on every
+startup, and bootstrap settings that apply only once on first start.
+
+### Runtime Settings (`app/src/settings.rs`)
+
+Loaded on every startup via the `config` crate. Four layers, each overriding the previous:
+
+| Layer | Source | Required |
+| ----- | ------ | -------- |
+| 1 | `appsettings.toml` | Yes |
+| 2 | `appsettings.{APP_ENV}.toml` | No |
+| 3 | `appsettings.local.toml` | No (gitignored) |
+| 4 | `APP_*` environment variables | No |
+
+`APP_ENV` defaults to `development`. Environment variable keys use double-underscore as
+separator: `APP_SERVER__ADDRESS` → `settings.server.address`.
+
+### TrailBase Bootstrap (`[trailbase]` settings)
+
+TrailBase stores its own runtime configuration in `app/traildepot/config.textproto`.
+This file is **owned by TrailBase** after first creation — it may be read and rewritten
+by TrailBase at runtime.
+
+The `[trailbase]` TOML sections provide **initial values** applied via TrailBase's own
+config API (`state.validate_and_update_config`) **on first start only**. If
+`config.textproto` already exists when the server starts, the `[trailbase]` settings
+are ignored entirely — operator changes are never overwritten.
+
+```
+[trailbase.server]        # application_name, site_url, logs_retention_sec
+[trailbase.auth]          # disable_password_auth, enable_otp_signin
+[trailbase.auth.oidc0]    # OIDC provider (optional — omitted when client_id is empty)
+```
+
+**Key rules:**
+
+- Bootstrap applies only when `config.textproto` is absent (first start).
+- To re-apply bootstrap: delete `app/traildepot/config.textproto` and restart.
+- `config.textproto` is gitignored — never commit it.
+- The OIDC `client_secret` must be supplied via env var in production:
+  `APP_TRAILBASE__AUTH__OIDC0__CLIENT_SECRET=<value>`
+- When `email.dev_intercept = true`, TrailBase's SMTP is auto-configured with mailcrab
+  settings (host, port, no TLS) — so outgoing emails are intercepted in development.
+
+**Startup sequence** (relevant excerpt from `main.rs`):
+
+```
+is_first_start = !config.textproto.exists()   ← checked before Server::init()
+trailbase::Server::init()                      ← TrailBase creates default config if absent
+if is_first_start:
+    trailbase_bootstrap::apply_bootstrap()     ← overwrites defaults with [trailbase] values
+```
+
+---
+
 ## Data Flow
 
 ### Authentication Flow

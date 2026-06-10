@@ -5,6 +5,7 @@ mod preflight;
 mod routes;
 mod settings;
 mod smtp;
+mod trailbase_bootstrap;
 
 use settings::{PasswordAuthEnabled, Settings};
 use std::path::PathBuf;
@@ -27,17 +28,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let _bun_watch = frontend::start(&settings.frontend, &manifest_dir.join("ui"))?;
 
+    // Detect first start BEFORE Server::init() creates a default config.textproto.
+    let data_dir = manifest_dir.join("traildepot");
+    let is_first_start = !data_dir.join("config.textproto").exists();
+
     let trailbase::Server {
         state,
         main_router,
         admin_router,
         tls,
     } = trailbase::Server::init(trailbase::ServerOptions {
-        data_dir: trailbase::DataDir(manifest_dir.join("traildepot")),
+        data_dir: trailbase::DataDir(data_dir),
         address: settings.server.address.clone(),
         ..Default::default()
     })
     .await?;
+
+    // Apply bootstrap settings only when this is a fresh TrailBase install.
+    // The bootstrap is a one-time operation — if config.textproto already
+    // existed before init(), operator changes are preserved unchanged.
+    if is_first_start {
+        trailbase_bootstrap::apply_bootstrap(&state, &settings.trailbase, &settings.email)
+            .await?;
+    }
 
     let password_auth_enabled =
         PasswordAuthEnabled(settings.frontend.password_auth_enabled.unwrap_or(true));
