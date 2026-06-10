@@ -12,13 +12,6 @@ path = "/emails"
 smtp_host = "127.0.0.1"
 smtp_port = 1025
 
-# ──────────────────────────────────────────────────────────────────────────────
-# TRAILBASE BOOTSTRAP — Applied ONLY on first start (when
-# app/traildepot/config.textproto is absent). After first start, TrailBase
-# owns config.textproto and these values are ignored entirely.
-# To re-apply: delete app/traildepot/config.textproto and restart.
-# ──────────────────────────────────────────────────────────────────────────────
-
 [trailbase.server]
 application_name = "Argiago"
 site_url = "http://localhost:4000"
@@ -28,9 +21,6 @@ logs_retention_sec = 604800
 disable_password_auth = false
 enable_otp_signin = false
 
-# OIDC provider — omit this section (or leave client_id empty) to disable OIDC.
-# In production supply the secret via env var (never commit secrets):
-#   APP_TRAILBASE__AUTH__OIDC0__CLIENT_SECRET=<value>
 [trailbase.auth.oidc0]
 client_id = "argiago"
 client_secret = ""
@@ -38,10 +28,6 @@ auth_url = "https://idm.argiago.ru/ui/oauth2"
 token_url = "https://idm.argiago.ru/oauth2/token"
 user_api_url = "https://idm.argiago.ru/oauth2/openid/argiago/userinfo"
 
-# Outgoing SMTP for TrailBase (password resets, OTP emails, etc.).
-# Priority: explicit smtp_host > dev_intercept auto-fill (transport from mailcrab).
-# sender_name / sender_address are applied in both cases when set here.
-# Supply smtp_password via env var:  APP_TRAILBASE__SMTP__SMTP_PASSWORD=<value>
 [trailbase.smtp]
 sender_name = "Argiago Notifications"
 sender_address = "notifications@argiago.ru"
