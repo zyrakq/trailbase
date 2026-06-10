@@ -161,7 +161,9 @@ class AuthService {
    */
   async loginWithMfa(mfaToken: string, totpCode: string): Promise<void> {
     await trailbaseService.loginWithMfa(mfaToken, totpCode);
-    await this.loadAuthState();
+    // Use refresh() (not loadAuthState directly) so the SDK re-reads the new
+    // HttpOnly cookies that TrailBase set via the form path 303 redirect.
+    await this.refresh();
   }
 
   /**

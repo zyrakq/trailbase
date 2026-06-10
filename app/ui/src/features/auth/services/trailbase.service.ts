@@ -1,6 +1,6 @@
 // TrailBase API client — wraps the official trailbase SDK.
 // SDK docs: https://trailbase.io/documentation/auth
-import { initClientFromCookies, FetchError, type Client } from 'trailbase';
+import { initClientFromCookies, type Client } from 'trailbase';
 import { AuthError, AuthErrorCode } from '../types/auth-error';
 
 /**
@@ -71,7 +71,12 @@ class TrailBaseService {
    * redirect. After this call, checkCookies()/initClientFromCookies() will
    * find a valid cookie and restore the session on any subsequent page load.
    *
-   * On error TrailBase redirects to `redirect_uri?alert=Login Failed: <code>`,
+   * `mfa_redirect_uri` tells TrailBase where to redirect when the account has
+   * TOTP enabled. Without it, TrailBase returns 400 "?mfa_redirect required"
+   * on the form path. With it, TrailBase redirects to
+   * `<mfa_redirect_uri>?mfa_token=<jwt>` instead of completing the login.
+   *
+   * On credential error TrailBase redirects to `redirect_uri?alert=Login Failed: <code>`,
    * which we parse to throw a typed AuthError.
    *
    * @throws AuthError with a typed code on bad credentials, MFA required, or network failure
@@ -86,6 +91,9 @@ class TrailBaseService {
     // TrailBase redirects here on both success and failure.
     // The cookie is set before this redirect on the success path.
     body.set('redirect_uri', '/auth/callback');
+    // TrailBase redirects here (with ?mfa_token=<jwt>) when the account has TOTP enabled.
+    // Without this parameter, TrailBase returns 400 "?mfa_redirect required" instead.
+    body.set('mfa_redirect_uri', '/auth/mfa-pending');
 
     let response: Response;
     try {
@@ -104,9 +112,16 @@ class TrailBaseService {
       );
     }
 
-    // After following the redirect, check the final URL for an error param.
     if (response.redirected) {
       const finalUrl = new URL(response.url, window.location.origin);
+
+      // MFA required: TrailBase redirected to /auth/mfa-pending?mfa_token=<jwt>
+      const mfaToken = finalUrl.searchParams.get('mfa_token');
+      if (mfaToken) {
+        return { requiresMfa: true as const, mfaToken };
+      }
+
+      // Login failed: TrailBase redirected back with ?alert=Login Failed: <code>
       const alert = finalUrl.searchParams.get('alert');
       if (alert) {
         if (alert.includes('401')) {
@@ -115,18 +130,10 @@ class TrailBaseService {
             'Invalid email or password'
           );
         }
-        if (alert.includes('403')) {
-          // TrailBase encodes the mfa_token in the alert param as
-          // "Login Failed: 403 <mfa_token_value>" or similar.
-          // Extract the token: everything after the last space in the alert.
-          // If parsing fails, fall back to the raw alert string.
-          const parts = alert.split(' ');
-          const mfaToken = parts[parts.length - 1] ?? alert;
-          return { requiresMfa: true as const, mfaToken };
-        }
         throw new AuthError(AuthErrorCode.UNKNOWN, alert);
       }
-      // No alert param — success, cookie is now set.
+
+      // No alert param, no mfa_token — success, cookie is now set.
       return;
     }
 
@@ -360,37 +367,56 @@ class TrailBaseService {
   }
 
   /**
-   * Complete MFA login by submitting a TOTP code.
+   * Complete MFA login by submitting a TOTP code via a form-encoded POST.
    *
    * Called after `loginWithPassword()` returns `requiresMfa: true`.
-   * Delegates to client.loginSecond() from the SDK (POST /api/auth/v1/login_mfa).
+   * Uses the form path (not the SDK JSON path) so TrailBase sets HttpOnly
+   * cookies identically to regular login. The JSON path (client.loginSecond())
+   * only returns tokens in memory — they are lost on page reload.
+   *
+   * TrailBase behavior on the form path:
+   * - Correct TOTP → 303 redirect to `redirect_uri` with cookies set.
+   * - Wrong TOTP  → raw 401 (not redirected).
    *
    * @throws AuthError(INVALID_CREDENTIALS) on 401 (wrong TOTP code)
    * @throws AuthError(NETWORK_ERROR) on fetch failure
-   * @throws AuthError(UNKNOWN) on any other non-200 status
+   * @throws AuthError(UNKNOWN) on any other non-redirected response
    */
   async loginWithMfa(mfaToken: string, totpCode: string): Promise<void> {
-    const client = await this.initClient();
+    const body = new URLSearchParams();
+    body.set('mfa_token', mfaToken);
+    body.set('totp', totpCode);
+    body.set('redirect_uri', '/auth/callback');
+
+    let response: Response;
     try {
-      await client.loginSecond({ mfaToken: { token: mfaToken }, totpCode });
-    } catch (err) {
-      if (err instanceof FetchError) {
-        if (err.status === 401) {
-          throw new AuthError(
-            AuthErrorCode.INVALID_CREDENTIALS,
-            'Invalid MFA code'
-          );
-        }
-        throw new AuthError(
-          AuthErrorCode.UNKNOWN,
-          `MFA login failed: ${err.status}`
-        );
-      }
+      response = await fetch('/api/auth/v1/login_mfa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        credentials: 'include',
+        body: body.toString(),
+      });
+    } catch {
       throw new AuthError(
         AuthErrorCode.NETWORK_ERROR,
         'Network error during MFA login'
       );
     }
+
+    if (response.redirected) {
+      // Success — cookies are set via the 303 redirect headers.
+      return;
+    }
+
+    // Wrong TOTP: TrailBase returns raw 401 on the form path (not redirected).
+    if (response.status === 401) {
+      throw new AuthError(AuthErrorCode.INVALID_CREDENTIALS, 'Invalid MFA code');
+    }
+
+    throw new AuthError(
+      AuthErrorCode.UNKNOWN,
+      `MFA login failed: ${response.status}`
+    );
   }
 
   /**
