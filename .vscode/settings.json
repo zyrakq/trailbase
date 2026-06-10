@@ -6,7 +6,8 @@
   "files.associations": {
     "LICENSE-APACHE": "plaintext",
     "LICENSE-MIT": "plaintext",
-    ".gitmessage": "plaintext"
+    ".gitmessage": "plaintext",
+    "**/vendor/**/*.toml": "toml-nofmt"
   },
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
@@ -17,6 +18,9 @@
     "editor.defaultFormatter": "vscode.json-language-features"
   },
   "[dockerfile]": {
+    "editor.formatOnSave": false
+  },
+  "[toml-nofmt]": {
     "editor.formatOnSave": false
   },
   "[html]": {
