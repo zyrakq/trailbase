@@ -431,7 +431,7 @@ fn internal(err: impl std::string::ToString) -> HttpError {
   return HttpError::message(StatusCode::INTERNAL_SERVER_ERROR, err);
 }
 
-/// Response body for `GET /_/auth/api/profile`.
+/// Response body for `GET /api/auth/v1/profile`.
 #[derive(Serialize)]
 struct ProfileResponse {
   /// Whether to show the TOTP/MFA section in the profile UI.
@@ -504,7 +504,7 @@ const LOGIN_MFA_UI: &str = "/_/auth/login_mfa";
 const OTP_REQUEST_UI: &str = "/_/auth/otp/request";
 const OTP_LOGIN_UI: &str = "/_/auth/otp/login";
 const PROFILE_UI: &str = "/_/auth/profile";
-const PROFILE_API: &str = "/_/auth/api/profile";
+const PROFILE_API: &str = "/api/auth/v1/profile";
 const REGISTER_USER_UI: &str = "/_/auth/register";
 const CHANGE_PASSWORD_UI: &str = "/_/auth/change_password";
 const CHANGE_EMAIL_UI: &str = "/_/auth/change_email";

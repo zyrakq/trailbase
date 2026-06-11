@@ -181,7 +181,7 @@ function ProfileTable(props: { client: Client; user: User }) {
     () => props.user,
     async () => {
       try {
-        const resp = await fetch("/_/auth/api/profile", {
+        const resp = await fetch("/api/auth/v1/profile", {
           credentials: "include",
         });
         if (!resp.ok) return null;

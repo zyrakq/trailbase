@@ -442,7 +442,7 @@ class TrailBaseService {
   } | null> {
     let response: Response;
     try {
-      response = await fetch('/_/auth/api/profile', { credentials: 'include' });
+      response = await fetch('/api/auth/v1/profile', { credentials: 'include' });
     } catch {
       throw new AuthError(
         AuthErrorCode.NETWORK_ERROR,
