@@ -102,7 +102,7 @@ impl Guest for Endpoints {
         },
       ),
       routing::get(
-        PROFILE_API,
+        &format!("{AUTH_API}/profile"),
         async |req: Request| -> Result<Response, HttpError> {
           let user = req
             .user()
@@ -504,7 +504,6 @@ const LOGIN_MFA_UI: &str = "/_/auth/login_mfa";
 const OTP_REQUEST_UI: &str = "/_/auth/otp/request";
 const OTP_LOGIN_UI: &str = "/_/auth/otp/login";
 const PROFILE_UI: &str = "/_/auth/profile";
-const PROFILE_API: &str = "/api/auth/v1/profile";
 const REGISTER_USER_UI: &str = "/_/auth/register";
 const CHANGE_PASSWORD_UI: &str = "/_/auth/change_password";
 const CHANGE_EMAIL_UI: &str = "/_/auth/change_email";
