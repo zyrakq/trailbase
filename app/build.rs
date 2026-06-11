@@ -1,8 +1,8 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn main() {
-    // Rebuild WASM when auth-ui Rust or UI sources change.
+    //     // Rebuild WASM when auth-ui Rust or UI sources change.
     println!("cargo::rerun-if-changed=../vendor/trailbase/crates/auth-ui/src");
     println!("cargo::rerun-if-changed=../vendor/trailbase/crates/auth-ui/ui/src");
 
@@ -30,9 +30,19 @@ fn main() {
 
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
+
     let workspace_dir = Path::new(&manifest_dir)
         .parent()
         .expect("app/ has no parent directory");
+
+    let wasm_path = PathBuf::from(&manifest_dir)
+        .join("traildepot")
+        .join("wasm")
+        .join("auth_ui_component.wasm");
+
+    if wasm_path.exists() {
+        return ();
+    }
 
     println!("cargo::warning=Building auth-ui-component for wasm32-wasip2...");
 
@@ -52,4 +62,5 @@ fn main() {
     if !status.success() {
         panic!("auth-ui-component WASM build failed");
     }
+    ()
 }

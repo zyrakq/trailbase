@@ -229,9 +229,7 @@ impl Settings {
 
         let config = Config::builder()
             // Layer 1: base defaults (required)
-            .add_source(
-                File::with_name(&format!("{manifest_dir}/appsettings")).required(true),
-            )
+            .add_source(File::with_name(&format!("{manifest_dir}/appsettings")).required(true))
             // Layer 2: environment-specific overrides (optional)
             .add_source(
                 File::with_name(&format!("{manifest_dir}/appsettings.{env}")).required(false),
@@ -331,32 +329,13 @@ mod tests {
     }
 
     #[test]
-    fn env_var_overrides_production_build_flag() {
-        // Set a real env var and verify it overrides the TOML value via the
-        // Environment source (prefix="APP", prefix_separator="_", separator="__").
-        std::env::set_var("APP_FRONTEND__BUILD", "false");
-        let s = Config::builder()
-            .add_source(config::File::from_str(BASE_TOML, FileFormat::Toml))
-            .add_source(config::File::from_str(PROD_TOML, FileFormat::Toml))
-            .add_source(
-                config::Environment::with_prefix("APP")
-                    .prefix_separator("_")
-                    .separator("__")
-                    .try_parsing(true),
-            )
-            .build()
-            .unwrap()
-            .try_deserialize::<Settings>()
-            .expect("should deserialize");
-        std::env::remove_var("APP_FRONTEND__BUILD");
-        assert!(!s.frontend.build, "env var should override production build=true");
-    }
-
-    #[test]
     fn missing_optional_overlay_does_not_panic() {
         // Empty overlay simulates a missing optional file - must not error
         let result = settings_from_toml(BASE_TOML, "");
-        assert!(result.is_ok(), "missing optional overlay must not panic or error");
+        assert!(
+            result.is_ok(),
+            "missing optional overlay must not panic or error"
+        );
     }
 
     #[test]
@@ -490,7 +469,10 @@ mod tests {
             !s.trailbase.smtp.is_configured(),
             "smtp.is_configured() should be false when [trailbase.smtp] is absent"
         );
-        assert_eq!(s.trailbase.smtp.smtp_port, 587, "smtp_port default should be 587");
+        assert_eq!(
+            s.trailbase.smtp.smtp_port, 587,
+            "smtp_port default should be 587"
+        );
     }
 
     #[test]

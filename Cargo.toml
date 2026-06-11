@@ -5,14 +5,14 @@ exclude = ["vendor/trailbase", "vendor/mailcrab"]
 resolver = "2"
 
 [workspace.dependencies]
-axum = { version = "0.8", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
+axum = { version = "^0.8.1", features = ["json"] }
 tower-http = { version = "0.6", features = ["fs", "cors"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
-env_logger = "0.11"
-tokio-rustls = "0.26"
+env_logger = { version = "^0.11.8", default-features = false, features = ["auto-color", "humantime"] }
+tokio = { version = "^1.38.0", default-features = false, features = ["fs", "io-std", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-rustls = { version = "0.26.1", default-features = false }
 pretty_env_logger = "0.5"
 dotenvy = "0.15"
 config = { version = "0.15", features = ["toml"] }
@@ -23,12 +23,12 @@ rust-embed = { version = "8.4.0", default-features = false, features = ["mime-gu
 trailbase-wasm = { path = "./vendor/trailbase/crates/wasm-runtime-guest" }
 trailbase-build = { path = "./vendor/trailbase/crates/build" }
 
-trailbase = { git = "https://github.com/trailbaseio/trailbase", tag = "v0.28.3" }
+trailbase = { git = "https://github.com/zyrakq/trailbase", default-features = false, features = ["wasm", "pg"] }
 mailcrab = { path = "vendor/mailcrab/mailcrab" }
 mailcrab-backend = { path = "vendor/mailcrab/backend" }
 
 # Use local vendor/trailbase subtree instead of fetching from git.
 # [patch] is ignored by downstream consumers of trailbase, so this only
 # affects top-level builds of this workspace.
-[patch."https://github.com/trailbaseio/trailbase"]
-trailbase = { path = "./vendor/trailbase/crates/core" }
+[patch."https://github.com/zyrakq/trailbase"]
+trailbase = { path = "./vendor/trailbase/crates/core"}

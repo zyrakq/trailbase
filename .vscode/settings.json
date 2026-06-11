@@ -6,8 +6,7 @@
   "files.associations": {
     "LICENSE-APACHE": "plaintext",
     "LICENSE-MIT": "plaintext",
-    ".gitmessage": "plaintext",
-    "**/vendor/**/*.toml": "toml-nofmt"
+    ".gitmessage": "plaintext"
   },
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
@@ -20,7 +19,7 @@
   "[dockerfile]": {
     "editor.formatOnSave": false
   },
-  "[toml-nofmt]": {
+  "[toml]": {
     "editor.formatOnSave": false
   },
   "[html]": {
