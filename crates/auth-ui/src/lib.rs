@@ -431,38 +431,13 @@ fn internal(err: impl std::string::ToString) -> HttpError {
   return HttpError::message(StatusCode::INTERNAL_SERVER_ERROR, err);
 }
 
-/// Response body for `GET /api/auth/v1/profile`.
 #[derive(Serialize)]
 struct ProfileResponse {
-  /// Whether to show the TOTP/MFA section in the profile UI.
-  ///
-  /// True when password authentication is enabled on this server and the user
-  /// is not an OAuth-only account. An account is considered OAuth-only when
-  /// `provider_id != 0` AND `password_hash` is empty. Admins may assign a
-  /// password to an OAuth user; in that case the account is treated as
-  /// password-capable and the OTP section is shown.
   show_otp_section: bool,
-
-  /// Whether to show the change-password option in the profile UI.
-  ///
-  /// True when password authentication is enabled and the user is not
-  /// OAuth-only (same definition as `show_otp_section`). Kept as a separate
-  /// field because the conditions may diverge in the future.
   show_change_password: bool,
 }
 
-/// Return per-user profile flags for the currently authenticated user.
-///
-/// Queries `provider_id` and `password_hash` from the `_user` table to
-/// determine whether the account is OAuth-only. An account is OAuth-only when
-/// it was created via an external OIDC provider (`provider_id != 0`) and has
-/// no password set (`password_hash` is empty). Admins can assign a password to
-/// an OAuth account, making it password-capable and eligible to see the OTP
-/// section.
 async fn profile_capabilities_handler(user: &User) -> Result<Response, HttpError> {
-  // Query both provider_id and password_hash to correctly detect OAuth-only
-  // accounts. An OAuth user who has been given a password by an admin is
-  // treated the same as a regular password account for TOTP purposes.
   let rows = db::query(
     r#"SELECT provider_id, password_hash FROM "_user" WHERE email = ?"#,
     vec![db::Value::Text(user.email.clone())],
@@ -485,7 +460,6 @@ async fn profile_capabilities_handler(user: &User) -> Result<Response, HttpError
     })
     .unwrap_or(false);
 
-  // Read auth config from the KV store written by TrailBase on startup.
   let password_auth_enabled = {
     let store = Store::open().map_err(internal)?;
     match store.get("config:auth").map_err(internal)? {
