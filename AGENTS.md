@@ -16,6 +16,13 @@ Primary documentation is in two canonical files:
 - Use **bun** for frontend tasks, **cargo** for backend
 - All comments and documentation must be in **English**
 
+## Comments
+
+Add comments only when the code cannot speak for itself — non-obvious side-effects,
+counter-intuitive decisions, or subtle invariants. Do not add doc-comments (`///`, `/** */`)
+to every struct, field, or function; do not narrate what the code obviously does with
+inline comments. Match the comment density of the surrounding file.
+
 ## Logging — DO NOT TOUCH
 
 The logging setup is a two-system arrangement that must not be broken:
