@@ -32,3 +32,9 @@ mailcrab-backend = { path = "vendor/mailcrab/backend" }
 # affects top-level builds of this workspace.
 [patch."https://github.com/zyrakq/trailbase"]
 trailbase = { path = "./vendor/trailbase/crates/core"}
+
+[profile.dev]
+debug = 1
+
+[profile.dev.package."*"]
+opt-level = 2
