@@ -58,9 +58,14 @@ pub struct EmailSettings {
     pub smtp_port: u16,
 }
 
-/// Newtype wrapper so `axum::Extension<PasswordAuthEnabled>` is unambiguous.
+/// Settings visible to every request handler via `axum::Extension<PublicConfig>`.
+///
+/// Add fields here when a handler needs a value from `appsettings.toml`
+/// without requiring access to the full `Settings` tree.
 #[derive(Clone, Copy)]
-pub struct PasswordAuthEnabled(pub bool);
+pub struct PublicConfig {
+    pub password_auth_enabled: bool,
+}
 
 // ---------------------------------------------------------------------------
 // TrailBase bootstrap (first-start only)

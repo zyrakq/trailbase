@@ -7,7 +7,7 @@ mod settings;
 mod smtp;
 mod trailbase_bootstrap;
 
-use settings::{PasswordAuthEnabled, Settings};
+use settings::{PublicConfig, Settings};
 use std::path::PathBuf;
 use tracing::info;
 
@@ -52,8 +52,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .await?;
     }
 
-    let password_auth_enabled =
-        PasswordAuthEnabled(settings.frontend.password_auth_enabled.unwrap_or(true));
+    let public_config = PublicConfig {
+        password_auth_enabled: settings.frontend.password_auth_enabled.unwrap_or(true),
+    };
 
     let interceptor = smtp::setup(&settings.email);
 
@@ -61,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .merge(routes::build(state))
         .merge(main_router.1)
         .fallback_service(routes::static_files(&settings.frontend, &manifest_dir))
-        .layer(axum::Extension(password_auth_enabled));
+        .layer(axum::Extension(public_config));
 
     let (router, smtp_handle) = smtp::mount(interceptor, base_router);
 

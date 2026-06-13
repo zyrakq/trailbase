@@ -8,7 +8,7 @@ use axum::{Router, extract::State, routing::get};
 use tower_http::services::{ServeDir, ServeFile};
 use trailbase::AppState;
 
-use crate::settings::{FrontendSettings, PasswordAuthEnabled};
+use crate::settings::{FrontendSettings, PublicConfig};
 
 /// Build the custom API router.
 ///
@@ -51,9 +51,7 @@ async fn hello_handler() -> axum::Json<serde_json::Value> {
 /// and controls whether password-based login, registration, and OTP UI is shown.
 async fn public_config_handler(
     State(state): State<AppState>,
-    axum::Extension(PasswordAuthEnabled(password_auth_enabled)): axum::Extension<
-        PasswordAuthEnabled,
-    >,
+    axum::Extension(config): axum::Extension<PublicConfig>,
 ) -> axum::Json<serde_json::Value> {
     let (registration_enabled, otp_enabled) = state.access_config(|c| {
         let registration_enabled = !c.auth.disable_password_auth.unwrap_or(false);
@@ -63,7 +61,7 @@ async fn public_config_handler(
     });
 
     axum::Json(serde_json::json!({
-        "passwordAuthEnabled": password_auth_enabled,
+        "passwordAuthEnabled": config.password_auth_enabled,
         "registrationEnabled": registration_enabled,
         "otpEnabled": otp_enabled,
     }))
