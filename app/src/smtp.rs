@@ -2,7 +2,7 @@
 //!
 //! Wraps mailcrab_server to provide a single setup function that wires the
 //! mailcrab router and SMTP listener. Only active when
-//! `settings.email.dev_intercept = true`.
+//! `settings.mailcrab.dev_intercept = true`.
 
 use axum::{Router, http::StatusCode, response::Html};
 use mailcrab_server::MailcrabHandle;

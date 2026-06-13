@@ -3176,7 +3176,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mailcrab-backend"
+name = "mailcrab-server"
 version = "1.7.0"
 dependencies = [
  "axum",
@@ -5311,7 +5311,7 @@ dependencies = [
  "dotenvy",
  "env_logger 0.11.10",
  "indoc",
- "mailcrab-backend",
+ "mailcrab-server",
  "pretty_env_logger",
  "serde",
  "serde_json",

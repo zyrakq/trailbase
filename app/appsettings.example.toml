@@ -43,12 +43,12 @@ public_dir = ""
 # Never enable in production.
 # ------------------------------------------------------------------------------
 
-[email]
+[mailcrab]
 # Start the mailcrab SMTP interceptor and serve its UI under `path`.
 dev_intercept = false
 
 # URL prefix for the mailcrab web UI and API.
-path = "/emails"
+path = "/_/mailcrab"
 
 # IP the mailcrab SMTP listener binds to.
 smtp_host = "127.0.0.1"

@@ -11,7 +11,7 @@ use serde::Deserialize;
 pub struct Settings {
     pub server: ServerSettings,
     pub frontend: FrontendSettings,
-    pub email: EmailSettings,
+    pub mailcrab: EmailSettings,
     /// Bootstrap settings applied to TrailBase on first start only.
     /// Ignored when `app/traildepot/config.textproto` already exists.
     pub trailbase: TrailbaseBootstrap,
@@ -328,9 +328,9 @@ mod tests {
         watch = false
         public_dir = ""
 
-        [email]
+        [mailcrab]
         dev_intercept = false
-        path = "/emails"
+        path = "/_/mailcrab"
         smtp_host = "127.0.0.1"
         smtp_port = 1025
 
@@ -427,7 +427,7 @@ mod tests {
     #[test]
     fn email_dev_intercept_defaults_to_false() {
         let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
-        assert!(!s.email.dev_intercept);
+        assert!(!s.mailcrab.dev_intercept);
     }
 
     #[test]
@@ -441,9 +441,9 @@ mod tests {
             watch = false
             public_dir = ""
 
-            [email]
+            [mailcrab]
             dev_intercept = false
-            path = "/emails"
+            path = "/_/mailcrab"
             smtp_host = "127.0.0.1"
             smtp_port = 1025
 
@@ -457,11 +457,11 @@ mod tests {
             enable_otp_signin = false
         "#};
         let overlay = indoc! {r#"
-            [email]
+            [mailcrab]
             dev_intercept = true
         "#};
         let s = settings_from_toml(base, overlay).expect("should deserialize");
-        assert!(s.email.dev_intercept);
+        assert!(s.mailcrab.dev_intercept);
     }
 
     #[test]

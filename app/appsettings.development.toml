@@ -2,7 +2,7 @@
 watch = true
 password_auth_enabled = true
 
-[email]
+[mailcrab]
 dev_intercept = true
 
 [components]

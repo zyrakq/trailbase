@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // The bootstrap is a one-time operation — if config.textproto already
     // existed before init(), operator changes are preserved unchanged.
     if is_first_start {
-        trailbase_bootstrap::apply_bootstrap(&state, &settings.trailbase, &settings.email)
+        trailbase_bootstrap::apply_bootstrap(&state, &settings.trailbase, &settings.mailcrab)
             .await?;
     }
 
@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         password_auth_enabled: settings.frontend.password_auth_enabled.unwrap_or(true),
     };
 
-    let interceptor = smtp::setup(&settings.email);
+    let interceptor = smtp::setup(&settings.mailcrab);
 
     let base_router = axum::Router::new()
         .merge(routes::build(state))

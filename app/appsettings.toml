@@ -6,9 +6,9 @@ build = false
 watch = false
 public_dir = ""
 
-[email]
+[mailcrab]
 dev_intercept = false
-path = "/emails"
+path = "/_/mailcrab"
 smtp_host = "127.0.0.1"
 smtp_port = 1025
 
