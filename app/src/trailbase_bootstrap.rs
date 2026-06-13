@@ -11,7 +11,7 @@
 
 use crate::settings::{EmailSettings, SmtpEncryptionSetting, TrailbaseBootstrap};
 use trailbase::config::proto::{
-    EmailConfig, OAuthProviderConfig, OAuthProviderId, SmtpEncryption,
+    EmailConfig, EmailTemplate, OAuthProviderConfig, OAuthProviderId, SmtpEncryption,
 };
 use trailbase::AppState;
 use tracing::{info, warn};
@@ -110,6 +110,48 @@ pub async fn apply_bootstrap(
             ..Default::default()
         };
         info!("TrailBase bootstrap: mailcrab SMTP auto-fill applied");
+    }
+
+    // Email templates (all four are optional — absent/empty fields are skipped).
+    {
+        let t = &bootstrap.email.user_verification;
+        if t.has_content() {
+            config.email.user_verification_template = Some(EmailTemplate {
+                subject: non_empty(&t.subject),
+                body: non_empty(&t.body),
+            });
+            info!("TrailBase bootstrap: user_verification_template applied");
+        }
+    }
+    {
+        let t = &bootstrap.email.password_reset;
+        if t.has_content() {
+            config.email.password_reset_template = Some(EmailTemplate {
+                subject: non_empty(&t.subject),
+                body: non_empty(&t.body),
+            });
+            info!("TrailBase bootstrap: password_reset_template applied");
+        }
+    }
+    {
+        let t = &bootstrap.email.change_email;
+        if t.has_content() {
+            config.email.change_email_template = Some(EmailTemplate {
+                subject: non_empty(&t.subject),
+                body: non_empty(&t.body),
+            });
+            info!("TrailBase bootstrap: change_email_template applied");
+        }
+    }
+    {
+        let t = &bootstrap.email.otp;
+        if t.has_content() {
+            config.email.otp_template = Some(EmailTemplate {
+                subject: non_empty(&t.subject),
+                body: non_empty(&t.body),
+            });
+            info!("TrailBase bootstrap: otp_template applied");
+        }
     }
 
     state

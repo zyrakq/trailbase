@@ -111,6 +111,45 @@ user_api_url = "https://idm.argiago.ru/oauth2/openid/argiago/userinfo"
 #   APP_TRAILBASE__SMTP__SMTP_PASSWORD=<value>
 # ------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# Email templates (optional)
+#
+# Override the built-in TrailBase templates for transactional emails.
+# Each sub-section is entirely optional — omit it (or leave subject/body empty)
+# to keep the TrailBase default for that message type.
+#
+# Template variables available in body/subject:
+#   {{ APP_NAME }}        — application name (from trailbase.server.application_name)
+#   {{ EMAIL }}           — recipient email address
+#   {{ SITE_URL }}        — canonical site URL (from trailbase.server.site_url)
+#
+# Additional variables per type:
+#   user_verification / change_email:
+#     {{ VERIFICATION_URL }}, {{ TOKEN }}, {{ CODE }}, {{ REDIRECT_URI }}
+#   password_reset:
+#     {{ TOKEN }}, {{ CODE }}
+#   otp:
+#     {{ CODE }}, {{ REDIRECT_URI }}
+# ------------------------------------------------------------------------------
+
+# [trailbase.email.user_verification]
+# subject = ""
+# body = ""
+
+# [trailbase.email.password_reset]
+# subject = ""
+# body = ""
+
+# [trailbase.email.change_email]
+# subject = ""
+# body = ""
+
+# [trailbase.email.otp]
+# subject = ""
+# body = ""
+
+# ------------------------------------------------------------------------------
+
 [trailbase.smtp]
 # SMTP server hostname or IP. Empty → section inactive (transport not configured).
 smtp_host = ""

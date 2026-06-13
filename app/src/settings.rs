@@ -83,6 +83,12 @@ pub struct TrailbaseBootstrap {
     /// section is ignored and the dev auto-fill applies (if enabled).
     #[serde(default)]
     pub smtp: TrailbaseBootstrapSmtp,
+    /// Email templates for TrailBase transactional messages.
+    ///
+    /// Each sub-section is optional — an absent or empty template leaves the
+    /// TrailBase built-in default in place.
+    #[serde(default)]
+    pub email: TrailbaseBootstrapEmailCfg,
 }
 
 #[derive(Debug, Deserialize)]
@@ -190,6 +196,44 @@ impl TrailbaseBootstrapSmtp {
     pub fn is_configured(&self) -> bool {
         !self.smtp_host.is_empty()
     }
+}
+
+/// A single email template (subject + HTML body).
+///
+/// Both fields default to an empty string, which means "use the TrailBase
+/// built-in default for this template".
+#[derive(Debug, Default, Deserialize)]
+pub struct TrailbaseBootstrapEmailTemplate {
+    /// Email subject line.  Empty → keep TrailBase default.
+    #[serde(default)]
+    pub subject: String,
+    /// HTML email body.  Empty → keep TrailBase default.
+    #[serde(default)]
+    pub body: String,
+}
+
+impl TrailbaseBootstrapEmailTemplate {
+    /// Returns `true` when at least one of the fields carries a value.
+    pub fn has_content(&self) -> bool {
+        !self.subject.is_empty() || !self.body.is_empty()
+    }
+}
+
+/// Email templates for all four TrailBase transactional message types.
+///
+/// Every sub-struct is optional (defaults to all-empty).  When a template has
+/// no content (`has_content()` is false) it is left untouched in the config so
+/// the TrailBase built-in default remains active.
+#[derive(Debug, Default, Deserialize)]
+pub struct TrailbaseBootstrapEmailCfg {
+    #[serde(default)]
+    pub user_verification: TrailbaseBootstrapEmailTemplate,
+    #[serde(default)]
+    pub password_reset: TrailbaseBootstrapEmailTemplate,
+    #[serde(default)]
+    pub change_email: TrailbaseBootstrapEmailTemplate,
+    #[serde(default)]
+    pub otp: TrailbaseBootstrapEmailTemplate,
 }
 
 // ---------------------------------------------------------------------------
@@ -526,5 +570,67 @@ mod tests {
         );
         assert_eq!(s.trailbase.smtp.sender_name, "Argiago");
         assert_eq!(s.trailbase.smtp.sender_address, "noreply@argiago.ru");
+    }
+
+    #[test]
+    fn email_templates_absent_gives_empty_defaults() {
+        let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
+        assert!(!s.trailbase.email.user_verification.has_content());
+        assert!(!s.trailbase.email.password_reset.has_content());
+        assert!(!s.trailbase.email.change_email.has_content());
+        assert!(!s.trailbase.email.otp.has_content());
+    }
+
+    #[test]
+    fn email_template_body_only_has_content() {
+        let overlay = indoc! {r#"
+            [trailbase.email.password_reset]
+            body = "<p>Reset link: {{ TOKEN }}</p>"
+        "#};
+        let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+        assert!(s.trailbase.email.password_reset.has_content());
+        assert_eq!(s.trailbase.email.password_reset.body, "<p>Reset link: {{ TOKEN }}</p>");
+        assert_eq!(s.trailbase.email.password_reset.subject, "");
+        // Other templates stay empty.
+        assert!(!s.trailbase.email.user_verification.has_content());
+    }
+
+    #[test]
+    fn email_template_subject_only_has_content() {
+        let overlay = indoc! {r#"
+            [trailbase.email.otp]
+            subject = "Your OTP code"
+        "#};
+        let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+        assert!(s.trailbase.email.otp.has_content());
+        assert_eq!(s.trailbase.email.otp.subject, "Your OTP code");
+        assert_eq!(s.trailbase.email.otp.body, "");
+    }
+
+    #[test]
+    fn email_template_all_four_parse() {
+        let overlay = indoc! {r#"
+            [trailbase.email.user_verification]
+            subject = "Verify your email"
+            body = "<p>{{ VERIFICATION_URL }}</p>"
+
+            [trailbase.email.password_reset]
+            subject = "Reset your password"
+            body = "<p>{{ TOKEN }}</p>"
+
+            [trailbase.email.change_email]
+            subject = "Confirm email change"
+            body = "<p>{{ VERIFICATION_URL }}</p>"
+
+            [trailbase.email.otp]
+            subject = "Your OTP"
+            body = "<p>{{ CODE }}</p>"
+        "#};
+        let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+        assert!(s.trailbase.email.user_verification.has_content());
+        assert!(s.trailbase.email.password_reset.has_content());
+        assert!(s.trailbase.email.change_email.has_content());
+        assert!(s.trailbase.email.otp.has_content());
+        assert_eq!(s.trailbase.email.password_reset.subject, "Reset your password");
     }
 }
