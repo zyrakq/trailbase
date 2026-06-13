@@ -11,10 +11,15 @@ fn main() {
     // Re-run (and thus rebuild) when dist/index.html is absent.
     // Cargo always re-runs a build script when a rerun-if-changed path does not exist,
     // so deleting dist/ is enough to trigger an automatic rebuild on the next cargo build.
-    println!(
-        "cargo:rerun-if-changed={}",
-        frontend.join("dist/index.html").display()
-    );
+    let dist_index = frontend.join("dist/index.html");
+    println!("cargo:rerun-if-changed={}", dist_index.display());
+
+    // Skip trunk if the frontend is already built. Without this guard, a successful
+    // trunk run would update dist/index.html's mtime on every build, causing Cargo
+    // to re-run this script indefinitely.
+    if dist_index.exists() {
+        return;
+    }
 
     // Clear rustflags inherited from the parent Cargo invocation — they target
     // x86_64 (e.g. mold linker args) and are invalid for wasm32-unknown-unknown.
