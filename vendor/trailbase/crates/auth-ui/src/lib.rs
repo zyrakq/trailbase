@@ -442,6 +442,13 @@ struct ProfileResponse {
   /// password to an OAuth user; in that case the account is treated as
   /// password-capable and the OTP section is shown.
   show_otp_section: bool,
+
+  /// Whether to show the change-password option in the profile UI.
+  ///
+  /// True when password authentication is enabled and the user is not
+  /// OAuth-only (same definition as `show_otp_section`). Kept as a separate
+  /// field because the conditions may diverge in the future.
+  show_change_password: bool,
 }
 
 /// Return per-user profile flags for the currently authenticated user.
@@ -492,6 +499,7 @@ async fn profile_capabilities_handler(user: &User) -> Result<Response, HttpError
   return Ok(
     Json(ProfileResponse {
       show_otp_section: !is_oauth_only && password_auth_enabled,
+      show_change_password: !is_oauth_only && password_auth_enabled,
     })
     .into_response(),
   );
