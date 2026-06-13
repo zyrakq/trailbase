@@ -25,7 +25,7 @@ trailbase-build = { path = "./vendor/trailbase/crates/build" }
 
 trailbase = { git = "https://github.com/zyrakq/trailbase", default-features = false, features = ["wasm", "pg"] }
 mailcrab = { path = "vendor/mailcrab/mailcrab" }
-mailcrab-backend = { path = "vendor/mailcrab/backend" }
+mailcrab-server = { path = "vendor/mailcrab/backend" }
 
 # Use local vendor/trailbase subtree instead of fetching from git.
 # [patch] is ignored by downstream consumers of trailbase, so this only

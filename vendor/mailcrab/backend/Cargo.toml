@@ -1,5 +1,5 @@
 [package]
-name = "mailcrab-backend"
+name = "mailcrab-server"
 version = "1.7.0"
 edition = "2024"
 publish = true
@@ -8,21 +8,21 @@ repository = "https://github.com/tweedegolf/mailcrab"
 description = "Email test server for development, written in Rust"
 
 [lib]
-name = "mailcrab_backend"
+name = "mailcrab_server"
 path = "src/lib.rs"
 
 [dependencies]
 axum = { version = "0.8", features = ["ws"] }
 mailcrab = { path = "../mailcrab" }
 rust-embed = "8.0"
-serde = { version = "1.0", features = ["derive"] }
+serde = { workspace = true }
 serde_json = "1.0"
-tokio = { version = "1", features = ["full"] }
-tokio-util = "0.7"
+tokio = { workspace = true }
+tokio-util = { workspace = true }
 tower-http = { version = "0.6", features = ["fs", "trace"] }
-tracing = "0.1"
+tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "std"] }
-uuid = { version = "1.19", features = ["v4", "serde"] }
+uuid = { workspace = true }
 
 [dev-dependencies]
 lettre = { version = "0.11", default-features = false, features=[

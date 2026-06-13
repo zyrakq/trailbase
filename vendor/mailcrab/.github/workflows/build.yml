@@ -224,7 +224,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p bin
-          cp backend/target/${{ matrix.target }}/release/mailcrab-backend bin/${{ matrix.artifact }}
+          cp backend/target/${{ matrix.target }}/release/mailcrab-server bin/${{ matrix.artifact }}
 
       - uses: actions/upload-artifact@v4
         if: ${{ needs.check-version.outputs.should_release == 'true' }}

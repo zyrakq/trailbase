@@ -1,11 +1,11 @@
 //! SMTP email intercept setup for development environments.
 //!
-//! Wraps mailcrab_backend to provide a single setup function that wires the
+//! Wraps mailcrab_server to provide a single setup function that wires the
 //! mailcrab router and SMTP listener. Only active when
 //! `settings.email.dev_intercept = true`.
 
 use axum::{Router, http::StatusCode, response::Html};
-use mailcrab_backend::MailcrabHandle;
+use mailcrab_server::MailcrabHandle;
 use tracing::info;
 
 use crate::settings::EmailSettings;
@@ -36,12 +36,12 @@ pub fn setup(settings: &EmailSettings) -> Option<Interceptor> {
         .unwrap_or_else(|_| panic!("invalid email.smtp_host: {}", settings.smtp_host));
 
     let (router, handle) =
-        mailcrab_backend::mailcrab_router(&settings.path, smtp_host, settings.smtp_port);
+        mailcrab_server::mailcrab_router(&settings.path, smtp_host, settings.smtp_port);
 
     // build_router() only registers GET "/" when index.html is embedded.
     // If the WASM frontend was not compiled into the binary, attach a fallback
     // so the browser always gets a useful response instead of a 404.
-    let router = if mailcrab_backend::Asset::get("index.html").is_none() {
+    let router = if mailcrab_server::Asset::get("index.html").is_none() {
         router.fallback(frontend_not_built)
     } else {
         router

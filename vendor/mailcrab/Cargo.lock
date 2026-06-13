@@ -1361,26 +1361,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mailcrab-backend"
-version = "1.7.0"
-dependencies = [
- "axum",
- "fake",
- "lettre",
- "mailcrab",
- "reqwest",
- "rust-embed",
- "serde",
- "serde_json",
- "tokio",
- "tokio-util",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "mailcrab-frontend"
 version = "1.7.0"
 dependencies = [
@@ -1398,6 +1378,26 @@ dependencies = [
  "web-sys",
  "yew",
  "yew-hooks",
+]
+
+[[package]]
+name = "mailcrab-server"
+version = "1.7.0"
+dependencies = [
+ "axum",
+ "fake",
+ "lettre",
+ "mailcrab",
+ "reqwest",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

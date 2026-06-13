@@ -141,7 +141,7 @@ async fn main() {
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG")
-                .unwrap_or_else(|_| "mailcrab_backend=info,tower_http=info".into()),
+                .unwrap_or_else(|_| "mailcrab_server=info,tower_http=info".into()),
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
