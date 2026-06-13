@@ -16,9 +16,13 @@ fn main() {
         frontend.join("dist/index.html").display()
     );
 
+    // Clear rustflags inherited from the parent Cargo invocation — they target
+    // x86_64 (e.g. mold linker args) and are invalid for wasm32-unknown-unknown.
     let status = Command::new("trunk")
         .args(["build", "--release"])
         .current_dir(&frontend)
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env_remove("RUSTFLAGS")
         .status()
         .expect("failed to run `trunk`; install with: cargo install trunk");
 
