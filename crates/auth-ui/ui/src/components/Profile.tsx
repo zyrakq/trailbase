@@ -185,13 +185,14 @@ function ProfileTable(props: { client: Client; user: User }) {
           credentials: "include",
         });
         if (!resp.ok) return null;
-        return (await resp.json()) as { show_otp_section: boolean };
+        return (await resp.json()) as { show_otp_section: boolean; show_change_password: boolean };
       } catch {
         return null;
       }
     },
   );
   const showOtpSection = () => profileData()?.show_otp_section ?? false;
+  const showChangePassword = () => profileData()?.show_change_password ?? false;
 
   return (
     <>
@@ -206,13 +207,15 @@ function ProfileTable(props: { client: Client; user: User }) {
               </DropdownMenuTrigger>
 
               <DropdownMenuContent>
-                <a href="/_/auth/change_email">
-                  <DropdownMenuItem>Change Email</DropdownMenuItem>
-                </a>
+                 <a href="/_/auth/change_email">
+                   <DropdownMenuItem>Change Email</DropdownMenuItem>
+                 </a>
 
-                <a href="/_/auth/change_password">
-                  <DropdownMenuItem>Change Password</DropdownMenuItem>
-                </a>
+                 <Show when={showChangePassword()}>
+                   <a href="/_/auth/change_password">
+                     <DropdownMenuItem>Change Password</DropdownMenuItem>
+                   </a>
+                 </Show>
 
                 <DropdownMenuSeparator />
 
