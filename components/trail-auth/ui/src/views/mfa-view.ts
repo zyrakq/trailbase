@@ -1,21 +1,17 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { msg } from '@lit/localize';
-import { localized } from '@/features/localization';
-import { authService } from '../../services/auth.service';
-import { AuthError, AuthErrorCode } from '../../types/auth-error';
-import { authSharedStyles } from '../auth-shared.styles';
+import { authSharedStyles } from '../styles.ts';
+import { loginWithMfa, AuthClientError, AuthErrorCode } from '../api/auth-client.ts';
 
 /**
  * MFA / TOTP verification view.
  *
- * Events dispatched:
- * - auth-success: () → parent closes modal + shows toast
- * - auth-navigate: { view: 'password' } — back button
+ * Events dispatched (bubbles, composed):
+ * - trail-auth-success
+ * - trail-auth-navigate: { view: 'password' }
  */
-@customElement('auth-mfa-view')
-@localized()
-export class AuthMfaView extends LitElement {
+@customElement('trail-auth-mfa')
+export class TrailAuthMfaView extends LitElement {
   @property({ type: String }) mfaToken = '';
 
   @state() private mfaCode = '';
@@ -30,7 +26,7 @@ export class AuthMfaView extends LitElement {
 
   private handleBack() {
     this.dispatchEvent(
-      new CustomEvent('auth-navigate', {
+      new CustomEvent('trail-auth-navigate', {
         detail: { view: 'password' },
         bubbles: true,
         composed: true,
@@ -44,7 +40,7 @@ export class AuthMfaView extends LitElement {
 
     const code = this.mfaCode.trim();
     if (code.length !== 6) {
-      this.errorMessage = msg('Please enter the 6-digit code from your authenticator app.');
+      this.errorMessage = 'Please enter the 6-digit code from your authenticator app.';
       return;
     }
 
@@ -52,17 +48,18 @@ export class AuthMfaView extends LitElement {
     this.errorMessage = '';
 
     try {
-      await authService.loginWithMfa(this.mfaToken, code);
-      this.dispatchEvent(new CustomEvent('auth-success', { bubbles: true, composed: true }));
+      await loginWithMfa(this.mfaToken, code);
+      this.dispatchEvent(
+        new CustomEvent('trail-auth-success', { bubbles: true, composed: true })
+      );
     } catch (error) {
-      if (error instanceof AuthError && error.code === AuthErrorCode.INVALID_CREDENTIALS) {
-        this.errorMessage = msg('Invalid code. Please try again.');
-      } else if (error instanceof AuthError && error.code === AuthErrorCode.NETWORK_ERROR) {
-        this.errorMessage = msg(
-          'Unable to connect. Please check your internet connection and try again.'
-        );
+      if (error instanceof AuthClientError && error.code === AuthErrorCode.INVALID_CREDENTIALS) {
+        this.errorMessage = 'Invalid code. Please try again.';
+      } else if (error instanceof AuthClientError && error.code === AuthErrorCode.NETWORK_ERROR) {
+        this.errorMessage =
+          'Unable to connect. Please check your internet connection and try again.';
       } else {
-        this.errorMessage = msg('Verification failed. Please try again.');
+        this.errorMessage = 'Verification failed. Please try again.';
       }
     } finally {
       this.isLoading = false;
@@ -72,12 +69,10 @@ export class AuthMfaView extends LitElement {
   render() {
     return html`
       <form class="password-form" @submit=${this.handleSubmit}>
-        <p class="mfa-subtitle">
-          ${msg('Enter the 6-digit code from your authenticator app.')}
-        </p>
+        <p class="mfa-subtitle">Enter the 6-digit code from your authenticator app.</p>
 
         <div class="form-field">
-          <label for="mfa-code">${msg('Verification code')}</label>
+          <label for="mfa-code">Verification code</label>
           <input
             id="mfa-code"
             type="text"
@@ -101,12 +96,12 @@ export class AuthMfaView extends LitElement {
           class="btn btn-primary"
           ?disabled=${this.isLoading || this.mfaCode.length !== 6}
         >
-          ${this.isLoading ? msg('Verifying...') : msg('Verify')}
+          ${this.isLoading ? 'Verifying\u2026' : 'Verify'}
         </button>
       </form>
 
       <button class="back-link" @click=${this.handleBack} ?disabled=${this.isLoading}>
-        ${msg('Back to sign in')}
+        Back to sign in
       </button>
     `;
   }
@@ -125,6 +120,6 @@ export class AuthMfaView extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'auth-mfa-view': AuthMfaView;
+    'trail-auth-mfa': TrailAuthMfaView;
   }
 }

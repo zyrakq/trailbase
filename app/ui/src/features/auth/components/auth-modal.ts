@@ -2,62 +2,93 @@ import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
-import { configService, type OAuthProviderConfig } from '../services/config.service';
 import { authModalStyles } from './auth-modal.styles';
+import { configService } from '@/features/auth/services/config.service';
 
-// Sub-component side-effect imports — registers the custom elements.
-import './views/auth-choice-view';
-import './views/auth-password-view';
-import './views/auth-register-view';
-import './views/auth-register-success-view';
-import './views/auth-mfa-view';
-import './views/auth-forgot-password-view';
-import './views/auth-forgot-password-sent-view';
+// trail-auth bundle is loaded lazily on first open via a <script> tag.
+// The bundle URL is served by the trail-auth-component WASM.
+const TRAIL_AUTH_BUNDLE = '/_/auth/bundle.js?v1';
 
-type ViewState =
-  | 'choice'
-  | 'password'
-  | 'register'
-  | 'register-success'
-  | 'mfa'
-  | 'forgot-password'
-  | 'forgot-password-sent';
+let bundleLoaded = false;
+
+function loadTrailAuthBundle(): Promise<void> {
+  if (bundleLoaded) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(
+      `script[src="${TRAIL_AUTH_BUNDLE}"]`
+    );
+    if (existing) {
+      bundleLoaded = true;
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = TRAIL_AUTH_BUNDLE;
+    script.onload = () => {
+      bundleLoaded = true;
+      resolve();
+    };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
 
 @customElement('auth-modal')
 @localized()
 export class AuthModal extends LitElement {
   @state() private isOpen = false;
-  @state() private view: ViewState = 'choice';
+  @state() private bundleReady = false;
 
-  // Shared state passed down to sub-components as properties.
-  @state() private sharedEmail = '';
-  @state() private mfaToken = '';
   @state() private passwordAuthEnabled = true;
   @state() private registrationEnabled = true;
-  @state() private oauthProviders: OAuthProviderConfig[] = [];
-  @state() private registerSuccessEmailSent = false;
+  private configLoaded = false;
 
   open() {
-    this.view = 'choice';
-    this.sharedEmail = '';
-    this.mfaToken = '';
-    this.registerSuccessEmailSent = false;
-
-    configService.fetchConfig().then((config) => {
-      this.passwordAuthEnabled = config.passwordAuthEnabled;
-      this.registrationEnabled = config.registrationEnabled;
-      this.oauthProviders = config.oauthProviders;
-    });
-
     this.isOpen = true;
     document.body.style.overflow = 'hidden';
-    window.dispatchEvent(new CustomEvent('modal-opened', { bubbles: true, composed: true }));
+    window.dispatchEvent(
+      new CustomEvent('modal-opened', { bubbles: true, composed: true })
+    );
+
+    if (!this.configLoaded) {
+      configService.fetchConfig().then((config) => {
+        this.configLoaded = true;
+        this.passwordAuthEnabled = config.passwordAuthEnabled;
+        this.registrationEnabled = config.registrationEnabled;
+      });
+    }
+
+    if (!this.bundleReady) {
+      loadTrailAuthBundle()
+        .then(() => customElements.whenDefined('trail-auth'))
+        .then(() => {
+          this.bundleReady = true;
+          // Reset trail-auth state if already in DOM.
+          const el = this.shadowRoot?.querySelector('trail-auth') as
+            | (HTMLElement & { reset?: () => void })
+            | null;
+          el?.reset?.();
+        })
+        .catch(() => {
+          // Bundle load failure is non-fatal — the component won't render but
+          // the host app remains functional.
+        });
+    } else {
+      // Bundle already loaded — reset view state.
+      const el = this.shadowRoot?.querySelector('trail-auth') as
+        | (HTMLElement & { reset?: () => void })
+        | null;
+      el?.reset?.();
+    }
   }
 
   close() {
     this.isOpen = false;
     document.body.style.overflow = '';
-    window.dispatchEvent(new CustomEvent('modal-closed', { bubbles: true, composed: true }));
+    window.dispatchEvent(
+      new CustomEvent('modal-closed', { bubbles: true, composed: true })
+    );
   }
 
   private handleOverlayClick(e: MouseEvent) {
@@ -85,23 +116,6 @@ export class AuthModal extends LitElement {
     document.body.style.overflow = '';
   }
 
-  /**
-   * Handles navigation events from sub-components.
-   * Each sub-component fires auth-navigate with { view, email?, mfaToken?, emailSent? }.
-   */
-  private handleNavigate(e: CustomEvent) {
-    const { view, email, mfaToken, emailSent } = e.detail ?? {};
-
-    if (email !== undefined) this.sharedEmail = email;
-    if (mfaToken !== undefined) this.mfaToken = mfaToken;
-    if (emailSent !== undefined) this.registerSuccessEmailSent = emailSent;
-
-    this.view = view;
-  }
-
-  /**
-   * Handles auth-success from sub-components — closes modal and shows toast.
-   */
   private handleAuthSuccess() {
     this.close();
     window.dispatchEvent(
@@ -118,19 +132,6 @@ export class AuthModal extends LitElement {
     );
   }
 
-  private get modalTitle(): string {
-    if (this.view === 'register' || this.view === 'register-success') {
-      return msg('Create account');
-    }
-    if (this.view === 'mfa') {
-      return msg('Two-factor authentication');
-    }
-    if (this.view === 'forgot-password' || this.view === 'forgot-password-sent') {
-      return msg('Reset password');
-    }
-    return msg('Sign in');
-  }
-
   render() {
     if (!this.isOpen) return html``;
 
@@ -138,13 +139,11 @@ export class AuthModal extends LitElement {
       <div
         class="modal-overlay"
         @click=${this.handleOverlayClick}
-        @auth-navigate=${this.handleNavigate}
-        @auth-success=${this.handleAuthSuccess}
-        @auth-close=${this.handleClose}
+        @trail-auth-success=${this.handleAuthSuccess}
+        @trail-auth-close=${this.handleClose}
       >
         <div class="modal-card">
           <div class="modal-header">
-            <span class="modal-title">${this.modalTitle}</span>
             <button
               class="modal-close"
               @click=${(e: Event) => this.handleClose(e)}
@@ -154,45 +153,27 @@ export class AuthModal extends LitElement {
             </button>
           </div>
           <div class="modal-content">
-            ${this.renderCurrentView()}
+            ${this.bundleReady
+              ? html`<trail-auth
+                  ?no-password-auth=${!this.passwordAuthEnabled}
+                  ?no-registration=${!this.registrationEnabled}
+                ></trail-auth>`
+              : html`
+                  <div
+                    class="auth-skeleton"
+                    aria-busy="true"
+                    aria-label=${msg('Loading sign-in form')}
+                  >
+                    <div class="skeleton-title"></div>
+                    <div class="skeleton-field"></div>
+                    <div class="skeleton-field"></div>
+                    <div class="skeleton-btn"></div>
+                  </div>
+                `}
           </div>
         </div>
       </div>
     `;
-  }
-
-  private renderCurrentView() {
-    switch (this.view) {
-      case 'choice':
-        return html`<auth-choice-view
-          .passwordAuthEnabled=${this.passwordAuthEnabled}
-          .registrationEnabled=${this.registrationEnabled}
-          .oauthProviders=${this.oauthProviders}
-        ></auth-choice-view>`;
-
-      case 'password':
-        return html`<auth-password-view .initialEmail=${this.sharedEmail}></auth-password-view>`;
-
-      case 'register':
-        return html`<auth-register-view></auth-register-view>`;
-
-      case 'register-success':
-        return html`
-          <auth-register-success-view
-            .email=${this.sharedEmail}
-            .emailSent=${this.registerSuccessEmailSent}
-          ></auth-register-success-view>
-        `;
-
-      case 'mfa':
-        return html`<auth-mfa-view .mfaToken=${this.mfaToken}></auth-mfa-view>`;
-
-      case 'forgot-password':
-        return html`<auth-forgot-password-view .initialEmail=${this.sharedEmail}></auth-forgot-password-view>`;
-
-      case 'forgot-password-sent':
-        return html`<auth-forgot-password-sent-view></auth-forgot-password-sent-view>`;
-    }
   }
 
   static styles = authModalStyles;

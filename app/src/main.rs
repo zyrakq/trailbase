@@ -7,7 +7,7 @@ mod settings;
 mod smtp;
 mod trailbase_bootstrap;
 
-use settings::{PublicConfig, Settings};
+use settings::{ActiveComponent, PublicConfig, Settings};
 use std::path::PathBuf;
 use tracing::info;
 
@@ -24,7 +24,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let settings = Settings::load()?;
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-    components::ensure_auth_ui(&manifest_dir, settings.components.vendor_auth_ui)?;
+    match settings.components.active {
+        ActiveComponent::AuthUi => {
+            components::ensure_auth_ui(&manifest_dir, settings.components.vendor_auth_ui)?
+        }
+        ActiveComponent::TrailAuth => {
+            components::ensure_trail_auth(&manifest_dir, settings.components.vendor_auth_ui)?
+        }
+    };
 
     let _bun_watch = frontend::start(&settings.frontend, &manifest_dir.join("ui"))?;
 

@@ -4,3 +4,4 @@ rustflags = ["-C", "link-arg=-fuse-ld=mold", "-C", "link-arg=-Wl,--icf=all"]
 
 [env]
 APP_SKIP_WASM = "1"
+APP_WASM_PACKAGE = "trail-auth-component"

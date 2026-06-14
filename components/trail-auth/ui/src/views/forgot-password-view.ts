@@ -1,22 +1,17 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { msg } from '@lit/localize';
-import { localized } from '@/features/localization';
-import { authService } from '../../services/auth.service';
-import { AuthError, AuthErrorCode } from '../../types/auth-error';
-import { authSharedStyles } from '../auth-shared.styles';
+import { authSharedStyles } from '../styles.ts';
+import { requestPasswordReset, AuthClientError, AuthErrorCode } from '../api/auth-client.ts';
 
 /**
  * Forgot password view — email form to request a reset link.
  *
- * Events dispatched:
- * - auth-navigate: { view: 'forgot-password-sent' }
- * - auth-navigate: { view: 'password', email: string } — back button preserves email
+ * Events dispatched (bubbles, composed):
+ * - trail-auth-navigate: { view: 'forgot-password-sent' }
+ * - trail-auth-navigate: { view: 'password', email: string }
  */
-@customElement('auth-forgot-password-view')
-@localized()
-export class AuthForgotPasswordView extends LitElement {
-  /** Pre-populated from the password view so the user doesn't retype. */
+@customElement('trail-auth-forgot-password')
+export class TrailAuthForgotPasswordView extends LitElement {
   @property({ type: String }) initialEmail = '';
 
   @state() private email = '';
@@ -35,7 +30,7 @@ export class AuthForgotPasswordView extends LitElement {
 
   private handleBack() {
     this.dispatchEvent(
-      new CustomEvent('auth-navigate', {
+      new CustomEvent('trail-auth-navigate', {
         detail: { view: 'password', email: this.email },
         bubbles: true,
         composed: true,
@@ -49,7 +44,7 @@ export class AuthForgotPasswordView extends LitElement {
 
     const trimmedEmail = this.email.trim();
     if (!trimmedEmail) {
-      this.errorMessage = msg('Please enter your email address.');
+      this.errorMessage = 'Please enter your email address.';
       return;
     }
 
@@ -57,33 +52,32 @@ export class AuthForgotPasswordView extends LitElement {
     this.errorMessage = '';
 
     try {
-      await authService.requestPasswordReset(trimmedEmail);
+      await requestPasswordReset(trimmedEmail);
       this.dispatchEvent(
-        new CustomEvent('auth-navigate', {
+        new CustomEvent('trail-auth-navigate', {
           detail: { view: 'forgot-password-sent' },
           bubbles: true,
           composed: true,
         })
       );
     } catch (error) {
-      if (error instanceof AuthError) {
+      if (error instanceof AuthClientError) {
         switch (error.code) {
           case AuthErrorCode.RATE_LIMITED:
-            this.errorMessage = msg(
-              'A reset link was already sent. Check your inbox or wait 1 hour before trying again.'
-            );
+            this.errorMessage =
+              'A reset link was already sent. Check your inbox or wait 1 hour before trying again.';
             break;
           case AuthErrorCode.EMAIL_NOT_SENT:
-            this.errorMessage = msg('Could not send the email. Please contact support.');
+            this.errorMessage = 'Could not send the email. Please contact support.';
             break;
           case AuthErrorCode.NETWORK_ERROR:
-            this.errorMessage = msg('Network error. Please check your connection.');
+            this.errorMessage = 'Network error. Please check your connection.';
             break;
           default:
-            this.errorMessage = error.message || msg('An error occurred. Please try again.');
+            this.errorMessage = error.message || 'An error occurred. Please try again.';
         }
       } else {
-        this.errorMessage = msg('An error occurred. Please try again.');
+        this.errorMessage = 'An error occurred. Please try again.';
       }
     } finally {
       this.isLoading = false;
@@ -94,11 +88,11 @@ export class AuthForgotPasswordView extends LitElement {
     return html`
       <form class="password-form" @submit=${this.handleSubmit}>
         <p class="mfa-subtitle">
-          ${msg("Enter your email address and we'll send you a reset link.")}
+          Enter your email address and we'll send you a reset link.
         </p>
 
         <div class="form-field">
-          <label for="forgot-email">${msg('Email address')}</label>
+          <label for="forgot-email">Email address</label>
           <input
             id="forgot-email"
             type="email"
@@ -115,12 +109,12 @@ export class AuthForgotPasswordView extends LitElement {
           : ''}
 
         <button type="submit" class="btn btn-primary" ?disabled=${this.isLoading}>
-          ${this.isLoading ? msg('Sending\u2026') : msg('Send reset link')}
+          ${this.isLoading ? 'Sending\u2026' : 'Send reset link'}
         </button>
       </form>
 
       <button class="back-link" @click=${this.handleBack} ?disabled=${this.isLoading}>
-        ${msg('Back to sign in')}
+        Back to sign in
       </button>
     `;
   }
@@ -139,6 +133,6 @@ export class AuthForgotPasswordView extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'auth-forgot-password-view': AuthForgotPasswordView;
+    'trail-auth-forgot-password': TrailAuthForgotPasswordView;
   }
 }

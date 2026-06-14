@@ -1,15 +1,5 @@
-// Public config service — fetches server-side feature flags for the frontend.
+// Public config service — fetches argiago-specific feature flags for the frontend.
 // No caching: each call fetches fresh data from the server.
-
-/** OAuth provider metadata returned by /api/config/public. */
-export interface OAuthProviderConfig {
-  /** TrailBase provider map key, e.g. "oidc0", "google". */
-  key: string;
-  /** Human-readable provider name, e.g. "OIDC", "Google". */
-  displayName: string;
-  /** Icon filename served at /_/auth/oauth2/<imgName>, e.g. "oidc.svg". */
-  imgName: string;
-}
 
 export interface PublicConfig {
   /** Whether password-based login, registration, and OTP UI should be shown. */
@@ -17,14 +7,12 @@ export interface PublicConfig {
   registrationEnabled: boolean;
   /** Whether OTP/TOTP two-factor authentication is enabled server-side. */
   otpEnabled: boolean;
-  oauthProviders: OAuthProviderConfig[];
 }
 
 const DEFAULT_CONFIG: PublicConfig = {
   passwordAuthEnabled: true,
   registrationEnabled: true,
   otpEnabled: true,
-  oauthProviders: [],
 };
 
 class ConfigService {
@@ -40,22 +28,21 @@ class ConfigService {
   }
 
   /**
-   * Fetch public configuration flags from the server.
+   * Fetch public configuration flags from /api/config/public.
    *
-   * Reads disable_password_auth from the live TrailBase config — changes
-   * made through the admin panel are reflected immediately.
-   *
-   * On any failure (network error, non-2xx), defaults to
-   * registrationEnabled: true (fail-open). TrailBase will still enforce
-   * the real value server-side via the 403 REGISTRATION_DISABLED error.
+   * On any failure, defaults to fail-open. TrailBase enforces the real values
+   * server-side regardless.
    */
   async fetchConfig(): Promise<PublicConfig> {
     try {
       const response = await fetch('/api/config/public');
-      if (!response.ok) {
-        return DEFAULT_CONFIG;
-      }
-      return (await response.json()) as PublicConfig;
+      if (!response.ok) return DEFAULT_CONFIG;
+      const data = (await response.json()) as Partial<PublicConfig>;
+      return {
+        passwordAuthEnabled: data.passwordAuthEnabled ?? DEFAULT_CONFIG.passwordAuthEnabled,
+        registrationEnabled: data.registrationEnabled ?? DEFAULT_CONFIG.registrationEnabled,
+        otpEnabled: data.otpEnabled ?? DEFAULT_CONFIG.otpEnabled,
+      };
     } catch {
       return DEFAULT_CONFIG;
     }

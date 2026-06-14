@@ -1,6 +1,6 @@
 // app/src/components.rs
 //
-// TrailBase component lifecycle: ensure the auth_ui component wasm is present,
+// TrailBase component lifecycle: ensure component wasm files are present,
 // either by copying from a local vendor build or installing via the trail CLI.
 
 use std::path::Path;
@@ -84,6 +84,88 @@ pub fn ensure_auth_ui(
     Ok(())
 }
 
+/// Ensure the `trail-auth` component is installed.
+///
+/// Checks for the compiled wasm file at
+/// `{manifest_dir}/traildepot/wasm/trail_auth_component.wasm`.
+/// If the file already exists the function returns immediately.
+///
+/// When `vendor` is `true`, copies the wasm from the local build output at
+/// `{manifest_dir}/../target/wasm32-wasip2/release/trail_auth_component.wasm`.
+/// Build it first:
+///   cargo build --target wasm32-wasip2 --release -p trail-auth-component
+///
+/// When `vendor` is `false`, verifies that `trail` is in PATH and runs
+/// `trail components add <url>` to download the component from GitHub releases.
+/// The URL is a placeholder — update it once the package is published.
+pub fn ensure_trail_auth(
+    manifest_dir: &Path,
+    vendor: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let wasm_path = manifest_dir
+        .join("traildepot")
+        .join("wasm")
+        .join("trail_auth_component.wasm");
+
+    if wasm_path.exists() {
+        return Ok(());
+    }
+
+    if vendor {
+        let src = manifest_dir
+            .parent()
+            .ok_or("cannot determine parent directory of manifest_dir")?
+            .join("target")
+            .join("wasm32-wasip2")
+            .join("release")
+            .join("trail_auth_component.wasm");
+
+        if !src.exists() {
+            return Err(format!(
+                "trail-auth wasm not found at {}.\n\
+                 Build it first: cargo build --target wasm32-wasip2 --release -p trail-auth-component",
+                src.display()
+            )
+            .into());
+        }
+
+        let wasm_dir = wasm_path
+            .parent()
+            .ok_or("cannot determine wasm output directory")?;
+        std::fs::create_dir_all(wasm_dir)?;
+        std::fs::copy(&src, &wasm_path)?;
+        info!("Copied trail-auth WASM from build output: {}", src.display());
+
+        return Ok(());
+    }
+
+    crate::preflight::check_dependency(
+        "trail",
+        "https://trailbase.io/getting-started/install/",
+    )?;
+
+    // TODO: replace placeholder URL with the actual release URL once the package
+    // is published at https://github.com/zyrakq/trail-auth/releases
+    const TRAIL_AUTH_URL: &str =
+        "https://github.com/zyrakq/trail-auth/releases/latest/download/trail_auth_component.wasm";
+
+    info!("Installing trail-auth component from {TRAIL_AUTH_URL}...");
+
+    let status = std::process::Command::new("trail")
+        .args(["components", "add", TRAIL_AUTH_URL])
+        .current_dir(manifest_dir)
+        .status()?;
+
+    if !status.success() {
+        return Err(
+            format!("Failed to install trail-auth component: exit status {status}").into(),
+        );
+    }
+
+    info!("trail-auth component installed");
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -101,17 +183,35 @@ mod tests {
         fs::write(wasm_dir.join("auth_ui_component.wasm"), b"fake")
             .expect("write fake wasm");
 
-        // Must return Ok without invoking trail (which may not be installed in CI)
         assert!(ensure_auth_ui(dir.path(), false).is_ok());
     }
 
     #[test]
     fn vendor_returns_err_when_src_missing() {
         let dir = tempfile::tempdir().expect("tempdir");
-        // Do not create the wasm file — must fail with a useful error message
         let result = ensure_auth_ui(dir.path(), true);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("vendor auth_ui wasm not found"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn trail_auth_returns_ok_immediately_when_wasm_exists() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let wasm_dir = dir.path().join("traildepot").join("wasm");
+        fs::create_dir_all(&wasm_dir).expect("create wasm dir");
+        fs::write(wasm_dir.join("trail_auth_component.wasm"), b"fake")
+            .expect("write fake wasm");
+
+        assert!(ensure_trail_auth(dir.path(), true).is_ok());
+    }
+
+    #[test]
+    fn trail_auth_vendor_returns_err_when_src_missing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let result = ensure_trail_auth(dir.path(), true);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("trail-auth wasm not found"), "unexpected error: {msg}");
     }
 }

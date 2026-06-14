@@ -1,149 +1,55 @@
-import { LitElement, css, html, nothing } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
-import { authService, trailbaseService, totpService, AuthError, AuthErrorCode } from '@/features/auth';
-import type { TotpSetupData } from '@/features/auth';
+import { authService } from '@/features/auth';
 import { notificationService } from '@/features/notifications';
-import type { TotpSetupState, TotpActionPayload } from './blocks/security-card.ts';
 import type { User } from '@/features/auth';
 import '@/shared/components/app-header';
 import '@/shared/components/footer-info';
-import './blocks/user-card.ts';
-import './blocks/security-card.ts';
+
+const TRAIL_AUTH_BUNDLE = '/_/auth/bundle.js';
+let bundleLoaded = false;
+
+function loadBundle(): Promise<void> {
+  if (bundleLoaded) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${TRAIL_AUTH_BUNDLE}"]`);
+    if (existing) { bundleLoaded = true; resolve(); return; }
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = TRAIL_AUTH_BUNDLE;
+    script.onload = () => { bundleLoaded = true; resolve(); };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
 
 @customElement('profile-page')
 @localized()
 export class ProfilePage extends LitElement {
   @state() private user: User | null = null;
-  @state() private totpState: TotpSetupState = 'idle';
-  @state() private totpSetupData: TotpSetupData | null = null;
-  @state() private verifyCode = '';
-  @state() private disableCode = '';
-  @state() private totpError = '';
-  @state() private showOtpSection = false;
-  @state() private signOutLoading = false;
+  @state() private bundleReady = false;
 
   async connectedCallback() {
     super.connectedCallback();
     const authState = authService.getAuthState();
     this.user = authState.user;
-    this.totpState = authState.hasMfa ? 'enabled' : 'idle';
-    // Fetch profile flags from auth-ui WASM. Falls back to false on any error
-    // so the security card stays hidden (safe default for OAuth users).
-    const profile = await trailbaseService.fetchUserProfile().catch(() => null);
-    this.showOtpSection = profile?.showOtpSection ?? false;
+    try {
+      await loadBundle();
+      await customElements.whenDefined('trail-profile');
+      this.bundleReady = true;
+    } catch {
+      // Bundle failed to load — profile component stays hidden
+    }
   }
 
   private async handleSignOut() {
     try {
-      this.signOutLoading = true;
       await authService.signOut();
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 1000);
+      setTimeout(() => { window.location.href = '/'; }, 1000);
     } catch {
       notificationService.error(msg('Failed to sign out. Please try again.'));
-    } finally {
-      this.signOutLoading = false;
-    }
-  }
-
-  private async handleTotpAction(e: CustomEvent<TotpActionPayload>) {
-    const action = e.detail;
-
-    switch (action.kind) {
-      case 'enable':
-        await this.enableTotp();
-        break;
-      case 'verify-code-input':
-        this.verifyCode = action.value.replace(/\D/g, '').slice(0, 6);
-        if (this.totpError) this.totpError = '';
-        break;
-      case 'confirm-setup':
-        await this.confirmSetup(action.code);
-        break;
-      case 'start-disable':
-        this.disableCode = '';
-        this.totpError = '';
-        this.totpState = 'disabling';
-        break;
-      case 'disable-code-input':
-        this.disableCode = action.value.replace(/\D/g, '').slice(0, 6);
-        if (this.totpError) this.totpError = '';
-        break;
-      case 'confirm-disable':
-        await this.confirmDisable(action.code);
-        break;
-      case 'cancel-disable':
-        this.totpState = 'enabled';
-        this.disableCode = '';
-        this.totpError = '';
-        break;
-    }
-  }
-
-  private async enableTotp() {
-    this.totpError = '';
-    this.totpState = 'loading-qr';
-    try {
-      const data = await totpService.startSetup();
-      this.totpSetupData = data;
-      this.verifyCode = '';
-      this.totpState = 'qr-ready';
-    } catch {
-      this.totpState = 'idle';
-      notificationService.error(msg('Failed to start TOTP setup. Please try again.'));
-    }
-  }
-
-  private async confirmSetup(code: string) {
-    if (this.totpState === 'confirming') return;
-    if (!this.totpSetupData) return;
-
-    if (code.length !== 6) {
-      this.totpError = msg('Please enter the 6-digit code from your authenticator app.');
-      return;
-    }
-
-    this.totpState = 'confirming';
-    this.totpError = '';
-
-    try {
-      await totpService.confirmSetup(this.totpSetupData.totpUrl, code);
-      this.totpState = 'enabled';
-      this.totpSetupData = null;
-      this.verifyCode = '';
-      notificationService.success(msg('Two-factor authentication enabled.'));
-    } catch (error) {
-      if (error instanceof AuthError && error.code === AuthErrorCode.INVALID_CREDENTIALS) {
-        this.totpError = msg('Invalid code. Please try again.');
-      } else {
-        this.totpError = msg('Verification failed. Please try again.');
-      }
-      this.totpState = 'qr-ready';
-    }
-  }
-
-  private async confirmDisable(code: string) {
-    if (code.length !== 6) {
-      this.totpError = msg('Please enter the 6-digit code from your authenticator app.');
-      return;
-    }
-
-    this.totpError = '';
-
-    try {
-      await totpService.disableTotp(code);
-      this.totpState = 'idle';
-      this.disableCode = '';
-      notificationService.success(msg('Two-factor authentication disabled.'));
-    } catch (error) {
-      if (error instanceof AuthError && error.code === AuthErrorCode.INVALID_CREDENTIALS) {
-        this.totpError = msg('Invalid code. Please try again.');
-      } else {
-        this.totpError = msg('Failed to disable two-factor authentication. Please try again.');
-      }
     }
   }
 
@@ -153,31 +59,15 @@ export class ProfilePage extends LitElement {
         <app-header></app-header>
         <main class="main-content">
           <div class="profile-container">
-            <profile-user-card .user=${this.user}></profile-user-card>
-
-            ${this.showOtpSection
+            ${this.bundleReady
               ? html`
-                <profile-security-card
-                  .totpState=${this.totpState}
-                  .totpData=${this.totpSetupData}
-                  .totpSecret=${this.totpSetupData ? totpService.extractSecret(this.totpSetupData.totpUrl) : null}
-                  .verifyCode=${this.verifyCode}
-                  .disableCode=${this.disableCode}
-                  .totpError=${this.totpError}
-                  @totp-action=${this.handleTotpAction}
-                ></profile-security-card>
-              `
-              : nothing}
-
-            <div class="actions">
-              <button
-                class="btn btn-danger"
-                @click=${this.handleSignOut}
-                ?disabled=${this.signOutLoading}
-              >
-                ${this.signOutLoading ? msg('Signing out...') : msg('Sign Out')}
-              </button>
-            </div>
+                  <trail-profile
+                    .email=${this.user?.email ?? ''}
+                    ?has-mfa=${authService.getAuthState().hasMfa}
+                    @trail-profile-sign-out=${this.handleSignOut}
+                  ></trail-profile>
+                `
+              : html`<div class="skeleton"></div>`}
           </div>
         </main>
         <footer-info></footer-info>
@@ -209,46 +99,22 @@ export class ProfilePage extends LitElement {
     .profile-container {
       width: 100%;
       max-width: 600px;
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
     }
 
-    .actions {
-      display: flex;
-      justify-content: center;
-      padding-bottom: 1rem;
+    .skeleton {
+      height: 200px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--theme-color-text-primary) 8%, transparent);
+      animation: pulse 1.5s ease-in-out infinite;
     }
 
-    .btn {
-      padding: 0.625rem 1.25rem;
-      font-size: 0.9375rem;
-      font-weight: 500;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background-color 0.2s ease;
-    }
-
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .btn-danger {
-      background: var(--theme-color-error);
-      color: white;
-    }
-
-    .btn-danger:hover:not(:disabled) {
-      opacity: 0.9;
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
     }
 
     @media (max-width: 640px) {
-      .main-content {
-        padding: 1.5rem 1rem;
-      }
+      .main-content { padding: 1.5rem 1rem; }
     }
   `;
 }

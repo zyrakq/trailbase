@@ -96,4 +96,46 @@ export const authModalStyles = css`
     .modal-content { padding: 1rem; }
     .modal-title { font-size: 1rem; }
   }
+
+  /* Loading skeleton shown while trail-auth bundle is being fetched */
+  .auth-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: 0.25rem 0;
+  }
+
+  .skeleton-title,
+  .skeleton-field,
+  .skeleton-btn {
+    background: var(--theme-color-border);
+    border-radius: 6px;
+    animation: skeleton-pulse 1.4s ease-in-out infinite;
+  }
+
+  .skeleton-title {
+    height: 1.25rem;
+    width: 45%;
+    margin-bottom: 0.25rem;
+  }
+
+  .skeleton-field {
+    height: 2.5rem;
+    width: 100%;
+    border-radius: 8px;
+  }
+
+  .skeleton-btn {
+    height: 2.625rem;
+    width: 100%;
+    border-radius: 8px;
+    margin-top: 0.25rem;
+    background: var(--theme-color-primary, #4f46e5);
+    opacity: 0.25;
+  }
+
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
 `;

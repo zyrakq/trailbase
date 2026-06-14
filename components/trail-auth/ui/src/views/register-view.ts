@@ -1,23 +1,24 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { msg } from '@lit/localize';
-import { localized } from '@/features/localization';
-import { authService } from '../../services/auth.service';
-import { AuthError, AuthErrorCode } from '../../types/auth-error';
-import { authSharedStyles } from '../auth-shared.styles';
-import { eyeIcon, eyeSlashIcon } from '../auth-icons';
+import { authSharedStyles } from '../styles.ts';
+import { eyeIcon, eyeSlashIcon } from '../icons.ts';
+import {
+  registerWithPassword,
+  loginWithPassword,
+  AuthClientError,
+  AuthErrorCode,
+} from '../api/auth-client.ts';
 
 /**
  * Registration view — email + password + confirm form.
  *
- * Events dispatched:
- * - auth-success: () → parent closes modal + shows toast
- * - auth-navigate: { view: 'register-success', email: string, emailSent: boolean }
- * - auth-navigate: { view: 'choice' }
+ * Events dispatched (bubbles, composed):
+ * - trail-auth-success
+ * - trail-auth-navigate: { view: 'register-success', email: string, emailSent: boolean }
+ * - trail-auth-navigate: { view: 'choice' }
  */
-@customElement('auth-register-view')
-@localized()
-export class AuthRegisterView extends LitElement {
+@customElement('trail-auth-register')
+export class TrailAuthRegisterView extends LitElement {
   @state() private email = '';
   @state() private password = '';
   @state() private confirmPassword = '';
@@ -53,7 +54,7 @@ export class AuthRegisterView extends LitElement {
 
   private handleBack() {
     this.dispatchEvent(
-      new CustomEvent('auth-navigate', {
+      new CustomEvent('trail-auth-navigate', {
         detail: { view: 'choice' },
         bubbles: true,
         composed: true,
@@ -70,73 +71,87 @@ export class AuthRegisterView extends LitElement {
     const trimmedConfirm = this.confirmPassword;
 
     if (!trimmedEmail || !trimmedPassword || !trimmedConfirm) {
-      this.errorMessage = msg('Please fill in all fields.');
+      this.errorMessage = 'Please fill in all fields.';
       return;
     }
 
     if (trimmedPassword !== trimmedConfirm) {
-      this.errorMessage = msg('Passwords do not match.');
+      this.errorMessage = 'Passwords do not match.';
       return;
     }
 
     this.isLoading = true;
     this.errorMessage = '';
 
-    try {
-      const result = await authService.registerWithPassword(trimmedEmail, trimmedPassword);
+    let requiresVerification = false;
+    let emailSent = true;
 
-      if (result.requiresVerification) {
-        this.dispatchEvent(
-          new CustomEvent('auth-navigate', {
-            detail: {
-              view: 'register-success',
-              email: trimmedEmail,
-              emailSent: result.emailSent,
-            },
-            bubbles: true,
-            composed: true,
-          })
-        );
-      } else {
-        this.dispatchEvent(new CustomEvent('auth-success', { bubbles: true, composed: true }));
-      }
-    } catch (error) {
-      if (error instanceof AuthError) {
-        switch (error.code) {
+    try {
+      await registerWithPassword(trimmedEmail, trimmedPassword);
+    } catch (err) {
+      if (err instanceof AuthClientError && err.code === AuthErrorCode.EMAIL_NOT_SENT) {
+        requiresVerification = true;
+        emailSent = false;
+      } else if (err instanceof AuthClientError) {
+        switch (err.code) {
           case AuthErrorCode.EMAIL_TAKEN:
-            this.errorMessage = msg('This email is already registered. Please sign in instead.');
+            this.errorMessage = 'This email is already registered. Please sign in instead.';
             break;
           case AuthErrorCode.WEAK_PASSWORD:
-            this.errorMessage = msg(
-              'Password does not meet requirements. Please choose a stronger password.'
-            );
+            this.errorMessage =
+              'Password does not meet requirements. Please choose a stronger password.';
             break;
           case AuthErrorCode.REGISTRATION_DISABLED:
-            this.errorMessage = msg(
-              'Registration is currently disabled. Please contact an administrator.'
-            );
+            this.errorMessage =
+              'Registration is currently disabled. Please contact an administrator.';
             break;
           case AuthErrorCode.NETWORK_ERROR:
-            this.errorMessage = msg(
-              'Unable to connect. Please check your internet connection and try again.'
-            );
+            this.errorMessage =
+              'Unable to connect. Please check your internet connection and try again.';
             break;
           default:
-            this.errorMessage = msg('Registration failed. Please try again.');
+            this.errorMessage = 'Registration failed. Please try again.';
         }
+        this.isLoading = false;
+        return;
       } else {
-        this.errorMessage = msg('Registration failed. Please try again.');
+        this.errorMessage = 'Registration failed. Please try again.';
+        this.isLoading = false;
+        return;
       }
-    } finally {
-      this.isLoading = false;
     }
+
+    if (!requiresVerification) {
+      // Attempt auto-login after registration.
+      try {
+        await loginWithPassword(trimmedEmail, trimmedPassword);
+        this.dispatchEvent(
+          new CustomEvent('trail-auth-success', { bubbles: true, composed: true })
+        );
+        this.isLoading = false;
+        return;
+      } catch {
+        // Auto-login failed — verification is pending.
+        requiresVerification = true;
+        emailSent = true;
+      }
+    }
+
+    this.dispatchEvent(
+      new CustomEvent('trail-auth-navigate', {
+        detail: { view: 'register-success', email: trimmedEmail, emailSent },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    this.isLoading = false;
   }
 
   render() {
     return html`
       <form class="password-form" @submit=${this.handleSubmit}>
         <div class="form-field">
-          <label for="reg-email">${msg('Email address')}</label>
+          <label for="reg-email">Email address</label>
           <input
             id="reg-email"
             type="email"
@@ -149,7 +164,7 @@ export class AuthRegisterView extends LitElement {
         </div>
 
         <div class="form-field password-field">
-          <label for="reg-password">${msg('Password')}</label>
+          <label for="reg-password">Password</label>
           <div class="password-input-wrapper">
             <input
               id="reg-password"
@@ -164,7 +179,7 @@ export class AuthRegisterView extends LitElement {
               type="button"
               class="password-toggle"
               @click=${this.togglePasswordVisibility}
-              aria-label=${this.showPassword ? msg('Hide password') : msg('Show password')}
+              aria-label=${this.showPassword ? 'Hide password' : 'Show password'}
               ?disabled=${this.isLoading}
             >
               ${this.showPassword ? eyeSlashIcon() : eyeIcon()}
@@ -173,7 +188,7 @@ export class AuthRegisterView extends LitElement {
         </div>
 
         <div class="form-field password-field">
-          <label for="reg-confirm-password">${msg('Confirm password')}</label>
+          <label for="reg-confirm-password">Confirm password</label>
           <div class="password-input-wrapper">
             <input
               id="reg-confirm-password"
@@ -188,7 +203,7 @@ export class AuthRegisterView extends LitElement {
               type="button"
               class="password-toggle"
               @click=${this.toggleConfirmPasswordVisibility}
-              aria-label=${this.showConfirmPassword ? msg('Hide password') : msg('Show password')}
+              aria-label=${this.showConfirmPassword ? 'Hide password' : 'Show password'}
               ?disabled=${this.isLoading}
             >
               ${this.showConfirmPassword ? eyeSlashIcon() : eyeIcon()}
@@ -201,12 +216,12 @@ export class AuthRegisterView extends LitElement {
           : ''}
 
         <button type="submit" class="btn btn-primary" ?disabled=${this.isLoading}>
-          ${this.isLoading ? msg('Creating account...') : msg('Create account')}
+          ${this.isLoading ? 'Creating account\u2026' : 'Create account'}
         </button>
       </form>
 
       <button class="back-link" @click=${this.handleBack} ?disabled=${this.isLoading}>
-        ${msg('Back to sign in options')}
+        Back to sign in options
       </button>
     `;
   }
@@ -225,6 +240,6 @@ export class AuthRegisterView extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'auth-register-view': AuthRegisterView;
+    'trail-auth-register': TrailAuthRegisterView;
   }
 }

@@ -6,4 +6,5 @@ password_auth_enabled = true
 dev_intercept = true
 
 [components]
+active = "trail_auth"
 vendor_auth_ui = true

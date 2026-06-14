@@ -6142,6 +6142,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "trail-auth-component"
+version = "0.1.0"
+dependencies = [
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "trailbase-build",
+ "trailbase-wasm",
+]
+
+[[package]]
 name = "trailbase"
 version = "0.2.0"
 dependencies = [

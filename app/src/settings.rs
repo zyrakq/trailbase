@@ -25,13 +25,26 @@ pub struct ServerSettings {
     pub address: String,
 }
 
+/// Which auth UI WASM component is active.
+///
+/// Controls which component `ensure_auth_component` installs on startup.
+/// Switch via `[components] active = "trail_auth"` in appsettings.
+#[derive(Debug, Default, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ActiveComponent {
+    #[default]
+    AuthUi,
+    TrailAuth,
+}
+
 /// Settings for TrailBase WASM component management.
 #[derive(Debug, Default, Deserialize)]
 pub struct ComponentSettings {
-    /// When true, copy auth_ui from the local vendor build instead of downloading
-    /// via `trail components add`. Requires the WASM to be built first:
-    ///   cargo build --target wasm32-wasip2 --release -p auth-ui
-    /// in the `vendor/trailbase` workspace.
+    /// Which auth UI component to install. Defaults to `auth_ui`.
+    #[serde(default)]
+    pub active: ActiveComponent,
+    /// When true, copy the active component from the local build output instead
+    /// of downloading via `trail components add`.
     #[serde(default)]
     pub vendor_auth_ui: bool,
 }

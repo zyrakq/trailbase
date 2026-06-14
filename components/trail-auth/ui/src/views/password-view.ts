@@ -1,25 +1,24 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { msg } from '@lit/localize';
-import { localized } from '@/features/localization';
-import { authService } from '../../services/auth.service';
-import { AuthError, AuthErrorCode } from '../../types/auth-error';
-import { authSharedStyles } from '../auth-shared.styles';
-import { eyeIcon, eyeSlashIcon } from '../auth-icons';
+import { authSharedStyles } from '../styles.ts';
+import { eyeIcon, eyeSlashIcon } from '../icons.ts';
+import {
+  loginWithPassword,
+  AuthClientError,
+  AuthErrorCode,
+} from '../api/auth-client.ts';
 
 /**
  * Password sign-in view — email + password form.
  *
- * Events dispatched:
- * - auth-success: () → parent closes modal + shows toast
- * - auth-navigate: { view: 'mfa', mfaToken: string }
- * - auth-navigate: { view: 'forgot-password', email: string }
- * - auth-navigate: { view: 'choice' }
+ * Events dispatched (bubbles, composed):
+ * - trail-auth-success
+ * - trail-auth-navigate: { view: 'mfa', mfaToken: string }
+ * - trail-auth-navigate: { view: 'forgot-password', email: string }
+ * - trail-auth-navigate: { view: 'choice' }
  */
-@customElement('auth-password-view')
-@localized()
-export class AuthPasswordView extends LitElement {
-  /** Pre-populate email (e.g. coming back from forgot-password flow). */
+@customElement('trail-auth-password')
+export class TrailAuthPasswordView extends LitElement {
   @property({ type: String }) initialEmail = '';
 
   @state() private email = '';
@@ -50,7 +49,7 @@ export class AuthPasswordView extends LitElement {
 
   private handleForgotPassword() {
     this.dispatchEvent(
-      new CustomEvent('auth-navigate', {
+      new CustomEvent('trail-auth-navigate', {
         detail: { view: 'forgot-password', email: this.email },
         bubbles: true,
         composed: true,
@@ -60,7 +59,7 @@ export class AuthPasswordView extends LitElement {
 
   private handleBack() {
     this.dispatchEvent(
-      new CustomEvent('auth-navigate', {
+      new CustomEvent('trail-auth-navigate', {
         detail: { view: 'choice' },
         bubbles: true,
         composed: true,
@@ -76,7 +75,7 @@ export class AuthPasswordView extends LitElement {
     const trimmedPassword = this.password;
 
     if (!trimmedEmail || !trimmedPassword) {
-      this.errorMessage = msg('Please enter your email and password.');
+      this.errorMessage = 'Please enter your email and password.';
       return;
     }
 
@@ -84,11 +83,11 @@ export class AuthPasswordView extends LitElement {
     this.errorMessage = '';
 
     try {
-      const result = await authService.loginWithPassword(trimmedEmail, trimmedPassword);
+      const result = await loginWithPassword(trimmedEmail, trimmedPassword);
 
       if (result && result.requiresMfa) {
         this.dispatchEvent(
-          new CustomEvent('auth-navigate', {
+          new CustomEvent('trail-auth-navigate', {
             detail: { view: 'mfa', mfaToken: result.mfaToken },
             bubbles: true,
             composed: true,
@@ -97,23 +96,24 @@ export class AuthPasswordView extends LitElement {
         return;
       }
 
-      this.dispatchEvent(new CustomEvent('auth-success', { bubbles: true, composed: true }));
+      this.dispatchEvent(
+        new CustomEvent('trail-auth-success', { bubbles: true, composed: true })
+      );
     } catch (error) {
-      if (error instanceof AuthError) {
+      if (error instanceof AuthClientError) {
         switch (error.code) {
           case AuthErrorCode.INVALID_CREDENTIALS:
-            this.errorMessage = msg('Invalid email or password. Please try again.');
+            this.errorMessage = 'Invalid email or password. Please try again.';
             break;
           case AuthErrorCode.NETWORK_ERROR:
-            this.errorMessage = msg(
-              'Unable to connect. Please check your internet connection and try again.'
-            );
+            this.errorMessage =
+              'Unable to connect. Please check your internet connection and try again.';
             break;
           default:
-            this.errorMessage = msg('Sign in failed. Please try again.');
+            this.errorMessage = 'Sign in failed. Please try again.';
         }
       } else {
-        this.errorMessage = msg('Sign in failed. Please try again.');
+        this.errorMessage = 'Sign in failed. Please try again.';
       }
     } finally {
       this.isLoading = false;
@@ -124,7 +124,7 @@ export class AuthPasswordView extends LitElement {
     return html`
       <form class="password-form" @submit=${this.handleSubmit}>
         <div class="form-field">
-          <label for="auth-email">${msg('Email address')}</label>
+          <label for="auth-email">Email address</label>
           <input
             id="auth-email"
             type="email"
@@ -137,7 +137,7 @@ export class AuthPasswordView extends LitElement {
         </div>
 
         <div class="form-field password-field">
-          <label for="auth-password">${msg('Password')}</label>
+          <label for="auth-password">Password</label>
           <div class="password-input-wrapper">
             <input
               id="auth-password"
@@ -152,7 +152,7 @@ export class AuthPasswordView extends LitElement {
               type="button"
               class="password-toggle"
               @click=${this.togglePasswordVisibility}
-              aria-label=${this.showPassword ? msg('Hide password') : msg('Show password')}
+              aria-label=${this.showPassword ? 'Hide password' : 'Show password'}
               ?disabled=${this.isLoading}
             >
               ${this.showPassword ? eyeSlashIcon() : eyeIcon()}
@@ -166,7 +166,7 @@ export class AuthPasswordView extends LitElement {
           @click=${this.handleForgotPassword}
           ?disabled=${this.isLoading}
         >
-          ${msg('Forgot password?')}
+          Forgot password?
         </button>
 
         ${this.errorMessage
@@ -174,12 +174,12 @@ export class AuthPasswordView extends LitElement {
           : ''}
 
         <button type="submit" class="btn btn-primary" ?disabled=${this.isLoading}>
-          ${this.isLoading ? msg('Signing in\u2026') : msg('Sign in')}
+          ${this.isLoading ? 'Signing in\u2026' : 'Sign in'}
         </button>
       </form>
 
       <button class="back-link" @click=${this.handleBack} ?disabled=${this.isLoading}>
-        ${msg('Back to sign in options')}
+        Back to sign in options
       </button>
     `;
   }
@@ -198,6 +198,6 @@ export class AuthPasswordView extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'auth-password-view': AuthPasswordView;
+    'trail-auth-password': TrailAuthPasswordView;
   }
 }
