@@ -7,7 +7,7 @@ import { configService } from '@/features/auth/services/config.service';
 
 // trail-auth bundle is loaded lazily on first open via a <script> tag.
 // The bundle URL is served by the trail-auth-component WASM.
-const TRAIL_AUTH_BUNDLE = '/_/auth/bundle.js?v1';
+const TRAIL_AUTH_BUNDLE = '/_/auth/bundle.js';
 
 let bundleLoaded = false;
 

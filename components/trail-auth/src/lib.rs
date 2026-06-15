@@ -20,16 +20,34 @@ struct Endpoints;
 impl Guest for Endpoints {
     fn http_handlers() -> Vec<HttpRoute> {
         return vec![
-            // Serve the compiled JS bundle.
+            // Serve the compiled JS bundle with ETag-based cache validation.
+            // Cache-Control: no-cache means the browser always revalidates with the server.
+            // The ETag is derived from the file's SHA-256 hash embedded at compile time,
+            // so it automatically changes whenever the bundle is rebuilt.
             routing::get(
                 "/_/auth/bundle.js",
-                async |_req: Request| -> Result<Response, HttpError> {
+                async |req: Request| -> Result<Response, HttpError> {
                     let file = Assets::get("bundle.iife.js")
                         .ok_or_else(|| internal("bundle.iife.js not found in embedded assets"))?;
 
+                    let etag = {
+                        let hash = file.metadata.sha256_hash();
+                        let hex: String = hash.iter().map(|b| format!("{b:02x}")).collect();
+                        format!("\"{hex}\"")
+                    };
+
+                    // Return 304 Not Modified if the client already has this version.
+                    if req.header("if-none-match").and_then(|v| v.to_str().ok()) == Some(&etag) {
+                        return Response::builder()
+                            .status(StatusCode::NOT_MODIFIED)
+                            .body(b"".into_body())
+                            .map_err(internal);
+                    }
+
                     return Response::builder()
-                        .header(header::CACHE_CONTROL, "public, max-age=604800, immutable")
+                        .header(header::CACHE_CONTROL, "no-cache")
                         .header(header::CONTENT_TYPE, "application/javascript; charset=utf-8")
+                        .header(header::ETAG, etag)
                         .body(file.data.into_body())
                         .map_err(internal);
                 },
