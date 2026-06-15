@@ -24,12 +24,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let settings = Settings::load()?;
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
+    let force_replace = settings.components.force_replace;
     match settings.components.active {
         ActiveComponent::AuthUi => {
-            components::ensure_auth_ui(&manifest_dir, settings.components.vendor_auth_ui)?
+            components::ensure_auth_ui(&manifest_dir, settings.components.vendor_auth_ui, force_replace)?
         }
         ActiveComponent::TrailAuth => {
-            components::ensure_trail_auth(&manifest_dir, settings.components.vendor_auth_ui)?
+            components::ensure_trail_auth(&manifest_dir, settings.components.vendor_auth_ui, force_replace)?
         }
     };
 

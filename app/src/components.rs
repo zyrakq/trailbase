@@ -24,13 +24,14 @@ use tracing::info;
 pub fn ensure_auth_ui(
     manifest_dir: &Path,
     vendor: bool,
+    force: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let wasm_path = manifest_dir
         .join("traildepot")
         .join("wasm")
         .join("auth_ui_component.wasm");
 
-    if wasm_path.exists() {
+    if wasm_path.exists() && !force {
         return Ok(());
     }
 
@@ -101,13 +102,14 @@ pub fn ensure_auth_ui(
 pub fn ensure_trail_auth(
     manifest_dir: &Path,
     vendor: bool,
+    force: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let wasm_path = manifest_dir
         .join("traildepot")
         .join("wasm")
         .join("trail_auth_component.wasm");
 
-    if wasm_path.exists() {
+    if wasm_path.exists() && !force {
         return Ok(());
     }
 
@@ -183,13 +185,13 @@ mod tests {
         fs::write(wasm_dir.join("auth_ui_component.wasm"), b"fake")
             .expect("write fake wasm");
 
-        assert!(ensure_auth_ui(dir.path(), false).is_ok());
+        assert!(ensure_auth_ui(dir.path(), false, false).is_ok());
     }
 
     #[test]
     fn vendor_returns_err_when_src_missing() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let result = ensure_auth_ui(dir.path(), true);
+        let result = ensure_auth_ui(dir.path(), true, false);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("vendor auth_ui wasm not found"), "unexpected error: {msg}");
@@ -203,13 +205,13 @@ mod tests {
         fs::write(wasm_dir.join("trail_auth_component.wasm"), b"fake")
             .expect("write fake wasm");
 
-        assert!(ensure_trail_auth(dir.path(), true).is_ok());
+        assert!(ensure_trail_auth(dir.path(), true, false).is_ok());
     }
 
     #[test]
     fn trail_auth_vendor_returns_err_when_src_missing() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let result = ensure_trail_auth(dir.path(), true);
+        let result = ensure_trail_auth(dir.path(), true, false);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("trail-auth wasm not found"), "unexpected error: {msg}");

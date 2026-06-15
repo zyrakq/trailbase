@@ -43,6 +43,9 @@ fn main() {
     let status = Command::new(&cargo)
         .args(["build", "--target", "wasm32-wasip2", "--release", "-p", &package])
         .current_dir(workspace_dir)
+        // Strip host rustflags so they don't bleed into the WASM linker.
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env_remove("RUSTFLAGS")
         .status()
         .unwrap_or_else(|_| panic!("failed to invoke cargo for {package}"));
 

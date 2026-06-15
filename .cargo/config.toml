@@ -3,5 +3,6 @@ linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=mold", "-C", "link-arg=-Wl,--icf=all"]
 
 [env]
-APP_SKIP_WASM = "1"
+APP_SKIP_WASM = "0"
 APP_WASM_PACKAGE = "trail-auth-component"
+APP_COMPONENTS__FORCE_REPLACE = "true"

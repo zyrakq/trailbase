@@ -47,6 +47,11 @@ pub struct ComponentSettings {
     /// of downloading via `trail components add`.
     #[serde(default)]
     pub vendor_auth_ui: bool,
+    /// When true, always overwrite the deployed wasm even if it already exists.
+    /// Useful during active development to avoid manual wasm deletion.
+    /// Set via `APP_COMPONENTS__FORCE_REPLACE=true` to avoid touching toml files.
+    #[serde(default)]
+    pub force_replace: bool,
 }
 
 #[derive(Debug, Deserialize)]
