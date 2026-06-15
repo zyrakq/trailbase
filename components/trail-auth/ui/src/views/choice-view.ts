@@ -34,6 +34,12 @@ export class TrailAuthChoiceView extends LitElement {
     );
   }
 
+  // Mirrors app_state.rs oauth_provider_name_to_img() — img_name is not in the REST API.
+  private providerImgName(name: string): string {
+    const named = ['discord', 'facebook', 'github', 'gitlab', 'google', 'microsoft', 'twitch', 'yandex'];
+    return named.includes(name) ? name : 'oidc';
+  }
+
   render() {
     return html`
       <div class="choice-view">
@@ -46,7 +52,7 @@ export class TrailAuthChoiceView extends LitElement {
             >
               <img
                 class="oauth-icon"
-                src="/_/auth/oauth2/${p.displayName}.svg"
+                src="/_/auth/oauth2/${this.providerImgName(p.name)}.svg"
                 alt=${p.displayName}
               />
               <span>${p.displayName}</span>

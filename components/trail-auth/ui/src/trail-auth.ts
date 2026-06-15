@@ -193,7 +193,7 @@ export class TrailAuth extends LitElement {
     }
 
     .trail-auth-root {
-      background: var(--theme-color-card, #ffffff);
+      background: var(--theme-color-surface-elevated, #ffffff);
       border-radius: 12px;
       padding: 1.5rem;
       width: 100%;
