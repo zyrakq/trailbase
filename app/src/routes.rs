@@ -8,7 +8,7 @@ use axum::{Router, extract::State, routing::get};
 use tower_http::services::{ServeDir, ServeFile};
 use trailbase::AppState;
 
-use crate::settings::{FrontendSettings, PublicConfig};
+use crate::settings::frontend::{FrontendSettings, PublicConfig};
 
 /// Build the custom API router.
 ///

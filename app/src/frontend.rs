@@ -10,7 +10,7 @@ use tokio::process::ChildStdout;
 use std::process::Stdio;
 use tracing::{info, warn};
 
-use crate::settings::FrontendSettings;
+use crate::settings::frontend::FrontendSettings;
 
 /// Run the full frontend lifecycle based on settings.
 ///

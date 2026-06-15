@@ -7,7 +7,7 @@ mod settings;
 mod smtp;
 mod trailbase_bootstrap;
 
-use settings::{ActiveComponent, PublicConfig, Settings};
+use settings::{components::ActiveComponent, frontend::PublicConfig, loader::Settings};
 use std::path::PathBuf;
 use tracing::info;
 

@@ -9,7 +9,7 @@
 // The caller checks whether `config.textproto` existed before `Server::init()`
 // and only calls `apply_bootstrap` when it did not (first start).
 
-use crate::settings::{EmailSettings, SmtpEncryptionSetting, TrailbaseBootstrap};
+use crate::settings::{bootstrap::SmtpEncryptionSetting, bootstrap::TrailbaseBootstrap, email::EmailSettings};
 use trailbase::config::proto::{
     EmailConfig, EmailTemplate, OAuthProviderConfig, OAuthProviderId, SmtpEncryption,
 };

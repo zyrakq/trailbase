@@ -8,7 +8,7 @@ use axum::{Router, http::StatusCode, response::Html};
 use mailcrab_server::MailcrabHandle;
 use tracing::info;
 
-use crate::settings::EmailSettings;
+use crate::settings::email::EmailSettings;
 
 /// Holds the router and background-task handle for the email interceptor.
 pub struct Interceptor {
