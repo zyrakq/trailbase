@@ -15,37 +15,11 @@ pub struct OAuthProvider {
   pub img_name: String,
 }
 
-fn default_min_length() -> u32 {
-  return 8;
-}
-
 #[derive(Deserialize)]
 pub struct AuthConfig {
   pub disable_password_auth: bool,
   pub enable_otp_signin: bool,
   pub oauth_providers: Vec<OAuthProvider>,
-  #[serde(default = "default_min_length")]
-  pub password_minimal_length: u32,
-  #[serde(default)]
-  pub password_must_contain_upper_and_lower_case: bool,
-  #[serde(default)]
-  pub password_must_contain_digits: bool,
-  #[serde(default)]
-  pub password_must_contain_special_characters: bool,
-}
-
-impl Default for AuthConfig {
-  fn default() -> Self {
-    return Self {
-      disable_password_auth: false,
-      enable_otp_signin: false,
-      oauth_providers: Vec::new(),
-      password_minimal_length: default_min_length(),
-      password_must_contain_upper_and_lower_case: false,
-      password_must_contain_digits: false,
-      password_must_contain_special_characters: false,
-    };
-  }
 }
 
 /// Render a slice of tuples into an unescpaed query string.
@@ -121,9 +95,6 @@ pub struct ResetPasswordUpdateTemplate<'a> {
 pub struct ChangePasswordTemplate<'a> {
   pub state: String,
   pub alert: &'a str,
-  pub password_min_length: u32,
-  pub password_pattern: String,
-  pub password_hint: String,
 }
 
 #[derive(Template)]
@@ -276,9 +247,6 @@ mod tests {
     let template = ChangePasswordTemplate {
       state: state.clone(),
       alert,
-      password_min_length: 8,
-      password_pattern: String::new(),
-      password_hint: String::new(),
     }
     .render()
     .unwrap();

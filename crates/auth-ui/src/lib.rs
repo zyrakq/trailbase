@@ -89,8 +89,7 @@ impl Guest for Endpoints {
       routing::get(
         CHANGE_PASSWORD_UI,
         async |req: Request| -> Result<Response, HttpError> {
-          let auth_config = read_auth_config()?;
-          return ui_change_password_handler(auth_config, req.query_parse()?).await;
+          return ui_change_password_handler(req.query_parse()?).await;
         },
       ),
       routing::get(
@@ -367,10 +366,7 @@ pub struct ChangePasswordQuery {
   alert: Option<String>,
 }
 
-async fn ui_change_password_handler(
-  config: auth::AuthConfig,
-  query: ChangePasswordQuery,
-) -> Result<Response, HttpError> {
+async fn ui_change_password_handler(query: ChangePasswordQuery) -> Result<Response, HttpError> {
   let redirect_uri = query.redirect_uri.as_deref().unwrap_or(LOGIN_UI);
   let html = auth::ChangePasswordTemplate {
     state: [
@@ -379,9 +375,6 @@ async fn ui_change_password_handler(
     ]
     .join("\n"),
     alert: query.alert.as_deref().unwrap_or_default(),
-    password_min_length: config.password_minimal_length,
-    password_pattern: build_password_pattern(&config),
-    password_hint: build_password_hint(config.password_minimal_length, &config),
   }
   .render();
 
@@ -438,87 +431,10 @@ fn internal(err: impl std::string::ToString) -> HttpError {
   return HttpError::message(StatusCode::INTERNAL_SERVER_ERROR, err);
 }
 
-fn read_auth_config() -> Result<auth::AuthConfig, HttpError> {
-  let store = Store::open().map_err(internal)?;
-  match store.get("config:auth").map_err(internal)? {
-    Some(bytes) if !bytes.is_empty() => {
-      serde_json::from_slice::<auth::AuthConfig>(&bytes).map_err(internal)
-    }
-    _ => Ok(auth::AuthConfig::default()),
-  }
-}
-
-fn build_password_pattern(config: &auth::AuthConfig) -> String {
-  let mut lookaheads: Vec<&str> = Vec::new();
-
-  if config.password_must_contain_upper_and_lower_case {
-    lookaheads.push(r"(?=.*[a-z])");
-    lookaheads.push(r"(?=.*[A-Z])");
-  }
-  if config.password_must_contain_digits {
-    lookaheads.push(r"(?=.*\d)");
-  }
-  if config.password_must_contain_special_characters {
-    lookaheads.push(r"(?=.*[^a-zA-Z0-9])");
-  }
-
-  if lookaheads.is_empty() {
-    return String::new();
-  }
-
-  return format!("{}.*", lookaheads.join(""));
-}
-
-fn build_password_hint(min_length: u32, config: &auth::AuthConfig) -> String {
-  let mut parts: Vec<String> = vec![format!("at least {} characters", min_length)];
-
-  if config.password_must_contain_upper_and_lower_case {
-    parts.push("upper and lower case letters".to_string());
-  }
-  if config.password_must_contain_digits {
-    parts.push("at least one digit".to_string());
-  }
-  if config.password_must_contain_special_characters {
-    parts.push("at least one special character".to_string());
-  }
-
-  if parts.len() == 1 {
-    return format!("Must be {}", parts[0]);
-  }
-
-  let last = &parts[parts.len() - 1];
-  let rest = &parts[..parts.len() - 1];
-  return format!("Must contain {} and {}", rest.join(", "), last);
-}
-
 #[derive(Serialize)]
 struct ProfileResponse {
   show_otp_section: bool,
   show_change_password: bool,
-  password_policy: PasswordPolicy,
-}
-
-#[derive(Serialize)]
-struct PasswordPolicy {
-  min_length: u32,
-  must_contain_upper_and_lower_case: bool,
-  must_contain_digits: bool,
-  must_contain_special_characters: bool,
-}
-
-impl Default for PasswordPolicy {
-  fn default() -> Self {
-    return Self {
-      min_length: default_min_length(),
-      must_contain_upper_and_lower_case: false,
-      must_contain_digits: false,
-      must_contain_special_characters: false,
-    };
-  }
-}
-
-fn default_min_length() -> u32 {
-  return 8;
 }
 
 async fn profile_capabilities_handler(user: &User) -> Result<Response, HttpError> {
@@ -544,23 +460,13 @@ async fn profile_capabilities_handler(user: &User) -> Result<Response, HttpError
     })
     .unwrap_or(false);
 
-  let (password_auth_enabled, password_policy) = {
+  let password_auth_enabled = {
     let store = Store::open().map_err(internal)?;
     match store.get("config:auth").map_err(internal)? {
       Some(bytes) if !bytes.is_empty() => serde_json::from_slice::<auth::AuthConfig>(&bytes)
-        .map(|c| {
-          (
-            !c.disable_password_auth,
-            PasswordPolicy {
-              min_length: c.password_minimal_length,
-              must_contain_upper_and_lower_case: c.password_must_contain_upper_and_lower_case,
-              must_contain_digits: c.password_must_contain_digits,
-              must_contain_special_characters: c.password_must_contain_special_characters,
-            },
-          )
-        })
-        .unwrap_or((true, PasswordPolicy::default())),
-      _ => (true, PasswordPolicy::default()),
+        .map(|c| !c.disable_password_auth)
+        .unwrap_or(true),
+      _ => true,
     }
   };
 
@@ -568,7 +474,6 @@ async fn profile_capabilities_handler(user: &User) -> Result<Response, HttpError
     Json(ProfileResponse {
       show_otp_section: !is_oauth_only && password_auth_enabled,
       show_change_password: !is_oauth_only && password_auth_enabled,
-      password_policy,
     })
     .into_response(),
   );
