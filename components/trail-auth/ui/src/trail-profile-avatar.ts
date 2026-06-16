@@ -1,8 +1,18 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { uploadAvatar, deleteAvatar, AuthClientError } from './api/auth-client.ts';
-import { userIcon, trashIcon } from './icons.ts';
+import { userIcon } from './icons.ts';
 
+/**
+ * `<trail-profile-avatar>` — avatar display + upload/delete actions.
+ *
+ * Layout: avatar on the left (display-only), action buttons on the right.
+ * The avatar itself is not clickable; explicit "Change" and "Remove" buttons
+ * are the only interaction points.
+ *
+ * Events dispatched to parent (bubbles, composed):
+ * - `trail-profile-avatar-changed` — fired after successful upload or delete
+ */
 @customElement('trail-profile-avatar')
 export class TrailProfileAvatar extends LitElement {
   @property({ type: String }) userId = '';
@@ -25,7 +35,7 @@ export class TrailProfileAvatar extends LitElement {
     this.avatarFailed = true;
   }
 
-  private handleFileClick() {
+  private handleChangeClick() {
     if (this.uploading || this.deleting) return;
     if (!this.fileInput) {
       this.fileInput = document.createElement('input');
@@ -61,7 +71,7 @@ export class TrailProfileAvatar extends LitElement {
     }
   }
 
-  private async handleDelete() {
+  private async handleRemove() {
     this.errorMessage = '';
     this.deleting = true;
 
@@ -80,47 +90,52 @@ export class TrailProfileAvatar extends LitElement {
     }
   }
 
+  private get isBusy() {
+    return this.uploading || this.deleting;
+  }
+
   render() {
-    const isBusy = this.uploading || this.deleting;
+    const hasAvatar = !this.avatarFailed;
 
     return html`
-      <div class="avatar-root">
-        <div class="avatar-wrapper" ?disabled=${isBusy}>
-          <button
-            class="avatar-trigger"
-            aria-label="Upload new avatar"
-            ?disabled=${isBusy}
-            @click=${this.handleFileClick}
+      <div class="avatar-row">
+        <div class="avatar-display">
+          <object
+            type="image/jpeg"
+            data=${this.avatarSrc}
+            class="avatar-image"
+            @error=${this.handleAvatarError}
           >
-            <object
-              type="image/jpeg"
-              data=${this.avatarSrc}
-              class="avatar-image"
-              @error=${this.handleAvatarError}
-            >
-              <div class="avatar-fallback">${userIcon(32)}</div>
-            </object>
-            ${this.uploading
-              ? html`<div class="avatar-loading-overlay"><div class="spinner"></div></div>`
-              : ''}
-          </button>
-
-          ${!this.avatarFailed && !this.uploading
-            ? html`<button
-                class="avatar-delete"
-                aria-label="Remove avatar"
-                ?disabled=${this.deleting}
-                @click=${this.handleDelete}
-              >
-                ${trashIcon()}
-              </button>`
+            <div class="avatar-fallback">${userIcon(36)}</div>
+          </object>
+          ${this.uploading
+            ? html`<div class="avatar-loading-overlay"><div class="spinner"></div></div>`
             : ''}
         </div>
 
-        ${this.errorMessage
-          ? html`<div class="error-message" role="alert">${this.errorMessage}</div>`
-          : ''}
+        <div class="avatar-actions">
+          <button
+            class="action-btn action-btn-change"
+            ?disabled=${this.isBusy}
+            @click=${this.handleChangeClick}
+          >
+            ${this.uploading ? 'Uploading...' : 'Change'}
+          </button>
+          ${hasAvatar
+            ? html`<button
+                class="action-btn action-btn-remove"
+                ?disabled=${this.isBusy}
+                @click=${this.handleRemove}
+              >
+                ${this.deleting ? 'Removing...' : 'Remove'}
+              </button>`
+            : ''}
+        </div>
       </div>
+
+      ${this.errorMessage
+        ? html`<div class="error-message" role="alert">${this.errorMessage}</div>`
+        : ''}
     `;
   }
 
@@ -133,43 +148,24 @@ export class TrailProfileAvatar extends LitElement {
       color: var(--theme-color-text-primary, #111827);
     }
 
-    .avatar-root {
+    .avatar-row {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 0.5rem;
+      gap: 1rem;
     }
 
-    .avatar-wrapper {
+    .avatar-display {
       position: relative;
-      display: inline-block;
-    }
-
-    .avatar-trigger {
-      position: relative;
+      flex-shrink: 0;
       width: 64px;
       height: 64px;
       border-radius: 50%;
       border: 2px solid var(--theme-color-border, #e5e7eb);
       background: var(--theme-color-primary, #6366f1);
-      color: white;
-      cursor: pointer;
-      padding: 0;
       overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .avatar-trigger:hover:not(:disabled) {
-      border-color: var(--theme-color-primary-hover, #4f46e5);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-color-primary, #6366f1) 25%, transparent);
-    }
-
-    .avatar-trigger:disabled {
-      cursor: not-allowed;
-      opacity: 0.7;
     }
 
     .avatar-image {
@@ -211,43 +207,70 @@ export class TrailProfileAvatar extends LitElement {
       to { transform: rotate(360deg); }
     }
 
-    .avatar-delete {
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      border: 1px solid var(--theme-color-border, #e5e7eb);
-      background: var(--theme-color-surface, #ffffff);
-      color: var(--theme-color-error, #ef4444);
-      cursor: pointer;
-      padding: 0;
+    .avatar-actions {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      transition: opacity 0.15s ease, background-color 0.15s ease;
+      gap: 0.5rem;
+      margin-left: auto;
     }
 
-    .avatar-wrapper:hover .avatar-delete {
-      opacity: 1;
+    .action-btn {
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      border: 1px solid transparent;
+      transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease,
+        opacity 0.2s ease;
     }
 
-    .avatar-delete:hover:not(:disabled) {
+    .action-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .action-btn-change {
+      background: var(--theme-color-surface, #ffffff);
+      border-color: var(--theme-color-border, #e5e7eb);
+      color: var(--theme-color-text-primary, #111827);
+    }
+
+    .action-btn-change:hover:not(:disabled) {
+      border-color: var(--theme-color-primary, #6366f1);
+      color: var(--theme-color-primary, #6366f1);
+    }
+
+    .action-btn-remove {
+      background: transparent;
+      border-color: var(--theme-color-error, #ef4444);
+      color: var(--theme-color-error, #ef4444);
+    }
+
+    .action-btn-remove:hover:not(:disabled) {
       background: var(--theme-color-error, #ef4444);
       color: white;
-    }
-
-    .avatar-delete:disabled {
-      cursor: not-allowed;
-      opacity: 0.5;
     }
 
     .error-message {
       font-size: 0.8125rem;
       color: var(--theme-color-error, #ef4444);
-      text-align: center;
+      margin-top: 0.5rem;
+    }
+
+    @media (max-width: 480px) {
+      .avatar-display {
+        width: 56px;
+        height: 56px;
+      }
+
+      .action-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8125rem;
+      }
     }
   `;
 }

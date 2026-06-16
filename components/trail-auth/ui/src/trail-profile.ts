@@ -176,7 +176,6 @@ export class TrailProfile extends LitElement {
     .user-info {
       display: flex;
       align-items: center;
-      justify-content: center;
     }
 
     .actions {
