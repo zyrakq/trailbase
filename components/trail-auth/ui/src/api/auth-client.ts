@@ -1,23 +1,26 @@
 // Minimal TrailBase auth API client — no SDK dependency.
 // All fetch calls use credentials:'include' to send/receive HttpOnly cookies.
 
-export const enum AuthErrorCode {
-  NETWORK_ERROR = 'NETWORK_ERROR',
-  INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
-  EMAIL_TAKEN = 'EMAIL_TAKEN',
-  WEAK_PASSWORD = 'WEAK_PASSWORD',
-  REGISTRATION_DISABLED = 'REGISTRATION_DISABLED',
-  RATE_LIMITED = 'RATE_LIMITED',
-  EMAIL_NOT_SENT = 'EMAIL_NOT_SENT',
-  UNKNOWN = 'UNKNOWN',
-}
+export const AuthErrorCode = {
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  EMAIL_TAKEN: 'EMAIL_TAKEN',
+  WEAK_PASSWORD: 'WEAK_PASSWORD',
+  REGISTRATION_DISABLED: 'REGISTRATION_DISABLED',
+  RATE_LIMITED: 'RATE_LIMITED',
+  EMAIL_NOT_SENT: 'EMAIL_NOT_SENT',
+  BAD_REQUEST: 'BAD_REQUEST',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+
+export type AuthErrorCode = (typeof AuthErrorCode)[keyof typeof AuthErrorCode];
 
 export class AuthClientError extends Error {
-  constructor(
-    public readonly code: AuthErrorCode,
-    message: string
-  ) {
+  readonly code: AuthErrorCode;
+  constructor(code: AuthErrorCode, message: string) {
     super(message);
+    this.code = code;
     this.name = 'AuthClientError';
   }
 }
@@ -46,6 +49,7 @@ export interface CurrentUser {
   id: string;
   email: string;
   hasMfa: boolean;
+  csrfToken: string;
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> {
@@ -67,7 +71,10 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
 
   if (!response.ok) return null;
 
-  const data = (await response.json()) as { auth_token?: string };
+  const data = (await response.json()) as {
+    auth_token?: string;
+    csrf_token?: string;
+  };
   if (!data.auth_token) return null;
 
   const claims = decodeJwtPayload(data.auth_token);
@@ -76,6 +83,7 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
     id: (claims['sub'] as string) || '',
     email,
     hasMfa: !!(claims['mfa'] as boolean),
+    csrfToken: (claims['csrf_token'] as string) || data.csrf_token || '',
   };
 }
 
@@ -83,9 +91,26 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
 // Profile capabilities (WASM endpoint)
 // ---------------------------------------------------------------------------
 
+export interface PasswordPolicy {
+  minLength: number;
+  maxLength: number;
+  mustContainUpperAndLowerCase: boolean;
+  mustContainDigits: boolean;
+  mustContainSpecialCharacters: boolean;
+}
+
+const defaultPasswordPolicy: PasswordPolicy = {
+  minLength: 8,
+  maxLength: 128,
+  mustContainUpperAndLowerCase: false,
+  mustContainDigits: false,
+  mustContainSpecialCharacters: false,
+};
+
 export interface ProfileCapabilities {
   showOtpSection: boolean;
   showChangePassword: boolean;
+  passwordPolicy: PasswordPolicy;
 }
 
 export async function fetchProfileCapabilities(): Promise<ProfileCapabilities> {
@@ -99,17 +124,48 @@ export async function fetchProfileCapabilities(): Promise<ProfileCapabilities> {
     );
   }
 
-  if (response.status === 401) return { showOtpSection: false, showChangePassword: false };
-  if (!response.ok) return { showOtpSection: false, showChangePassword: false };
+  if (response.status === 401) {
+    return {
+      showOtpSection: false,
+      showChangePassword: false,
+      passwordPolicy: defaultPasswordPolicy,
+    };
+  }
+  if (!response.ok) {
+    return {
+      showOtpSection: false,
+      showChangePassword: false,
+      passwordPolicy: defaultPasswordPolicy,
+    };
+  }
 
   const data = (await response.json()) as {
     show_otp_section?: boolean;
     show_change_password?: boolean;
+    password_policy?: {
+      min_length?: number;
+      max_length?: number;
+      must_contain_upper_and_lower_case?: boolean;
+      must_contain_digits?: boolean;
+      must_contain_special_characters?: boolean;
+    };
   };
 
+  const policy = data.password_policy;
   return {
     showOtpSection: data.show_otp_section ?? false,
     showChangePassword: data.show_change_password ?? false,
+    passwordPolicy: {
+      minLength: policy?.min_length ?? defaultPasswordPolicy.minLength,
+      maxLength: policy?.max_length ?? defaultPasswordPolicy.maxLength,
+      mustContainUpperAndLowerCase:
+        policy?.must_contain_upper_and_lower_case ??
+        defaultPasswordPolicy.mustContainUpperAndLowerCase,
+      mustContainDigits: policy?.must_contain_digits ?? defaultPasswordPolicy.mustContainDigits,
+      mustContainSpecialCharacters:
+        policy?.must_contain_special_characters ??
+        defaultPasswordPolicy.mustContainSpecialCharacters,
+    },
   };
 }
 
@@ -421,5 +477,173 @@ export async function updatePassword(token: string, password: string): Promise<v
   throw new AuthClientError(
     AuthErrorCode.UNKNOWN,
     text || `Password reset failed: ${response.status}`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Change email
+// ---------------------------------------------------------------------------
+
+export async function changeEmail(oldEmail: string, newEmail: string): Promise<void> {
+  // The /status endpoint rotates the JWT (new csrf_token) but does NOT set a
+  // new auth cookie — the body JWT and cookie JWT diverge. The server's User
+  // extractor reads Authorization: Bearer BEFORE the cookie, so we send the
+  // fresh JWT as a Bearer header. This guarantees the csrf_token in the body
+  // matches the csrf_token the server decodes from the Bearer JWT.
+  let statusResponse: Response;
+  try {
+    statusResponse = await fetch('/api/auth/v1/status', { credentials: 'include' });
+  } catch {
+    throw new AuthClientError(AuthErrorCode.NETWORK_ERROR, 'Network error fetching auth status');
+  }
+
+  if (!statusResponse.ok) {
+    throw new AuthClientError(AuthErrorCode.UNAUTHORIZED, 'Not authenticated');
+  }
+
+  const statusData = (await statusResponse.json()) as {
+    auth_token?: string;
+    csrf_token?: string;
+  };
+
+  if (!statusData.auth_token) {
+    throw new AuthClientError(AuthErrorCode.UNAUTHORIZED, 'Not authenticated');
+  }
+
+  const claims = decodeJwtPayload(statusData.auth_token);
+  const freshCsrfToken = (claims['csrf_token'] as string) || statusData.csrf_token || '';
+  if (!freshCsrfToken) {
+    throw new AuthClientError(AuthErrorCode.UNKNOWN, 'Failed to extract CSRF token');
+  }
+
+  let response: Response;
+  try {
+    response = await fetch('/api/auth/v1/change_email/request', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${statusData.auth_token}`,
+      },
+      credentials: 'include',
+      body: JSON.stringify({ csrf_token: freshCsrfToken, old_email: oldEmail, new_email: newEmail }),
+    });
+  } catch {
+    throw new AuthClientError(AuthErrorCode.NETWORK_ERROR, 'Network error during email change');
+  }
+
+  if (response.ok) return;
+
+  const text = await response.text().catch(() => '');
+  if (response.status === 409) {
+    throw new AuthClientError(AuthErrorCode.EMAIL_TAKEN, 'Email already registered');
+  }
+  if (response.status === 429) {
+    throw new AuthClientError(AuthErrorCode.RATE_LIMITED, 'Email change request already sent recently');
+  }
+  if (response.status === 400) {
+    throw new AuthClientError(AuthErrorCode.BAD_REQUEST, text || 'Invalid email address');
+  }
+  throw new AuthClientError(
+    AuthErrorCode.UNKNOWN,
+    text || `Email change failed: ${response.status}`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Change password
+// ---------------------------------------------------------------------------
+
+export async function changePassword(
+  oldPassword: string,
+  newPassword: string,
+  newPasswordRepeat: string
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch('/api/auth/v1/change_password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        old_password: oldPassword,
+        new_password: newPassword,
+        new_password_repeat: newPasswordRepeat,
+      }),
+    });
+  } catch {
+    throw new AuthClientError(AuthErrorCode.NETWORK_ERROR, 'Network error during password change');
+  }
+
+  if (response.ok) return;
+
+  const text = await response.text().catch(() => '');
+  if (response.status === 400) {
+    const lower = text.toLowerCase();
+    if (lower.includes('old') || lower.includes('credential')) {
+      throw new AuthClientError(AuthErrorCode.INVALID_CREDENTIALS, 'Current password is incorrect');
+    }
+    if (lower.includes('weak') || lower.includes('short')) {
+      throw new AuthClientError(AuthErrorCode.WEAK_PASSWORD, 'Password does not meet requirements');
+    }
+    throw new AuthClientError(AuthErrorCode.BAD_REQUEST, text || 'Invalid password change request');
+  }
+  if (response.status === 429) {
+    throw new AuthClientError(AuthErrorCode.RATE_LIMITED, 'Password change rate limited');
+  }
+  throw new AuthClientError(
+    AuthErrorCode.UNKNOWN,
+    text || `Password change failed: ${response.status}`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Avatar upload
+// ---------------------------------------------------------------------------
+
+export async function uploadAvatar(file: File): Promise<void> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  let response: Response;
+  try {
+    response = await fetch('/api/auth/v1/avatar', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+  } catch {
+    throw new AuthClientError(AuthErrorCode.NETWORK_ERROR, 'Network error during avatar upload');
+  }
+
+  if (response.ok) return;
+
+  const text = await response.text().catch(() => '');
+  throw new AuthClientError(
+    AuthErrorCode.UNKNOWN,
+    text || `Avatar upload failed: ${response.status}`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Avatar delete
+// ---------------------------------------------------------------------------
+
+export async function deleteAvatar(): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch('/api/auth/v1/avatar', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  } catch {
+    throw new AuthClientError(AuthErrorCode.NETWORK_ERROR, 'Network error during avatar deletion');
+  }
+
+  if (response.ok) return;
+
+  const text = await response.text().catch(() => '');
+  throw new AuthClientError(
+    AuthErrorCode.UNKNOWN,
+    text || `Avatar deletion failed: ${response.status}`
   );
 }

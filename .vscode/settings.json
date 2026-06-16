@@ -36,5 +36,12 @@
     "MD033": false,
     "MD036": false,
     "MD041": false
-  }
+  },
+  "rust-analyzer.checkOnSave": false,
+  "rust-analyzer.cargo.targetDir": "target/rust-analyzer",
+  "rust-analyzer.files.exclude": [
+    "vendor",
+    "target",
+    "app/ui"
+  ]
 }
