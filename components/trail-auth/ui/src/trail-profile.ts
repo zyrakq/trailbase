@@ -10,6 +10,7 @@ import './trail-profile-avatar.ts';
 import './trail-profile-email.ts';
 import './trail-profile-password.ts';
 import './trail-profile-totp.ts';
+import './trail-profile-account.ts';
 
 /**
  * `<trail-profile>` — self-contained profile management web component.
@@ -125,6 +126,7 @@ export class TrailProfile extends LitElement {
             ${this.signOutLoading ? 'Signing out...' : 'Sign Out'}
           </button>
         </div>
+        <trail-profile-account></trail-profile-account>
       </div>
     `;
   }

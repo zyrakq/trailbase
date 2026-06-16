@@ -53,6 +53,12 @@ export class ProfilePage extends LitElement {
     }
   }
 
+  private handleAccountDeleted() {
+    // The delete endpoint invalidated the auth cookie server-side. Redirect to
+    // the landing page; the normal unauthenticated flow takes over from there.
+    window.location.href = '/';
+  }
+
   render() {
     return html`
       <div class="page">
@@ -65,6 +71,7 @@ export class ProfilePage extends LitElement {
                     .email=${this.user?.email ?? ''}
                     ?has-mfa=${authService.getAuthState().hasMfa}
                     @trail-profile-sign-out=${this.handleSignOut}
+                    @trail-profile-account-deleted=${this.handleAccountDeleted}
                   ></trail-profile>
                 `
               : html`<div class="skeleton"></div>`}

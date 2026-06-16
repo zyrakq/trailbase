@@ -642,3 +642,30 @@ export async function deleteAvatar(): Promise<void> {
     text || `Avatar deletion failed: ${response.status}`
   );
 }
+
+// ---------------------------------------------------------------------------
+// Account deletion
+// ---------------------------------------------------------------------------
+
+export async function deleteUser(): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch('/api/auth/v1/delete', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  } catch {
+    throw new AuthClientError(
+      AuthErrorCode.NETWORK_ERROR,
+      'Network error during account deletion'
+    );
+  }
+
+  if (response.ok) return;
+
+  const text = await response.text().catch(() => '');
+  throw new AuthClientError(
+    AuthErrorCode.UNKNOWN,
+    text || `Account deletion failed: ${response.status}`
+  );
+}
