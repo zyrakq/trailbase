@@ -485,11 +485,9 @@ export async function updatePassword(token: string, password: string): Promise<v
 // ---------------------------------------------------------------------------
 
 export async function changeEmail(oldEmail: string, newEmail: string): Promise<void> {
-  // The /status endpoint rotates the JWT (new csrf_token) but does NOT set a
-  // new auth cookie — the body JWT and cookie JWT diverge. The server's User
-  // extractor reads Authorization: Bearer BEFORE the cookie, so we send the
-  // fresh JWT as a Bearer header. This guarantees the csrf_token in the body
-  // matches the csrf_token the server decodes from the Bearer JWT.
+  // Fetch a fresh CSRF token on-demand right before the POST. The /status
+  // endpoint rotates the JWT and sets both the response body and the auth
+  // cookie to the same new token, keeping them in sync.
   let statusResponse: Response;
   try {
     statusResponse = await fetch('/api/auth/v1/status', { credentials: 'include' });
@@ -520,10 +518,7 @@ export async function changeEmail(oldEmail: string, newEmail: string): Promise<v
   try {
     response = await fetch('/api/auth/v1/change_email/request', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${statusData.auth_token}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ csrf_token: freshCsrfToken, old_email: oldEmail, new_email: newEmail }),
     });
