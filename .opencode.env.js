@@ -10,7 +10,10 @@ export const InjectEnvPlugin = async ({ directory }) => {
   return {
     // Sees the command before it runs. If it's rtk, remember its callID.
     "tool.execute.before": async (input, output) => {
-      const serialized = JSON.stringify({ tool: input.tool, args: output.args });
+      const serialized = JSON.stringify({
+        tool: input.tool,
+        args: output.args,
+      });
       if (serialized.includes("rtk") && input.callID) {
         rtkCalls.add(input.callID);
       }
