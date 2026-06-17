@@ -4,6 +4,7 @@ import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
 import { authModalStyles } from './auth-modal.styles';
 import { configService } from '@/features/auth/services/config.service';
+import { authService } from '../services/auth.service';
 
 // trail-auth bundle is loaded lazily on first open via a <script> tag.
 // The bundle URL is served by the trail-auth-component WASM.
@@ -116,8 +117,9 @@ export class AuthModal extends LitElement {
     document.body.style.overflow = '';
   }
 
-  private handleAuthSuccess() {
+  private async handleAuthSuccess() {
     this.close();
+    await authService.refresh();
     window.dispatchEvent(
       new CustomEvent('notification-add', {
         detail: {
