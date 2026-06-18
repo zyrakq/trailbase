@@ -6,7 +6,7 @@
         "es",
         "zh-Hans"
     ],
-    "tsConfig": "./tsconfig.i18n.json",
+    "tsConfig": "./tsconfig.json",
     "output": {
         "mode": "runtime",
         "outputDir": "./src/features/localization/generated/locales",
