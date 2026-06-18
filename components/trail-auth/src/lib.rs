@@ -3,7 +3,7 @@
 
 use rust_embed::RustEmbed;
 use trailbase_wasm::http::{
-    Html, HttpError, HttpRoute, IntoBody, IntoResponse, Json, Request, Response, StatusCode,
+    Html, HttpError, HttpRoute, IntoBody, IntoResponse, Json, Method, Request, Response, StatusCode,
     header, routing,
 };
 use trailbase_wasm::kv::Store;
@@ -11,6 +11,7 @@ use trailbase_wasm::{Guest, export};
 
 mod config;
 mod error;
+mod i18n;
 mod pages;
 mod password;
 mod profile;
@@ -18,13 +19,17 @@ mod set_password;
 
 use config::{read_reset_password_url, TrailAuthConfig, KV_RESET_PASSWORD_URL};
 use error::{bad_request, internal};
+use i18n::{
+    delete_override, load_default_xliff, merge_entries, parse_xliff, read_override,
+    serialize_js_module, write_override,
+};
 use pages::verify_email_page;
 use profile::profile_capabilities_handler;
 use set_password::set_password_handler;
 
 #[derive(RustEmbed)]
 #[folder = "ui/dist/"]
-struct Assets;
+pub(crate) struct Assets;
 
 struct Endpoints;
 
@@ -142,6 +147,100 @@ impl Guest for Endpoints {
                 "/_/auth/verify_email",
                 async |_req: Request| -> Result<Response, HttpError> {
                     return Ok(Html(verify_email_page()).into_response());
+                },
+            ),
+            // i18n — serve the embedded default XLIFF for a given locale.
+            // Cache-Control: no-cache so the bundle picks up the latest embedded
+            // default without forcing the browser to revalidate with an ETag.
+            routing::get(
+                "/_/auth/i18n/{locale}.xlf",
+                async |req: Request| -> Result<Response, HttpError> {
+                    let locale = req
+                        .path_param("locale")
+                        .ok_or_else(|| internal("missing locale"))?;
+
+                    let xml = load_default_xliff(locale)
+                        .ok_or_else(|| HttpError::status(StatusCode::NOT_FOUND))?;
+
+                    return Response::builder()
+                        .header(header::CACHE_CONTROL, "no-cache")
+                        .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
+                        .body(xml.into_body())
+                        .map_err(internal);
+                },
+            ),
+            // i18n — replace the per-locale override stored in KV.
+            // No PUT helper in the routing module, so construct the route directly.
+            HttpRoute::new(
+                Method::PUT,
+                "/_/auth/i18n/{locale}.xlf",
+                async |mut req: Request| -> Result<Response, HttpError> {
+                    let body = req.body().bytes().await.map_err(internal)?;
+                    let xml =
+                        std::str::from_utf8(&body).map_err(|_| bad_request("invalid UTF-8"))?;
+                    let entries = parse_xliff(xml).map_err(bad_request)?;
+
+                    let locale = req
+                        .path_param("locale")
+                        .ok_or_else(|| internal("missing locale"))?
+                        .to_string();
+
+                    write_override(&locale, &entries)?;
+
+                    return Response::builder()
+                        .status(StatusCode::OK)
+                        .body(b"".into_body())
+                        .map_err(internal);
+                },
+            ),
+            // i18n — drop the per-locale override from KV.
+            routing::delete(
+                "/_/auth/i18n/{locale}.xlf",
+                async |req: Request| -> Result<Response, HttpError> {
+                    let locale = req
+                        .path_param("locale")
+                        .ok_or_else(|| internal("missing locale"))?;
+
+                    delete_override(locale)?;
+
+                    return Response::builder()
+                        .status(StatusCode::OK)
+                        .body(b"".into_body())
+                        .map_err(internal);
+                },
+            ),
+            // i18n — serve a JavaScript module bundling default + override entries.
+            // Returns 404 if neither the embedded default nor a stored override exist
+            // so unknown locales are surfaced as missing instead of producing an empty
+            // export.
+            routing::get(
+                "/_/auth/locales/{locale}.js",
+                async |req: Request| -> Result<Response, HttpError> {
+                    let locale = req
+                        .path_param("locale")
+                        .ok_or_else(|| internal("missing locale"))?;
+
+                    let default_entries: Vec<(String, String)> = match load_default_xliff(locale) {
+                        Some(xml) => parse_xliff(&xml).map_err(bad_request)?,
+                        None => Vec::new(),
+                    };
+                    let override_entries: Vec<(String, String)> = match read_override(locale)? {
+                        Some(entries) => entries,
+                        None => Vec::new(),
+                    };
+
+                    if default_entries.is_empty() && override_entries.is_empty() {
+                        return Err(HttpError::status(StatusCode::NOT_FOUND));
+                    }
+
+                    let merged = merge_entries(&default_entries, &override_entries);
+                    let js = serialize_js_module(&merged);
+
+                    return Response::builder()
+                        .header(header::CACHE_CONTROL, "no-cache")
+                        .header(header::CONTENT_TYPE, "application/javascript; charset=utf-8")
+                        .body(js.into_body())
+                        .map_err(internal);
                 },
             ),
             // Static assets — OAuth provider icons and any other public files.
