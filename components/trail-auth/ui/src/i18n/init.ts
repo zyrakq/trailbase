@@ -11,7 +11,7 @@ import { sourceLocale, targetLocales } from '../generated/locale-codes.js';
 const { getLocale, setLocale } = configureLocalization({
   sourceLocale,
   targetLocales,
-  loadLocale: (locale) => import(`/_/auth/locales/${locale}.js`),
+  loadLocale: (locale) => import(`/_/auth/locales/${locale}`),
 });
 
 class LocalizationService {

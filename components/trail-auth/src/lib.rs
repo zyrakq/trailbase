@@ -153,7 +153,7 @@ impl Guest for Endpoints {
             // Cache-Control: no-cache so the bundle picks up the latest embedded
             // default without forcing the browser to revalidate with an ETag.
             routing::get(
-                "/_/auth/i18n/{locale}.xlf",
+                "/_/auth/i18n/{locale}",
                 async |req: Request| -> Result<Response, HttpError> {
                     let locale = req
                         .path_param("locale")
@@ -173,7 +173,7 @@ impl Guest for Endpoints {
             // No PUT helper in the routing module, so construct the route directly.
             HttpRoute::new(
                 Method::PUT,
-                "/_/auth/i18n/{locale}.xlf",
+                "/_/auth/i18n/{locale}",
                 async |mut req: Request| -> Result<Response, HttpError> {
                     let body = req.body().bytes().await.map_err(internal)?;
                     let xml =
@@ -195,7 +195,7 @@ impl Guest for Endpoints {
             ),
             // i18n — drop the per-locale override from KV.
             routing::delete(
-                "/_/auth/i18n/{locale}.xlf",
+                "/_/auth/i18n/{locale}",
                 async |req: Request| -> Result<Response, HttpError> {
                     let locale = req
                         .path_param("locale")
@@ -214,7 +214,7 @@ impl Guest for Endpoints {
             // so unknown locales are surfaced as missing instead of producing an empty
             // export.
             routing::get(
-                "/_/auth/locales/{locale}.js",
+                "/_/auth/locales/{locale}",
                 async |req: Request| -> Result<Response, HttpError> {
                     let locale = req
                         .path_param("locale")
