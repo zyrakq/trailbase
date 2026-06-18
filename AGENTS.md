@@ -15,6 +15,9 @@ Primary documentation is in two canonical files:
   modifications beyond what is already in `src/lib.rs` and `src/app_state.rs`
 - Use **bun** for frontend tasks, **cargo** for backend
 - All comments and documentation must be in **English**
+- **NEVER run `cargo clean`** — it wipes the entire build cache and forces a
+  full recompilation of every crate, which is extremely costly on this workspace.
+  If a build artifact is stale, rebuild the specific package instead.
 
 ## Comments
 
