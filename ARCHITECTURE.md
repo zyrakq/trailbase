@@ -467,27 +467,47 @@ as the mock data backend instead of hardcoded fixtures.
 
 ### Frontend
 
+The frontend build (`bun install` + `bun run build`) is invoked automatically
+by `app/build.rs` whenever `cargo build` runs. Output goes to `app/ui/dist/`,
+which is embedded into the binary at compile time via `rust-embed`. There is
+no need to run `bun` manually before `cargo run` — stale `node_modules/` is
+detected by an mtime check against `package.json` / `bun.lock`.
+
 ```bash
-bun run build          # Full production build (i18n:build + tsc + vite build)
-bun run watch          # Watch mode (dev)
-bun run i18n:extract   # Extract msg() strings → xliff/*.xlf
-bun run i18n:build     # Generate locale modules from xliff/*.xlf
+bun run i18n:extract   # Extract msg() strings → xliff/*.xlf (manual, before release)
+bun run i18n:build     # Generate locale modules (runs automatically inside `bun run build`)
+bun run watch          # Dev hot reload — spawned by the server when [frontend] watch = true
 ```
 
-Output: `app/ui/dist/` — served by the Rust backend.
+`APP_SKIP_WASM=1 cargo build` skips the frontend and WASM builds for fast
+type-checking without the external toolchain (an empty `ui/dist/` is created so
+the `rust-embed` derive still compiles).
 
 ### Backend
 
 ```bash
-cargo build            # Compile Rust server
-cargo run              # Start server (serves frontend from app/ui/dist/)
+cargo build            # Compile Rust server (build.rs runs bun install + bun build + WASM)
+cargo run              # Start server — serving mode is controlled by [frontend] serve_from
 ```
+
+`[frontend] serve_from` selects how assets reach the client:
+
+- `"disk"` (default): serve from `app/ui/dist/` via `tower_http::ServeDir` with
+  SPA fallback. Hot reload is enabled when `watch = true` (dev).
+- `"embedded"`: serve from assets compiled into the binary via `rust-embed`
+  (prod). No `ui/`, `bun`, or `node` is required at runtime.
 
 ### Docker
 
 ```bash
-docker-compose up      # Full stack (backend + frontend)
+docker-compose up      # Single-stage Rust build; frontend embedded in the binary
 ```
+
+The Dockerfile is a two-stage build: a `rust-builder` stage installs Bun +
+Node + pnpm, runs `cargo build --release` (which triggers `build.rs` to
+populate `ui/dist/` and embed it), and a slim runtime stage ships only the
+binary + config + traildepot skeleton. No frontend assets exist on disk in the
+runtime image.
 
 ### Configuration
 

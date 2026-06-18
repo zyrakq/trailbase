@@ -1,19 +1,5 @@
 ###############################################################################
-# Stage 1 — Frontend (Bun)
-###############################################################################
-FROM oven/bun:1-debian AS frontend-builder
-
-WORKDIR /build
-
-# Install deps in a dedicated layer — invalidated only when lockfile changes
-COPY app/ui/package.json app/ui/bun.lock ./
-RUN bun install --frozen-lockfile
-
-COPY app/ui/ ./
-RUN bun run build
-
-###############################################################################
-# Stage 2 — Rust backend + TrailBase auth_ui component
+# Stage 1 — Rust backend (frontend embedded via rust-embed)
 ###############################################################################
 FROM rust:1-bookworm AS rust-builder
 
@@ -43,18 +29,31 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && corepack enable \
     && corepack prepare pnpm@9 --activate
 
+# ── Bun ──────────────────────────────────────────────────────────────────
+# app/build.rs runs `bun install` + `bun run build` to populate ui/dist/
+# before rust-embed inlines it into the binary. Bun must be in PATH during
+# `cargo build`.
+RUN curl -fsSL https://bun.sh/install | bash \
+    && ln -s /root/.bun/bin/bun /usr/local/bin/bun
+
 # ── Dependency cache layer ────────────────────────────────────────────────
 # Compile all dependencies using a stub binary.
-# This layer is invalidated only when Cargo.lock changes, not on src edits.
+# APP_SKIP_WASM=1 skips both the frontend build (bun install + bun run build)
+# and the WASM build, so this layer depends only on Cargo.lock — not on
+# package.json / bun.lock / appsettings.toml.
 WORKDIR /workspace
 
 COPY Cargo.toml Cargo.lock ./
 COPY app/Cargo.toml ./app/
 RUN mkdir -p app/src && printf 'fn main() {}' > app/src/main.rs
-RUN cargo build --release || true
+RUN APP_SKIP_WASM=1 cargo build --release || true
 
 # ── Real build ────────────────────────────────────────────────────────────
+# build.rs runs the full pipeline: bun install (if stale) -> bun run build
+# -> build WASM components. rust-embed then inlines ui/dist/ into the binary
+# at compile time, so the runtime image needs no ui/ tree.
 COPY app/src/                        ./app/src/
+COPY app/ui/                         ./app/ui/
 COPY app/appsettings.toml            ./app/
 COPY app/appsettings.production.toml ./app/
 COPY app/traildepot/config.textproto ./app/traildepot/
@@ -76,7 +75,7 @@ RUN mkdir -p traildepot/wasm traildepot/data \
     && trail components add trailbase/auth_ui
 
 ###############################################################################
-# Stage 3 — Runtime (slim)
+# Stage 2 — Runtime (slim)
 ###############################################################################
 FROM debian:bookworm-slim
 
@@ -89,6 +88,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /workspace/app
 
 # ── Binary ────────────────────────────────────────────────────────────────
+# Frontend assets are embedded via rust-embed — no ui/dist/ at runtime.
 COPY --from=rust-builder /workspace/target/release/server /usr/local/bin/server
 
 # ── Layered config ────────────────────────────────────────────────────────
@@ -102,10 +102,7 @@ COPY app/traildepot/config.textproto      traildepot/
 COPY app/traildepot/migrations/           traildepot/migrations/
 COPY --from=rust-builder \
      /workspace/app/traildepot/wasm/auth_ui_component.wasm \
-                                          traildepot/wasm/
-
-# ── Pre-built SPA assets ──────────────────────────────────────────────────
-COPY --from=frontend-builder /build/dist  ui/dist/
+                                           traildepot/wasm/
 
 # ── Mutable data directories ──────────────────────────────────────────────
 # Created here so they exist even without volume mounts.
@@ -120,8 +117,5 @@ VOLUME ["/workspace/app/traildepot/data",    \
 EXPOSE 4000
 
 ENV APP_ENV=production
-# Frontend was pre-built in Stage 1 — skip runtime rebuild.
-# Overrides the build=true in appsettings.production.toml.
-ENV APP_FRONTEND__BUILD=false
 
 CMD ["server"]
