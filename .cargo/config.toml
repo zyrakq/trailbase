@@ -1,4 +1,3 @@
-
 [build]
 jobs = 4
 rustc-wrapper = "sccache"

@@ -21,6 +21,9 @@ export const InjectEnvPlugin = async ({ directory }) => {
 
     // Sets env. Only acts when the matching callID was an rtk command.
     "shell.env": async (input, output) => {
+      output.env[`CARGO_BUILD_JOBS`] = "4";
+      output.env[`RUSTC_WRAPPER`] = "sccache";
+
       if (!input.callID || !rtkCalls.has(input.callID)) return;
 
       // vendor/ hosts separate workspaces (trailbase, mailcrab, react); skip them.
@@ -30,8 +33,8 @@ export const InjectEnvPlugin = async ({ directory }) => {
       // Per-target env var mirrors [target.x86_64-unknown-linux-gnu].rustflags from
       // .cargo/config.toml: applies only to the native target (skips wasm) and keeps
       // cargo's fingerprint stable so rtk runs don't trigger full rebuilds.
-      output.env[`CARGO_TARGET_${NATIVE_TARGET}_RUSTFLAGS`] =
-        "-C link-arg=-fuse-ld=mold -C link-arg=-Wl,--icf=all";
+      // output.env[`CARGO_TARGET_${NATIVE_TARGET}_RUSTFLAGS`] =
+      //   "-C link-arg=-fuse-ld=mold -C link-arg=-Wl,--icf=all";
     },
 
     // Cleanup so the Set doesn't grow unbounded.
