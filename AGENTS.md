@@ -46,23 +46,21 @@ The logging setup is a two-system arrangement that must not be broken:
 
 This constraint was discovered and fixed in the mailcrab integration (Jun 2026).
 
-## sccache — DO NOT BYPASS
+## Build cache — sccache and cargo subagent discipline
 
-`sccache` is configured in `.cargo/config.toml` as `rustc-wrapper = "sccache"`.
-It is an intentional, project-wide setup that caches Cargo compilations across
-invocations and is essential to keep rebuild times bearable on this workspace.
+`sccache` is configured in `.cargo/config.toml` (`rustc-wrapper = "sccache"`) and
+is essential for tolerable rebuild times on this workspace.
 
 **Never:**
 
-- Set `RUSTC_WRAPPER=""` (or any empty value) to disable the wrapper — even for a
-  "single invocation"
-- Override `RUSTC_WRAPPER` or `SCCACHE_*` env vars to work around sccache
-- Strip `.cargo/config.toml`'s `rustc-wrapper` line to "fix" a failing build
-- Recommend disabling sccache as a workaround for any build issue
-
-**If sccache appears missing or a build fails because of it, the correct response is
-to install it** (`cargo install sccache` or your distro's package), not to bypass it.
-Stop and ask the user instead of unilaterally disabling the cache.
+- Bypass sccache by setting `RUSTC_WRAPPER=""` or overriding `SCCACHE_*` env vars
+  — not even for a "single invocation". If sccache is missing or broken, install
+  it (`cargo install sccache`) instead of disabling it.
+- Run `cargo` commands inside **parallel subagents**. Cargo locks the build
+  directory and concurrent invocations thrash sccache, triggering full rebuilds
+  that wipe the cache for everyone. All `cargo` verification (`check`, `build`,
+  `test`) belongs in the **main agent thread, executed sequentially**. Subagents
+  (implementer, reviewer, etc.) must edit files only — never invoke the toolchain.
 
 ## Future Considerations
 
