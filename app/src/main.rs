@@ -1,6 +1,7 @@
 #[cfg(test)] mod build_settings;
 mod components;
 mod frontend;
+mod frontend_assets;
 mod logging;
 mod preflight;
 mod routes;
@@ -8,6 +9,7 @@ mod settings;
 mod smtp;
 mod trailbase_bootstrap;
 
+use axum::routing::get;
 use settings::{frontend::PublicConfig, loader::Settings};
 use std::path::PathBuf;
 use tracing::info;
@@ -29,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         components::ensure_component(entry, &settings.components, &manifest_dir)?;
     }
 
-    let _bun_watch = frontend::start(&settings.frontend, &manifest_dir.join("ui"))?;
+    let _frontend_handle = frontend::start(&settings.frontend, &manifest_dir)?;
 
     // Detect first start BEFORE Server::init() creates a default config.textproto.
     let data_dir = manifest_dir.join("traildepot");
@@ -63,9 +65,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let base_router = axum::Router::new()
         .merge(routes::build(state))
-        .merge(main_router.1)
-        .fallback_service(routes::static_files(&settings.frontend, &manifest_dir))
-        .layer(axum::Extension(public_config));
+        .merge(main_router.1);
+
+    let base_router = match settings.frontend.effective_serve_from() {
+        "embedded" => {
+            info!("Serving frontend from embedded assets");
+            base_router.fallback_service(get(routes::embedded_static_handler))
+        }
+        _ => {
+            info!("Serving frontend from disk (ui/dist)");
+            base_router
+                .fallback_service(routes::static_files(&settings.frontend, &manifest_dir))
+        }
+    };
+
+    let base_router = base_router.layer(axum::Extension(public_config));
 
     let (router, smtp_handle) = smtp::mount(interceptor, base_router);
 

@@ -1,58 +1,96 @@
 // app/src/frontend.rs
 //
-// Frontend lifecycle helpers: one-shot build and background watch process.
-// Extracted from main.rs so the same logic can be reused in other projects.
+// Frontend lifecycle coordinator. Dispatches between disk mode (dev hot
+// reload via `bun watch` + ServeDir) and embedded mode (assets compiled into
+// the binary via rust-embed). The one-shot `bun run build` is no longer done
+// here - build.rs handles install + build at compile time.
 
 use std::path::Path;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::ChildStderr;
-use tokio::process::ChildStdout;
 use std::process::Stdio;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::{Child, ChildStderr, ChildStdout};
 use tracing::{info, warn};
 
+use crate::frontend_assets::Assets;
 use crate::settings::frontend::FrontendSettings;
 
-/// Run the full frontend lifecycle based on settings.
+/// Outcome of `start`: how the frontend is being served.
 ///
-/// - If `settings.build` is true: runs `bun run build` and returns an error on failure.
-/// - If `settings.watch` is true: spawns `bun watch` in the background.
-///
-/// Returns the watch child process, if started. Keep the returned value alive
-/// for the duration of the server — dropping it kills the watch process.
-pub fn start(
-    settings: &FrontendSettings,
-    ui_dir: &Path,
-) -> Result<Option<tokio::process::Child>, Box<dyn std::error::Error + Send + Sync>> {
-    if settings.build || settings.watch {
-        crate::preflight::check_dependency("bun", "https://bun.sh/docs/installation")?;
-    }
-    if settings.build {
-        build(ui_dir)?;
-    }
-    Ok(if settings.watch {
-        spawn_watch(ui_dir)
-    } else {
-        None
-    })
+/// Keep the returned handle alive for the duration of the server - dropping
+/// `Disk { watch_child: Some(_) }` kills the `bun watch` process
+/// (`kill_on_drop(true)`).
+pub enum FrontendHandle {
+    /// Serve from `ui/dist/` on disk; `watch_child` is the background
+    /// `bun watch` process when `settings.watch` is true.
+    //
+    // `watch_child` is held but never read: dropping the handle kills the
+    // watcher (`kill_on_drop(true)`), so it must outlive `main`. The field
+    // is intentionally read-only-for-lifetime.
+    #[allow(dead_code)]
+    Disk { watch_child: Option<Child> },
+    /// Serve from assets embedded into the binary at compile time.
+    Embedded,
 }
 
-/// Run `bun run build` once in the given UI directory.
+/// Start the frontend in the mode configured by `settings.serve_from`.
 ///
-/// Returns an error if the command could not be launched or exited
-/// with a non-zero status.
-fn build(ui_dir: &Path) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    info!("Building frontend...");
-    let status = std::process::Command::new("bun")
-        .args(["run", "build"])
-        .current_dir(ui_dir)
-        .status();
-    match status {
-        Ok(s) if s.success() => {
-            info!("Frontend build completed successfully");
-            Ok(())
+/// - `disk`:     sanity-check `node_modules/`, optionally spawn `bun watch`.
+/// - `embedded`: sanity-check `Assets::get("index.html")` is present.
+///
+/// `manifest_dir` is `CARGO_MANIFEST_DIR` (the `app/` directory); the UI lives
+/// at `manifest_dir/ui`. No `bun run build` is run here - build.rs did it.
+pub fn start(
+    settings: &FrontendSettings,
+    manifest_dir: &Path,
+) -> Result<FrontendHandle, Box<dyn std::error::Error + Send + Sync>> {
+    let ui_dir = manifest_dir.join("ui");
+
+    match settings.effective_serve_from() {
+        "disk" => {
+            // build.rs already ran `bun install`, so node_modules should
+            // exist. Sanity-check anyway so the error is clear instead of a
+            // `bun watch` failure with an opaque message.
+            if !ui_dir.join("node_modules").exists() {
+                return Err(format!(
+                    "ui/node_modules is missing in disk mode.\n\
+                     Re-run `cargo run` - build.rs will run `bun install` \
+                     automatically.\n\
+                     (looked in {})",
+                    ui_dir.display()
+                )
+                .into());
+            }
+
+            if settings.watch {
+                crate::preflight::check_dependency(
+                    "bun",
+                    "https://bun.sh/docs/installation",
+                )?;
+            }
+
+            let watch_child = if settings.watch {
+                spawn_watch(&ui_dir)
+            } else {
+                None
+            };
+            Ok(FrontendHandle::Disk { watch_child })
         }
-        Ok(s) => Err(format!("Frontend build failed with exit status: {s}").into()),
-        Err(e) => Err(format!("Failed to run `bun run build`: {e}").into()),
+        "embedded" => {
+            if Assets::get("index.html").is_none() {
+                return Err(
+                    "embedded mode selected but `index.html` is not present in \
+                     the compiled-in assets. The binary was built without \
+                     `ui/dist/` populated. Rebuild with `cargo build` after \
+                     ensuring `bun run build` succeeds in app/ui."
+                        .into(),
+                );
+            }
+            Ok(FrontendHandle::Embedded)
+        }
+        other => Err(format!(
+            "unknown frontend.serve_from value: {other:?}. Expected \"disk\" or \"embedded\"."
+        )
+        .into()),
     }
 }
 
@@ -66,8 +104,8 @@ fn build(ui_dir: &Path) -> Result<(), Box<dyn std::error::Error + Send + Sync>> 
 /// The returned child process is kept alive as long as the `Option` is held.
 /// It is killed automatically when dropped (`kill_on_drop(true)`).
 ///
-/// Returns `None` if the process could not be launched (non-fatal, logged as warning).
-fn spawn_watch(ui_dir: &Path) -> Option<tokio::process::Child> {
+/// Returns `None` if the process could not be launched (non-fatal, logged).
+fn spawn_watch(ui_dir: &Path) -> Option<Child> {
     let mut cmd = tokio::process::Command::new("bun");
     cmd.args(["watch"])
         .current_dir(ui_dir)
@@ -79,22 +117,16 @@ fn spawn_watch(ui_dir: &Path) -> Option<tokio::process::Child> {
         Ok(mut child) => {
             info!("Started bun watch (pid: {:?})", child.id());
 
-            match child.stdout.take() {
-                Some(stdout) => {
-                    tokio::spawn(filter_and_print_stdout(stdout));
-                }
-                None => {
-                    warn!("bun watch stdout pipe unavailable; output will not be filtered");
-                }
+            if let Some(stdout) = child.stdout.take() {
+                tokio::spawn(filter_and_print_stdout(stdout));
+            } else {
+                warn!("bun watch stdout pipe unavailable; output will not be filtered");
             }
 
-            match child.stderr.take() {
-                Some(stderr) => {
-                    tokio::spawn(filter_and_print_stderr(stderr));
-                }
-                None => {
-                    warn!("bun watch stderr pipe unavailable; output will not be filtered");
-                }
+            if let Some(stderr) = child.stderr.take() {
+                tokio::spawn(filter_and_print_stderr(stderr));
+            } else {
+                warn!("bun watch stderr pipe unavailable; output will not be filtered");
             }
 
             Some(child)
@@ -109,12 +141,12 @@ fn spawn_watch(ui_dir: &Path) -> Option<tokio::process::Child> {
 /// Returns `true` if the line should be shown to the developer.
 ///
 /// Show rules (applied in order, first match wins):
-/// - Contains "error"  (case-insensitive) — build errors
-/// - Contains "warn"   (case-insensitive) — build warnings
-/// - Contains "build started"             — rebuild triggered
-/// - Contains "built in"                  — rebuild completed with timing
-/// - Contains "watching for file changes" — watcher ready confirmation
-/// - Starts with "✗" or "×"              — failure indicators
+/// - Contains "error"  (case-insensitive) - build errors
+/// - Contains "warn"   (case-insensitive) - build warnings
+/// - Contains "build started"             - rebuild triggered
+/// - Contains "built in"                  - rebuild completed with timing
+/// - Contains "watching for file changes" - watcher ready confirmation
+/// - Starts with the cross/failure glyphs - failure indicators
 ///
 /// Everything else (per-module transform lines, empty lines, etc.) is hidden.
 fn should_show(line: &str) -> bool {
@@ -124,8 +156,8 @@ fn should_show(line: &str) -> bool {
         || line.contains("build started")
         || line.contains("built in")
         || line.contains("watching for file changes")
-        || line.starts_with('✗')
-        || line.starts_with('×')
+        || line.starts_with('\u{2717}')
+        || line.starts_with('\u{00d7}')
 }
 
 /// Read lines from the child's stdout pipe and forward matching lines to stderr.
@@ -138,8 +170,8 @@ async fn filter_and_print_stdout(stdout: ChildStdout) {
                     eprintln!("{line}");
                 }
             }
-            Ok(None) => break, // pipe closed — child exited
-            Err(_) => break,   // read error — exit silently
+            Ok(None) => break,
+            Err(_) => break,
         }
     }
 }

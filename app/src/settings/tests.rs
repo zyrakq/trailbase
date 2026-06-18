@@ -18,7 +18,7 @@ const BASE_TOML: &str = indoc! {r#"
     address = "0.0.0.0:4000"
 
     [frontend]
-    build = false
+    serve_from = "disk"
     watch = false
     public_dir = ""
 
@@ -40,25 +40,34 @@ const BASE_TOML: &str = indoc! {r#"
 
 const DEV_TOML: &str = indoc! {r#"
     [frontend]
+    serve_from = "disk"
     watch = true
 "#};
 
 const PROD_TOML: &str = indoc! {r#"
     [frontend]
-    build = true
+    serve_from = "embedded"
 "#};
 
 #[test]
-fn development_env_enables_watch_disables_build() {
+fn development_env_enables_watch_in_disk_mode() {
     let s = settings_from_toml(BASE_TOML, DEV_TOML).expect("should deserialize");
     assert!(s.frontend.watch, "watch should be true in development");
-    assert!(!s.frontend.build, "build should be false in development");
+    assert_eq!(
+        s.frontend.effective_serve_from(),
+        "disk",
+        "development should serve from disk"
+    );
 }
 
 #[test]
-fn production_env_enables_build_disables_watch() {
+fn production_env_uses_embedded_serve_mode() {
     let s = settings_from_toml(BASE_TOML, PROD_TOML).expect("should deserialize");
-    assert!(s.frontend.build, "build should be true in production");
+    assert_eq!(
+        s.frontend.effective_serve_from(),
+        "embedded",
+        "production should serve from embedded assets"
+    );
     assert!(!s.frontend.watch, "watch should be false in production");
 }
 
@@ -66,7 +75,7 @@ fn production_env_enables_build_disables_watch() {
 fn base_defaults_are_correct() {
     let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
     assert_eq!(s.server.address, "0.0.0.0:4000");
-    assert!(!s.frontend.build);
+    assert_eq!(s.frontend.effective_serve_from(), "disk");
     assert!(!s.frontend.watch);
     assert_eq!(s.frontend.public_dir, "");
 }
@@ -130,7 +139,7 @@ fn email_dev_intercept_can_be_enabled() {
         address = "0.0.0.0:4000"
 
         [frontend]
-        build = false
+        serve_from = "disk"
         watch = false
         public_dir = ""
 
@@ -436,7 +445,7 @@ fn overlay_replaces_items_array_wholesale() {
         address = "0.0.0.0:4000"
 
         [frontend]
-        build = false
+        serve_from = "disk"
         watch = false
         public_dir = ""
 
@@ -514,7 +523,7 @@ fn appsettings_example_toml_parses() {
     let example = include_str!("../../appsettings.example.toml");
     let s = settings_from_toml(example, "").expect("example should deserialize as Settings");
     assert_eq!(s.server.address, "0.0.0.0:4000");
-    assert!(!s.frontend.build);
+    assert_eq!(s.frontend.effective_serve_from(), "disk");
     assert!(!s.frontend.watch);
     assert_eq!(s.trailbase.server.application_name, "Argiago");
     assert!(
@@ -533,4 +542,68 @@ fn appsettings_example_toml_parses() {
         s.components.items[0].source,
         ComponentSource::Fetch("trailbase/auth_ui".to_string())
     );
+}
+
+// ---------------------------------------------------------------------------
+// Frontend serve_from tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn serve_from_defaults_to_disk_when_absent() {
+    // A base with no serve_from in [frontend] - exercises the serde default.
+    let base = indoc! {r#"
+        [server]
+        address = "0.0.0.0:4000"
+
+        [frontend]
+        watch = false
+        public_dir = ""
+
+        [mailcrab]
+        dev_intercept = false
+        path = "/_/mailcrab"
+        smtp_host = "127.0.0.1"
+        smtp_port = 1025
+
+        [trailbase.server]
+        application_name = "Argiago"
+        site_url = "http://localhost:4000"
+        logs_retention_sec = 604800
+
+        [trailbase.auth]
+        disable_password_auth = false
+        enable_otp_signin = false
+    "#};
+    let s = settings_from_toml(base, "").expect("should deserialize");
+    assert_eq!(
+        s.frontend.serve_from, "disk",
+        "absent serve_from should default to disk via serde default"
+    );
+    assert_eq!(s.frontend.effective_serve_from(), "disk");
+}
+
+#[test]
+fn serve_from_empty_string_is_treated_as_disk() {
+    let overlay = indoc! {r#"
+        [frontend]
+        serve_from = ""
+        watch = false
+    "#};
+    let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+    assert_eq!(
+        s.frontend.effective_serve_from(),
+        "disk",
+        "empty serve_from should be treated as disk"
+    );
+}
+
+#[test]
+fn serve_from_embedded_parses() {
+    let overlay = indoc! {r#"
+        [frontend]
+        serve_from = "embedded"
+    "#};
+    let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+    assert_eq!(s.frontend.serve_from, "embedded");
+    assert_eq!(s.frontend.effective_serve_from(), "embedded");
 }

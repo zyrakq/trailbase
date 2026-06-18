@@ -23,13 +23,17 @@ address = "0.0.0.0:4000"
 # ------------------------------------------------------------------------------
 
 [frontend]
-# Run `bun run build` on startup. Useful in production.
-build = false
+# Where to serve frontend assets from.
+#   "disk"     — serve from ui/dist/ on disk (dev hot reload via bun watch)
+#   "embedded" — serve from assets compiled into the binary at build time (prod)
+# Default: "disk". Empty string is treated as "disk" for backwards compat.
+# bun install + bun run build are run automatically by build.rs at compile time.
+serve_from = "disk"
 
 # Spawn `bun watch` in the background. Useful in development.
 watch = false
 
-# Directory to serve frontend assets from.
+# Directory to serve frontend assets from (disk mode only).
 # Empty string → <CARGO_MANIFEST_DIR>/ui/dist
 public_dir = ""
 

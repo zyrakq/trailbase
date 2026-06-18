@@ -4,10 +4,18 @@
 
 use std::path::Path;
 
-use axum::{Router, extract::State, routing::get};
+use axum::{
+    Router,
+    body::Body,
+    extract::State,
+    http::{StatusCode, Uri, header},
+    response::Response,
+    routing::get,
+};
 use tower_http::services::{ServeDir, ServeFile};
 use trailbase::AppState;
 
+use crate::frontend_assets::Assets;
 use crate::settings::frontend::{FrontendSettings, PublicConfig};
 
 /// Build the custom API router.
@@ -31,6 +39,58 @@ pub fn build(state: AppState) -> Router {
 pub fn static_files(settings: &FrontendSettings, manifest_dir: &Path) -> ServeDir<ServeFile> {
     let public_dir = settings.resolve_public_dir(manifest_dir);
     ServeDir::new(&public_dir).fallback(ServeFile::new(public_dir.join("index.html")))
+}
+
+/// Serve a file from the embedded frontend assets (rust-embed).
+///
+/// SPA-aware: paths without a file extension fall back to `index.html` so
+/// client-side routes (e.g. `/profile`) work on direct navigation. Paths
+/// with an extension that are not in the asset set return a real 404.
+///
+/// Cache headers:
+///   - `index.html` → `no-cache` (always revalidate SPA entry point)
+///   - hashed assets → `public, max-age=31536000, immutable`
+pub async fn embedded_static_handler(uri: Uri) -> Response {
+    let path = uri.path().trim_start_matches('/');
+    let path = if path.is_empty() { "index.html" } else { path };
+
+    // Direct asset hit.
+    if let Some(file) = Assets::get(path) {
+        return embedded_response(path, file);
+    }
+
+    // SPA fallback: extension-less paths are client-side routes.
+    if Path::new(path).extension().is_none() {
+        if let Some(file) = Assets::get("index.html") {
+            return embedded_response("index.html", file);
+        }
+    }
+
+    // Extension-bearing path not found → real 404.
+    not_found().await
+}
+
+/// Build a `Response` from a single embedded file with cache headers.
+fn embedded_response(path: &str, file: rust_embed::EmbeddedFile) -> Response {
+    let mime = mime_guess::from_path(path).first_or_octet_stream();
+    let cache_control = if path == "index.html" {
+        "no-cache"
+    } else {
+        "public, max-age=31536000, immutable"
+    };
+
+    Response::builder()
+        .header(header::CONTENT_TYPE, mime.as_ref())
+        .header(header::CACHE_CONTROL, cache_control)
+        .body(Body::from(file.data.into_owned()))
+        .unwrap()
+}
+
+async fn not_found() -> Response {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::from("404"))
+        .unwrap()
 }
 
 async fn health_check() -> &'static str {
