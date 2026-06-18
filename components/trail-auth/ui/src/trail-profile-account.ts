@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
-import { localized } from '@/features/localization';
+import { localized } from './i18n/localized';
 import { deleteUser, AuthClientError } from './api/auth-client.ts';
 
 type AccountState = 'idle' | 'confirming' | 'deleting' | 'error';

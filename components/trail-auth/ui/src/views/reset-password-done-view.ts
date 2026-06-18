@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
-import { localized } from '@/features/localization';
+import { localized } from '../i18n/localized';
 import { authSharedStyles } from '../styles.ts';
 
 /**

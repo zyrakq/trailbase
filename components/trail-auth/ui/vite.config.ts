@@ -15,14 +15,5 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     minify: true,
-    rollupOptions: {
-      external: ['@lit/localize', '@/features/localization'],
-      output: {
-        globals: {
-          '@lit/localize': '__litLocalize',
-          '@/features/localization': '__argiagoLocalization',
-        },
-      },
-    },
   },
 });

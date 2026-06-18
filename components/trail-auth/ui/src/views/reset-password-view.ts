@@ -1,7 +1,7 @@
 import { LitElement, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
-import { localized } from '@/features/localization';
+import { localized } from '../i18n/localized';
 import { authSharedStyles } from '../styles.ts';
 import { updatePassword, AuthClientError, AuthErrorCode } from '../api/auth-client.ts';
 

@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { msg, str } from '@lit/localize';
-import { localized } from '@/features/localization';
+import { localized } from './i18n/localized.ts';
 import { changePassword, setPassword, AuthClientError, AuthErrorCode, type PasswordPolicy } from './api/auth-client.ts';
 import { eyeIcon, eyeSlashIcon } from './icons.ts';
 
