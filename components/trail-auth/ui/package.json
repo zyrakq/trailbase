@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "bun i18n:build && vite build",
+    "postbuild": "bun build src/generated/locales/*.ts --outdir dist/locales --target browser --format esm --entry-naming \"[name].js\" && mkdir -p dist/xliff && cp xliff/*.xlf dist/xliff/",
     "dev": "vite build --watch",
     "i18n:extract": "lit-localize extract",
     "i18n:build": "lit-localize build"
