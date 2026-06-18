@@ -37,11 +37,21 @@
     "MD036": false,
     "MD041": false
   },
+  "rust-analyzer.cachePriming.enable": false,
+  "rust-analyzer.check.workspace": false,
+  "rust-analyzer.procMacro.enable": true,
+  "rust-analyzer.lru.capacity": 64,
   "rust-analyzer.checkOnSave": false,
   "rust-analyzer.cargo.targetDir": "target/rust-analyzer",
   "rust-analyzer.files.exclude": [
     "vendor",
     "target",
     "app/ui"
-  ]
+  ],
+  "rust-analyzer.server.extraEnv": {
+    "RUSTC_WRAPPER": "sccache"
+  },
+  "rust-analyzer.cargo.extraEnv": {
+    "RUSTC_WRAPPER": "sccache"
+  }
 }
