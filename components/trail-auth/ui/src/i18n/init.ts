@@ -32,22 +32,6 @@ class LocalizationService {
   getLocale(): string {
     return getLocale();
   }
-
-  // Mirror a lit-localize status event back into this service's
-  // currentLocale so the setLocale() guard cannot desync from the
-  // @lit/localize runtime — e.g. when a host changes locale through
-  // its own localization instance and not through setLocale() here.
-  syncFromStatusEvent(detail: LocaleStatusEventDetail): void {
-    const next =
-      detail.status === 'ready'
-        ? detail.readyLocale
-        : detail.status === 'loading'
-          ? detail.loadingLocale
-          : null;
-    if (next) {
-      this.currentLocale = next;
-    }
-  }
 }
 
 export const localizationService = new LocalizationService();
@@ -58,8 +42,19 @@ export const localizationService = new LocalizationService();
 // chosen language without the host having to call init() explicitly.
 const ARGIAGO_LOCALE_STORAGE_KEY = 'argiago-locale';
 
+// Listen for locale changes dispatched by the host app's own
+// @lit/localize instance. When the host switches locale, this listener
+// mirrors the switch into trail-auth's independent @lit/localize instance
+// by calling setLocale(), which triggers loadLocale → fetch locale module
+// from WASM → lit-localize-status event → component re-render.
 window.addEventListener(LOCALE_STATUS_EVENT, (event) => {
-  localizationService.syncFromStatusEvent(event.detail);
+  const detail = (event as CustomEvent<LocaleStatusEventDetail>).detail;
+  if (!detail) return;
+  const locale =
+    detail.status === 'loading' ? detail.loadingLocale : detail.readyLocale;
+  if (locale && locale !== localizationService.getLocale()) {
+    void localizationService.setLocale(locale);
+  }
 });
 
 try {
