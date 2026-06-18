@@ -20,8 +20,8 @@ mod set_password;
 use config::{read_reset_password_url, TrailAuthConfig, KV_RESET_PASSWORD_URL};
 use error::{bad_request, internal};
 use i18n::{
-    delete_override, load_default_xliff, merge_entries, parse_xliff, read_override,
-    serialize_js_module, write_override,
+    delete_override, load_default_xliff, parse_xliff, read_override, serialize_js_module,
+    write_override,
 };
 use pages::verify_email_page;
 use profile::profile_capabilities_handler;
@@ -209,10 +209,9 @@ impl Guest for Endpoints {
                         .map_err(internal);
                 },
             ),
-            // i18n — serve a JavaScript module bundling default + override entries.
-            // Returns 404 if neither the embedded default nor a stored override exist
-            // so unknown locales are surfaced as missing instead of producing an empty
-            // export.
+            // i18n — serve a JavaScript module for the requested locale.
+            // A stored override takes precedence; otherwise the module embedded
+            // at build time is served. Returns 404 when neither is available.
             routing::get(
                 "/_/auth/locales/{locale}",
                 async |req: Request| -> Result<Response, HttpError> {
@@ -220,26 +219,22 @@ impl Guest for Endpoints {
                         .path_param("locale")
                         .ok_or_else(|| internal("missing locale"))?;
 
-                    let default_entries: Vec<(String, String)> = match load_default_xliff(locale) {
-                        Some(xml) => parse_xliff(&xml).map_err(bad_request)?,
-                        None => Vec::new(),
-                    };
-                    let override_entries: Vec<(String, String)> = match read_override(locale)? {
-                        Some(entries) => entries,
-                        None => Vec::new(),
-                    };
-
-                    if default_entries.is_empty() && override_entries.is_empty() {
-                        return Err(HttpError::status(StatusCode::NOT_FOUND));
+                    if let Some(entries) = read_override(locale)? {
+                        let js = serialize_js_module(&entries);
+                        return Response::builder()
+                            .header(header::CACHE_CONTROL, "no-cache")
+                            .header(header::CONTENT_TYPE, "application/javascript; charset=utf-8")
+                            .body(js.into_body())
+                            .map_err(internal);
                     }
 
-                    let merged = merge_entries(&default_entries, &override_entries);
-                    let js = serialize_js_module(&merged);
+                    let file = Assets::get(&format!("locales/{locale}.js"))
+                        .ok_or_else(|| HttpError::status(StatusCode::NOT_FOUND))?;
 
                     return Response::builder()
                         .header(header::CACHE_CONTROL, "no-cache")
                         .header(header::CONTENT_TYPE, "application/javascript; charset=utf-8")
-                        .body(js.into_body())
+                        .body(file.data.into_body())
                         .map_err(internal);
                 },
             ),

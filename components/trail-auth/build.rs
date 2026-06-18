@@ -3,6 +3,9 @@ use std::process::Command;
 fn main() {
     // Re-run this build script when UI source changes.
     println!("cargo::rerun-if-changed=ui/src");
+    println!("cargo::rerun-if-changed=ui/xliff");
+    println!("cargo::rerun-if-changed=ui/lit-localize.json");
+    println!("cargo::rerun-if-changed=ui/vite.config.ts");
     println!("cargo::rerun-if-changed=ui/package.json");
 
     if std::env::var("APP_SKIP_WASM").as_deref() == Ok("1") {
