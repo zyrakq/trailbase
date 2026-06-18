@@ -6,14 +6,6 @@
   <source>Sign in to continue</source>
   <target>登录以继续</target>
 </trans-unit>
-<trans-unit id="sbbd340ef453ff7e4">
-  <source>Go to Dashboard</source>
-  <target>前往控制面板</target>
-</trans-unit>
-<trans-unit id="sa0edd3227b3addeb">
-  <source>Redirecting...</source>
-  <target>正在重定向...</target>
-</trans-unit>
 <trans-unit id="s5e94738a2eeb8943">
   <source>Sign In</source>
   <target>登录</target>
@@ -200,66 +192,31 @@
 </trans-unit>
 <trans-unit id="sf2c19b921d23f6a0">
   <source>Welcome to argiago</source>
+  <target>欢迎使用 argiago</target>
 </trans-unit>
 <trans-unit id="sd5ce7d0a7aec4cb7">
   <source>argiago</source>
+  <target>argiago</target>
 </trans-unit>
 <trans-unit id="sb1971760847d4502">
   <source>Argiago GitHub</source>
+  <target>Argiago GitHub</target>
 </trans-unit>
 <trans-unit id="s69e6697ac7730542">
   <source>Argiago Docs</source>
+  <target>Argiago 文档</target>
 </trans-unit>
 <trans-unit id="s78c4bde18c238d45">
   <source>Argiago Repository</source>
-</trans-unit>
-<trans-unit id="s815c4f0a6876070c">
-  <source>Please enter your email and password.</source>
-  <target>请输入您的电子邮件和密码。</target>
+  <target>Argiago 仓库</target>
 </trans-unit>
 <trans-unit id="sc5161bbf7fbb7647">
   <source>Successfully signed in.</source>
   <target>登录成功。</target>
 </trans-unit>
-<trans-unit id="s352a78e565309bc8">
-  <source>Multi-factor authentication is required. Please sign in using Kanidm or contact your administrator.</source>
-  <target>需要多因素身份验证。请使用 Kanidm 登录或联系管理员。</target>
-</trans-unit>
-<trans-unit id="sca53e5ee345b14c7">
-  <source>Invalid email or password. Please try again.</source>
-  <target>邮箱或密码无效。请重试。</target>
-</trans-unit>
-<trans-unit id="s440973a5ab778843">
-  <source>Unable to connect. Please check your internet connection and try again.</source>
-  <target>无法连接。请检查您的互联网连接并重试。</target>
-</trans-unit>
-<trans-unit id="sf249dcf6c6b6f8ed">
-  <source>Sign in failed. Please try again.</source>
-  <target>登录失败。请重试。</target>
-</trans-unit>
 <trans-unit id="s5e27738a2e8eb763">
   <source>Sign in</source>
   <target>登录</target>
-</trans-unit>
-<trans-unit id="s877a9a1a10c02489">
-  <source>Close sign in dialog</source>
-  <target>关闭登录对话框</target>
-</trans-unit>
-<trans-unit id="s6e622f3ba399d5a2">
-  <source>Continue with Kanidm</source>
-  <target>使用 Kanidm 继续</target>
-</trans-unit>
-<trans-unit id="sd6250add7a3ea7d1">
-  <source>Sign in with email and password</source>
-  <target>使用邮箱和密码登录</target>
-</trans-unit>
-<trans-unit id="s38887b94b3320533">
-  <source>Email address</source>
-  <target>电子邮件地址</target>
-</trans-unit>
-<trans-unit id="sf6e1665c7022a1f8">
-  <source>Password</source>
-  <target>密码</target>
 </trans-unit>
 <trans-unit id="s452f791e0ff6a13e">
   <source>Hide password</source>
@@ -269,13 +226,521 @@
   <source>Show password</source>
   <target>显示密码</target>
 </trans-unit>
-<trans-unit id="sd4834a205d67ccdf">
-  <source>Signing in...</source>
-  <target>登录中...</target>
+<trans-unit id="se166e95fe447ebcd">
+  <source>Close dialog</source>
+  <target>关闭对话框</target>
+</trans-unit>
+<trans-unit id="s6e2365dab460cabe">
+  <source>Loading sign-in form</source>
+  <target>正在加载登录表单</target>
+</trans-unit>
+<trans-unit id="s939b9daaa2c6b475">
+  <source>Go to Profile</source>
+  <target>前往个人资料</target>
+</trans-unit>
+<trans-unit id="sb07b1d863273d7ab">
+  <source>Switch to light theme</source>
+  <target>切换到浅色主题</target>
+</trans-unit>
+<trans-unit id="s6ce0fded45fae733">
+  <source>Switch to dark theme</source>
+  <target>切换到深色主题</target>
+</trans-unit>
+<trans-unit id="sb9bd4f5a3810b77e">
+  <source>Something went wrong</source>
+  <target>出错了</target>
+</trans-unit>
+<trans-unit id="sed82476289014e13">
+  <source>An unexpected error occurred. Please try again or contact support.</source>
+  <target>发生了意外错误。请重试或联系支持。</target>
+</trans-unit>
+<trans-unit id="s29742f41758edc87">
+  <source>Go to home</source>
+  <target>返回首页</target>
+</trans-unit>
+<trans-unit id="s92a60207dec300c0">
+  <source>Link expired</source>
+  <target>链接已过期</target>
+</trans-unit>
+<trans-unit id="see99b28e5e7d0e26">
+  <source>This link is invalid or has expired. Reset links are valid for 60 minutes.</source>
+  <target>此链接无效或已过期。重置链接有效期为 60 分钟。</target>
+</trans-unit>
+<trans-unit id="s5194241eed10c7d0">
+  <source>Request new link</source>
+  <target>请求新链接</target>
+</trans-unit>
+<trans-unit id="sabe0e1da0c0dffb9">
+  <source>Please enter a new password.</source>
+  <target>请输入新密码。</target>
+</trans-unit>
+<trans-unit id="scfa81f565f29df08">
+  <source>Passwords do not match.</source>
+  <target>密码不匹配。</target>
+</trans-unit>
+<trans-unit id="s3c7cdf8041ebca56">
+  <source>Set new password</source>
+  <target>设置新密码</target>
+</trans-unit>
+<trans-unit id="s3490e2c8b9ec6ad2">
+  <source>New password</source>
+  <target>新密码</target>
+</trans-unit>
+<trans-unit id="s418f15154f4671aa">
+  <source>Confirm new password</source>
+  <target>确认新密码</target>
+</trans-unit>
+<trans-unit id="s35bf044022d7c437">
+  <source>Password updated</source>
+  <target>密码已更新</target>
+</trans-unit>
+<trans-unit id="s5fd24301740f7f43">
+  <source>Your password has been reset. You can now sign in with your new password.</source>
+  <target>您的密码已重置。现在可以使用新密码登录。</target>
+</trans-unit>
+<trans-unit id="sf2af1a716dffbd8c">
+  <source><ph id="0">${this.queuedCount}</ph> notification</source>
+  <target><ph id="0">${this.queuedCount}</ph> 个通知</target>
+</trans-unit>
+<trans-unit id="s5f47edbde98fd84d">
+  <source><ph id="0">${this.queuedCount}</ph> notifications</source>
+  <target><ph id="0">${this.queuedCount}</ph> 个通知</target>
+</trans-unit>
+<trans-unit id="s99a0cd0ecf3ee1c4">
+  <source>Close all notifications</source>
+  <target>关闭所有通知</target>
+</trans-unit>
+<trans-unit id="sf5944cc0bdc8bc60">
+  <source>Close all</source>
+  <target>全部关闭</target>
+</trans-unit>
+<trans-unit id="s8a3c78af5a3a1be1">
+  <source>Two-factor authentication</source>
+  <target>双因素身份验证</target>
+</trans-unit>
+<trans-unit id="s3e538c7535f6f129">
+  <source>Reset password</source>
+  <target>重置密码</target>
+</trans-unit>
+<trans-unit id="s11f3987890b096c8">
+  <source>Failed to delete account. Please try again.</source>
+  <target>无法删除账户。请重试。</target>
+</trans-unit>
+<trans-unit id="sdaf3d13c3b1ec474">
+  <source>Danger Zone</source>
+  <target>危险区域</target>
+</trans-unit>
+<trans-unit id="s954da8826feec8ca">
+  <source>Permanently delete your account and all associated data. This action cannot be undone.</source>
+  <target>永久删除您的账户和所有相关数据。此操作无法撤销。</target>
+</trans-unit>
+<trans-unit id="s7d00063d92ed2821">
+  <source>Delete Account</source>
+  <target>删除账户</target>
+</trans-unit>
+<trans-unit id="s948ad98a7dba6dc4">
+  <source>This action is destructive and cannot be reverted. All your data will be permanently deleted.</source>
+  <target>此操作具有破坏性，无法撤销。您的所有数据将被永久删除。</target>
+</trans-unit>
+<trans-unit id="s64e8cdefe1dc8061">
+  <source>Deleting...</source>
+  <target>正在删除...</target>
+</trans-unit>
+<trans-unit id="sdc673e73b5c13aea">
+  <source>Delete</source>
+  <target>删除</target>
+</trans-unit>
+<trans-unit id="s22106eb0affe368b">
+  <source>Avatar upload failed. Please try again.</source>
+  <target>头像上传失败。请重试。</target>
+</trans-unit>
+<trans-unit id="sebba7336e98a95ed">
+  <source>Failed to remove avatar. Please try again.</source>
+  <target>无法删除头像。请重试。</target>
+</trans-unit>
+<trans-unit id="se7692167f1edeef2">
+  <source>Uploading...</source>
+  <target>正在上传...</target>
+</trans-unit>
+<trans-unit id="s2f64461723d3df5d">
+  <source>Change</source>
+  <target>更改</target>
+</trans-unit>
+<trans-unit id="s6210b400a0196334">
+  <source>Removing...</source>
+  <target>正在移除...</target>
+</trans-unit>
+<trans-unit id="sea4f08110bb8f15d">
+  <source>Remove</source>
+  <target>移除</target>
+</trans-unit>
+<trans-unit id="s6adba329b433a53e">
+  <source>Please enter a valid email address.</source>
+  <target>请输入有效的电子邮件地址。</target>
+</trans-unit>
+<trans-unit id="sd44c1babed6d5b6d">
+  <source>Email already in use</source>
+  <target>电子邮件已被使用</target>
+</trans-unit>
+<trans-unit id="sc9fa9a572e13993e">
+  <source>Please wait before trying again</source>
+  <target>请稍候再试</target>
+</trans-unit>
+<trans-unit id="s7f41db41f313b7f1">
+  <source>Invalid request</source>
+  <target>无效请求</target>
+</trans-unit>
+<trans-unit id="s75c1bd0b06b8ba25">
+  <source>Failed to request email change. Please try again.</source>
+  <target>无法请求更改电子邮件。请重试。</target>
+</trans-unit>
+<trans-unit id="sf9bf8133c2196bd9">
+  <source>Verification email sent to</source>
+  <target>验证邮件已发送至</target>
+</trans-unit>
+<trans-unit id="sc16e00a7a8b2fde2">
+  <source>Back</source>
+  <target>返回</target>
+</trans-unit>
+<trans-unit id="s9935205555f03661">
+  <source>At least <ph id="0">${minLength}</ph> characters</source>
+  <target>至少 <ph id="0">${minLength}</ph> 个字符</target>
+</trans-unit>
+<trans-unit id="s85efe82068b2ba1b">
+  <source>Both upper and lower case letters</source>
+  <target>同时包含大写和小写字母</target>
+</trans-unit>
+<trans-unit id="sfa7323daaccd9ff4">
+  <source>At least one digit</source>
+  <target>至少一个数字</target>
+</trans-unit>
+<trans-unit id="sa9ea759946c2c691">
+  <source>At least one special character</source>
+  <target>至少一个特殊字符</target>
+</trans-unit>
+<trans-unit id="sbe6366bacf476146">
+  <source>Current password is incorrect</source>
+  <target>当前密码不正确</target>
+</trans-unit>
+<trans-unit id="s4ebb89dbb477b629">
+  <source>Password does not meet requirements</source>
+  <target>密码不符合要求</target>
+</trans-unit>
+<trans-unit id="s6d84c67f663fb24d">
+  <source>Too many attempts. Please try again later.</source>
+  <target>尝试次数过多。请稍后再试。</target>
+</trans-unit>
+<trans-unit id="seda6e7a56c9a25b9">
+  <source>Failed to change password. Please try again.</source>
+  <target>无法更改密码。请重试。</target>
+</trans-unit>
+<trans-unit id="sfee74640068abc13">
+  <source>Current password</source>
+  <target>当前密码</target>
+</trans-unit>
+<trans-unit id="sdfe2fbe3700c436b">
+  <source>Changing password...</source>
+  <target>正在更改密码...</target>
+</trans-unit>
+<trans-unit id="s94f83322f089fbae">
+  <source>Create password</source>
+  <target>创建密码</target>
+</trans-unit>
+<trans-unit id="sff50532a2d85e32e">
+  <source>Change password</source>
+  <target>更改密码</target>
+</trans-unit>
+<trans-unit id="s07f07b015a0ee529">
+  <source>Password changed successfully</source>
+  <target>密码修改成功</target>
+</trans-unit>
+<trans-unit id="s0379fc73608ab971">
+  <source>Done</source>
+  <target>完成</target>
+</trans-unit>
+<trans-unit id="s922a5d4948c360b0">
+  <source>Failed to disable two-factor authentication. Please try again.</source>
+  <target>无法禁用双因素身份验证。请重试。</target>
+</trans-unit>
+<trans-unit id="s9b06fbe4c999e2ea">
+  <source>Add an extra layer of security to your account by requiring a code from your authenticator app when signing in.</source>
+  <target>通过在登录时要求您的身份验证器应用提供代码，为您的账户添加额外的安全层。</target>
+</trans-unit>
+<trans-unit id="s49730f3d5751a433">
+  <source>Loading...</source>
+  <target>加载中...</target>
+</trans-unit>
+<trans-unit id="s3d66aaab91b1e364">
+  <source>Enable two-factor authentication</source>
+  <target>启用双因素身份验证</target>
+</trans-unit>
+<trans-unit id="sfdf28b982ab5bfb3">
+  <source>Scan the QR code with your authenticator app, then enter the 6-digit code to verify.</source>
+  <target>使用您的身份验证器应用扫描二维码，然后输入 6 位代码进行验证。</target>
+</trans-unit>
+<trans-unit id="sb24b8e7c6df71830">
+  <source>TOTP QR code</source>
+  <target>TOTP 二维码</target>
+</trans-unit>
+<trans-unit id="sf1410dfa4033c312">
+  <source>Manual entry key:</source>
+  <target>手动输入密钥：</target>
+</trans-unit>
+<trans-unit id="s30d6ff9e15e0a40a">
+  <source>Verifying...</source>
+  <target>正在验证...</target>
+</trans-unit>
+<trans-unit id="s9e4fdbe8cd2f6c80">
+  <source>Verify and enable</source>
+  <target>验证并启用</target>
+</trans-unit>
+<trans-unit id="s1cfffeb326f3e4be">
+  <source>Two-factor authentication is enabled</source>
+  <target>双因素身份验证已启用</target>
+</trans-unit>
+<trans-unit id="s87cf58d0578b4fa5">
+  <source>Disable two-factor authentication</source>
+  <target>禁用双因素身份验证</target>
+</trans-unit>
+<trans-unit id="s2756c24166f19e64">
+  <source>Enter your current authenticator code to disable two-factor authentication.</source>
+  <target>输入您当前的身份验证器代码以禁用双因素身份验证。</target>
+</trans-unit>
+<trans-unit id="se1b1f6c54bc50c33">
+  <source>Current code</source>
+  <target>当前代码</target>
+</trans-unit>
+<trans-unit id="s8e57f7bed3b96e8b">
+  <source>Confirm disable</source>
+  <target>确认禁用</target>
+</trans-unit>
+<trans-unit id="s2ceb11be2290bb1b">
+  <source>Cancel</source>
+  <target>取消</target>
+</trans-unit>
+<trans-unit id="s01a8d45397ec133b">
+  <source>Security</source>
+  <target>安全</target>
+</trans-unit>
+<trans-unit id="sb061ff5a347a296e">
+  <source>Profile</source>
+  <target>个人资料</target>
+</trans-unit>
+<trans-unit id="sd6250add7a3ea7d1">
+  <source>Sign in with email and password</source>
+  <target>使用电子邮件和密码登录</target>
+</trans-unit>
+<trans-unit id="sc84410561a2a8073">
+  <source>Create an account</source>
+  <target>创建账户</target>
+</trans-unit>
+<trans-unit id="sbf6a0dbc8a792e9d">
+  <source>If this email address is registered, you'll receive a reset link shortly. Check your inbox.</source>
+  <target>如果此电子邮件地址已注册，您将很快收到重置链接。请检查您的收件箱。</target>
+</trans-unit>
+<trans-unit id="scedf77e8b75cad5a">
+  <source>Please enter your email address.</source>
+  <target>请输入您的电子邮件地址。</target>
+</trans-unit>
+<trans-unit id="s451d166d45726604">
+  <source>A reset link was already sent. Check your inbox or wait 1 hour before trying again.</source>
+  <target>重置链接已发送。请检查您的收件箱或等待 1 小时后再试。</target>
+</trans-unit>
+<trans-unit id="se9b201958e0bc004">
+  <source>Network error. Please check your connection.</source>
+  <target>网络错误。请检查您的连接。</target>
+</trans-unit>
+<trans-unit id="s539cc7126a88f5a8">
+  <source>An error occurred. Please try again.</source>
+  <target>发生错误。请重试。</target>
+</trans-unit>
+<trans-unit id="s11742bb831d6ea93">
+  <source>Enter your email address and we'll send you a reset link.</source>
+  <target>输入您的电子邮件地址，我们将向您发送重置链接。</target>
+</trans-unit>
+<trans-unit id="s2bc085f4279e8528">
+  <source>Send reset link</source>
+  <target>发送重置链接</target>
+</trans-unit>
+<trans-unit id="s4e4512611eeac0f0">
+  <source>Please enter the 6-digit code from your authenticator app.</source>
+  <target>请输入您的身份验证器应用中的 6 位代码。</target>
+</trans-unit>
+<trans-unit id="s05b0cd636ec6a22e">
+  <source>Invalid code. Please try again.</source>
+  <target>无效代码。请重试。</target>
+</trans-unit>
+<trans-unit id="sb47b0b39e28f35a8">
+  <source>Verification failed. Please try again.</source>
+  <target>验证失败。请重试。</target>
+</trans-unit>
+<trans-unit id="seca9f9bcc44c906c">
+  <source>Enter the 6-digit code from your authenticator app.</source>
+  <target>输入您的身份验证器应用中的 6 位代码。</target>
+</trans-unit>
+<trans-unit id="s1d3e412955e528f7">
+  <source>Verification code</source>
+  <target>验证码</target>
+</trans-unit>
+<trans-unit id="s067e961bb67cf3f6">
+  <source>Verifying…</source>
+  <target>正在验证…</target>
+</trans-unit>
+<trans-unit id="sc2b6c18334a4a2c4">
+  <source>Verify</source>
+  <target>验证</target>
+</trans-unit>
+<trans-unit id="s8116180a3ff4936f">
+  <source>Back to sign in</source>
+  <target>返回登录</target>
+</trans-unit>
+<trans-unit id="s815c4f0a6876070c">
+  <source>Please enter your email and password.</source>
+  <target>请输入您的电子邮件和密码。</target>
+</trans-unit>
+<trans-unit id="sca53e5ee345b14c7">
+  <source>Invalid email or password. Please try again.</source>
+  <target>无效的电子邮件或密码。请重试。</target>
+</trans-unit>
+<trans-unit id="s440973a5ab778843">
+  <source>Unable to connect. Please check your internet connection and try again.</source>
+  <target>无法连接。请检查您的互联网连接并重试。</target>
+</trans-unit>
+<trans-unit id="sf249dcf6c6b6f8ed">
+  <source>Sign in failed. Please try again.</source>
+  <target>登录失败。请重试。</target>
+</trans-unit>
+<trans-unit id="s38887b94b3320533">
+  <source>Email address</source>
+  <target>电子邮件地址</target>
+</trans-unit>
+<trans-unit id="sf6e1665c7022a1f8">
+  <source>Password</source>
+  <target>密码</target>
+</trans-unit>
+<trans-unit id="s85366fac18679f28">
+  <source>Forgot password?</source>
+  <target>忘记密码？</target>
+</trans-unit>
+<trans-unit id="s59169c4e8fbcdccf">
+  <source>Signing in…</source>
+  <target>正在登录…</target>
 </trans-unit>
 <trans-unit id="s535205a9a936dacd">
   <source>Back to sign in options</source>
   <target>返回登录选项</target>
+</trans-unit>
+<trans-unit id="s829c029ff2b2f5ce">
+  <source>Check your inbox</source>
+  <target>请检查您的收件箱</target>
+</trans-unit>
+<trans-unit id="s8d85cfe2f59f0366">
+  <source>If this email isn't registered yet, a verification link has been sent. Please check your inbox and click the link to complete sign in.</source>
+  <target>如果此电子邮件尚未注册，则已发送验证链接。请检查您的收件箱并点击链接以完成登录。</target>
+</trans-unit>
+<trans-unit id="s86c6967126989c25">
+  <source>Verification email resent.</source>
+  <target>验证邮件已重新发送。</target>
+</trans-unit>
+<trans-unit id="s18db9d04bed5f64b">
+  <source>You can request a new link in a few hours.</source>
+  <target>您可以在几小时后请求新链接。</target>
+</trans-unit>
+<trans-unit id="s3e59d1d45febe1b3">
+  <source>Could not send the email. Please contact support.</source>
+  <target>无法发送邮件。请联系支持人员。</target>
+</trans-unit>
+<trans-unit id="s6ead281adf0d371d">
+  <source>Sending…</source>
+  <target>正在发送…</target>
+</trans-unit>
+<trans-unit id="s97ee1bd2cffede65">
+  <source>Resend verification email</source>
+  <target>重新发送验证邮件</target>
+</trans-unit>
+<trans-unit id="sb6a33664b18e690d">
+  <source>Sign in instead</source>
+  <target>改为登录</target>
+</trans-unit>
+<trans-unit id="s873adbcb887edaec">
+  <source>Account created</source>
+  <target>账户已创建</target>
+</trans-unit>
+<trans-unit id="sb129b4b64f55ab36">
+  <source>Your account has been created, but we could not send a verification email.</source>
+  <target>您的账户已创建，但我们无法发送验证邮件。</target>
+</trans-unit>
+<trans-unit id="s0543f88e7d397d64">
+  <source>Please contact support to verify your account and complete sign in.</source>
+  <target>请联系支持人员以验证您的账户并完成登录。</target>
+</trans-unit>
+<trans-unit id="s5e8250fb85d64c23">
+  <source>Close</source>
+  <target>关闭</target>
+</trans-unit>
+<trans-unit id="s82f8493b0823a619">
+  <source>Please fill in all fields.</source>
+  <target>请填写所有字段。</target>
+</trans-unit>
+<trans-unit id="s29a999ba183cddb3">
+  <source>This email is already registered. Please sign in instead.</source>
+  <target>此电子邮件已注册。请改为登录。</target>
+</trans-unit>
+<trans-unit id="s55e14946061017ae">
+  <source>Password does not meet requirements. Please choose a stronger password.</source>
+  <target>密码不符合要求。请选择更强的密码。</target>
+</trans-unit>
+<trans-unit id="s8038a46c043af486">
+  <source>Registration is currently disabled. Please contact an administrator.</source>
+  <target>注册当前已禁用。请联系管理员。</target>
+</trans-unit>
+<trans-unit id="s6590be55b885eab6">
+  <source>Registration failed. Please try again.</source>
+  <target>注册失败。请重试。</target>
+</trans-unit>
+<trans-unit id="s5515a136187c74c0">
+  <source>Confirm password</source>
+  <target>确认密码</target>
+</trans-unit>
+<trans-unit id="s7e736d1dc11355d1">
+  <source>Creating account…</source>
+  <target>正在创建账户…</target>
+</trans-unit>
+<trans-unit id="s0c97387dc725a9e2">
+  <source>Create account</source>
+  <target>创建账户</target>
+</trans-unit>
+<trans-unit id="s643b46be37d2cf15">
+  <source>Your password has been updated successfully.</source>
+  <target>您的密码已成功更新。</target>
+</trans-unit>
+<trans-unit id="s53aeb14de19dd0f6">
+  <source>Passwords do not match</source>
+  <target>密码不匹配</target>
+</trans-unit>
+<trans-unit id="s736157452e7fc7af">
+  <source>Something went wrong. Please try again.</source>
+  <target>出错了。请重试。</target>
+</trans-unit>
+<trans-unit id="s0f788e783a2383a8">
+  <source>This password reset link is invalid or has expired.</source>
+  <target>此密码重置链接无效或已过期。</target>
+</trans-unit>
+<trans-unit id="s87ae843b8b424681">
+  <source>Request a new link</source>
+  <target>请求新链接</target>
+</trans-unit>
+<trans-unit id="s5e02110f25c02642">
+  <source>Setting password...</source>
+  <target>正在设置密码...</target>
+</trans-unit>
+<trans-unit id="sf7d93e17ec4b1219">
+  <source>...</source>
+  <target>...</target>
+</trans-unit>
+<trans-unit id="sa20e55c96617cba0">
+  <source>Check your inbox.</source>
+  <target>请检查您的收件箱。</target>
 </trans-unit>
 </body>
 </file>

@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { authSharedStyles } from '../styles.ts';
 import { eyeIcon, eyeSlashIcon } from '../icons.ts';
 import {
@@ -18,6 +20,7 @@ import {
  * - trail-auth-navigate: { view: 'choice' }
  */
 @customElement('trail-auth-password')
+@localized()
 export class TrailAuthPasswordView extends LitElement {
   @property({ type: String }) initialEmail = '';
 
@@ -75,7 +78,7 @@ export class TrailAuthPasswordView extends LitElement {
     const trimmedPassword = this.password;
 
     if (!trimmedEmail || !trimmedPassword) {
-      this.errorMessage = 'Please enter your email and password.';
+      this.errorMessage = msg('Please enter your email and password.');
       return;
     }
 
@@ -103,17 +106,18 @@ export class TrailAuthPasswordView extends LitElement {
       if (error instanceof AuthClientError) {
         switch (error.code) {
           case AuthErrorCode.INVALID_CREDENTIALS:
-            this.errorMessage = 'Invalid email or password. Please try again.';
+            this.errorMessage = msg('Invalid email or password. Please try again.');
             break;
           case AuthErrorCode.NETWORK_ERROR:
-            this.errorMessage =
-              'Unable to connect. Please check your internet connection and try again.';
+            this.errorMessage = msg(
+              'Unable to connect. Please check your internet connection and try again.'
+            );
             break;
           default:
-            this.errorMessage = 'Sign in failed. Please try again.';
+            this.errorMessage = msg('Sign in failed. Please try again.');
         }
       } else {
-        this.errorMessage = 'Sign in failed. Please try again.';
+        this.errorMessage = msg('Sign in failed. Please try again.');
       }
     } finally {
       this.isLoading = false;
@@ -124,7 +128,7 @@ export class TrailAuthPasswordView extends LitElement {
     return html`
       <form class="password-form" @submit=${this.handleSubmit}>
         <div class="form-field">
-          <label for="auth-email">Email address</label>
+          <label for="auth-email">${msg('Email address')}</label>
           <input
             id="auth-email"
             type="email"
@@ -137,7 +141,7 @@ export class TrailAuthPasswordView extends LitElement {
         </div>
 
         <div class="form-field password-field">
-          <label for="auth-password">Password</label>
+          <label for="auth-password">${msg('Password')}</label>
           <div class="password-input-wrapper">
             <input
               id="auth-password"
@@ -152,7 +156,7 @@ export class TrailAuthPasswordView extends LitElement {
               type="button"
               class="password-toggle"
               @click=${this.togglePasswordVisibility}
-              aria-label=${this.showPassword ? 'Hide password' : 'Show password'}
+              aria-label=${this.showPassword ? msg('Hide password') : msg('Show password')}
               ?disabled=${this.isLoading}
             >
               ${this.showPassword ? eyeSlashIcon() : eyeIcon()}
@@ -166,7 +170,7 @@ export class TrailAuthPasswordView extends LitElement {
           @click=${this.handleForgotPassword}
           ?disabled=${this.isLoading}
         >
-          Forgot password?
+          ${msg('Forgot password?')}
         </button>
 
         ${this.errorMessage
@@ -174,12 +178,12 @@ export class TrailAuthPasswordView extends LitElement {
           : ''}
 
         <button type="submit" class="btn btn-primary" ?disabled=${this.isLoading}>
-          ${this.isLoading ? 'Signing in\u2026' : 'Sign in'}
+          ${this.isLoading ? msg('Signing in\u2026') : msg('Sign in')}
         </button>
       </form>
 
       <button class="back-link" @click=${this.handleBack} ?disabled=${this.isLoading}>
-        Back to sign in options
+        ${msg('Back to sign in options')}
       </button>
     `;
   }

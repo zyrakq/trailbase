@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { uploadAvatar, deleteAvatar, AuthClientError } from './api/auth-client.ts';
 import { userIcon } from './icons.ts';
 
@@ -14,6 +16,7 @@ import { userIcon } from './icons.ts';
  * - `trail-profile-avatar-changed` — fired after successful upload or delete
  */
 @customElement('trail-profile-avatar')
+@localized()
 export class TrailProfileAvatar extends LitElement {
   @property({ type: String }) userId = '';
 
@@ -65,7 +68,7 @@ export class TrailProfileAvatar extends LitElement {
       );
     } catch (err) {
       this.errorMessage =
-        err instanceof AuthClientError ? err.message : 'Avatar upload failed. Please try again.';
+        err instanceof AuthClientError ? err.message : msg('Avatar upload failed. Please try again.');
     } finally {
       this.uploading = false;
     }
@@ -84,7 +87,7 @@ export class TrailProfileAvatar extends LitElement {
       );
     } catch (err) {
       this.errorMessage =
-        err instanceof AuthClientError ? err.message : 'Failed to remove avatar. Please try again.';
+        err instanceof AuthClientError ? err.message : msg('Failed to remove avatar. Please try again.');
     } finally {
       this.deleting = false;
     }
@@ -106,7 +109,7 @@ export class TrailProfileAvatar extends LitElement {
             class="avatar-image"
             @error=${this.handleAvatarError}
           >
-            <div class="avatar-fallback">${userIcon(36)}</div>
+            <div class="avatar-fallback">${userIcon()}</div>
           </object>
           ${this.uploading
             ? html`<div class="avatar-loading-overlay"><div class="spinner"></div></div>`
@@ -119,7 +122,7 @@ export class TrailProfileAvatar extends LitElement {
             ?disabled=${this.isBusy}
             @click=${this.handleChangeClick}
           >
-            ${this.uploading ? 'Uploading...' : 'Change'}
+            ${this.uploading ? msg('Uploading...') : msg('Change')}
           </button>
           ${hasAvatar
             ? html`<button
@@ -127,7 +130,7 @@ export class TrailProfileAvatar extends LitElement {
                 ?disabled=${this.isBusy}
                 @click=${this.handleRemove}
               >
-                ${this.deleting ? 'Removing...' : 'Remove'}
+                ${this.deleting ? msg('Removing...') : msg('Remove')}
               </button>`
             : ''}
         </div>

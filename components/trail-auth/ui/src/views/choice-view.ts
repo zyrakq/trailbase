@@ -1,5 +1,7 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { msg } from "@lit/localize";
+import { localized } from "@/features/localization";
 import { authSharedStyles } from "../styles.ts";
 import type { OAuthProvider } from "../api/auth-client.ts";
 
@@ -11,6 +13,7 @@ import type { OAuthProvider } from "../api/auth-client.ts";
  * - trail-auth-close: (before OAuth redirect so host can close modal cleanly)
  */
 @customElement("trail-auth-choice")
+@localized()
 export class TrailAuthChoiceView extends LitElement {
   @property({ type: Boolean }) passwordAuthEnabled = true;
   @property({ type: Boolean }) registrationEnabled = true;
@@ -68,7 +71,7 @@ export class TrailAuthChoiceView extends LitElement {
                 class="btn btn-primary"
                 @click=${() => this.navigate("password")}
               >
-                Sign in with email and password
+                ${msg("Sign in with email and password")}
               </button>
             `
           : nothing}
@@ -79,7 +82,7 @@ export class TrailAuthChoiceView extends LitElement {
                 class="btn btn-secondary"
                 @click=${() => this.navigate("register")}
               >
-                Create an account
+                ${msg("Create an account")}
               </button>
             `
           : nothing}

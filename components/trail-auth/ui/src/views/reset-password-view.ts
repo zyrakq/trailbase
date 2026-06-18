@@ -1,9 +1,12 @@
 import { LitElement, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { authSharedStyles } from '../styles.ts';
 import { updatePassword, AuthClientError, AuthErrorCode } from '../api/auth-client.ts';
 
 @customElement('trail-auth-reset-password')
+@localized()
 export class TrailAuthResetPassword extends LitElement {
   @property({ type: String }) token = '';
 
@@ -19,7 +22,7 @@ export class TrailAuthResetPassword extends LitElement {
     if (this.isLoading) return;
 
     if (this.password !== this.confirmPassword) {
-      this.errorMessage = 'Passwords do not match';
+      this.errorMessage = msg('Passwords do not match');
       return;
     }
     if (!this.token) {
@@ -47,9 +50,9 @@ export class TrailAuthResetPassword extends LitElement {
       ) {
         this.invalidToken = true;
       } else if (err instanceof AuthClientError) {
-        this.errorMessage = 'Password does not meet requirements. Please choose a stronger password.';
+        this.errorMessage = msg('Password does not meet requirements. Please choose a stronger password.');
       } else {
-        this.errorMessage = 'Something went wrong. Please try again.';
+        this.errorMessage = msg('Something went wrong. Please try again.');
       }
     } finally {
       this.isLoading = false;
@@ -60,7 +63,7 @@ export class TrailAuthResetPassword extends LitElement {
     if (this.invalidToken) {
       return html`
         <div class="invalid-token">
-          <p class="error-message">This password reset link is invalid or has expired.</p>
+          <p class="error-message">${msg('This password reset link is invalid or has expired.')}</p>
           <button
             class="btn btn-ghost"
             @click=${() =>
@@ -72,7 +75,7 @@ export class TrailAuthResetPassword extends LitElement {
                 })
               )}
           >
-            Request a new link
+            ${msg('Request a new link')}
           </button>
         </div>
       `;
@@ -81,13 +84,13 @@ export class TrailAuthResetPassword extends LitElement {
     return html`
       <form class="form" @submit=${this.handleSubmit} novalidate>
         <div class="form-field">
-          <label for="trail-reset-password">New password</label>
+          <label for="trail-reset-password">${msg('New password')}</label>
           <div class="input-wrapper">
             <input
               id="trail-reset-password"
               type=${this.showPassword ? 'text' : 'password'}
               autocomplete="new-password"
-              placeholder="New password"
+              placeholder=${msg('New password')}
               .value=${this.password}
               @input=${(e: Event) => {
                 this.password = (e.target as HTMLInputElement).value;
@@ -100,13 +103,13 @@ export class TrailAuthResetPassword extends LitElement {
         </div>
 
         <div class="form-field">
-          <label for="trail-reset-confirm">Confirm password</label>
+          <label for="trail-reset-confirm">${msg('Confirm password')}</label>
           <div class="input-wrapper">
             <input
               id="trail-reset-confirm"
               type=${this.showPassword ? 'text' : 'password'}
               autocomplete="new-password"
-              placeholder="Confirm new password"
+              placeholder=${msg('Confirm new password')}
               .value=${this.confirmPassword}
               @input=${(e: Event) => {
                 this.confirmPassword = (e.target as HTMLInputElement).value;
@@ -127,7 +130,7 @@ export class TrailAuthResetPassword extends LitElement {
           class="btn btn-primary"
           ?disabled=${this.isLoading || !this.password || !this.confirmPassword}
         >
-          ${this.isLoading ? 'Setting password...' : 'Set new password'}
+          ${this.isLoading ? msg('Setting password...') : msg('Set new password')}
         </button>
       </form>
     `;

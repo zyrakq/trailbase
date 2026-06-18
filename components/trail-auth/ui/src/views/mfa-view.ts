@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { authSharedStyles } from '../styles.ts';
 import { loginWithMfa, AuthClientError, AuthErrorCode } from '../api/auth-client.ts';
 
@@ -11,6 +13,7 @@ import { loginWithMfa, AuthClientError, AuthErrorCode } from '../api/auth-client
  * - trail-auth-navigate: { view: 'password' }
  */
 @customElement('trail-auth-mfa')
+@localized()
 export class TrailAuthMfaView extends LitElement {
   @property({ type: String }) mfaToken = '';
 
@@ -40,7 +43,7 @@ export class TrailAuthMfaView extends LitElement {
 
     const code = this.mfaCode.trim();
     if (code.length !== 6) {
-      this.errorMessage = 'Please enter the 6-digit code from your authenticator app.';
+      this.errorMessage = msg('Please enter the 6-digit code from your authenticator app.');
       return;
     }
 
@@ -54,12 +57,13 @@ export class TrailAuthMfaView extends LitElement {
       );
     } catch (error) {
       if (error instanceof AuthClientError && error.code === AuthErrorCode.INVALID_CREDENTIALS) {
-        this.errorMessage = 'Invalid code. Please try again.';
+        this.errorMessage = msg('Invalid code. Please try again.');
       } else if (error instanceof AuthClientError && error.code === AuthErrorCode.NETWORK_ERROR) {
-        this.errorMessage =
-          'Unable to connect. Please check your internet connection and try again.';
+        this.errorMessage = msg(
+          'Unable to connect. Please check your internet connection and try again.'
+        );
       } else {
-        this.errorMessage = 'Verification failed. Please try again.';
+        this.errorMessage = msg('Verification failed. Please try again.');
       }
     } finally {
       this.isLoading = false;
@@ -69,10 +73,10 @@ export class TrailAuthMfaView extends LitElement {
   render() {
     return html`
       <form class="password-form" @submit=${this.handleSubmit}>
-        <p class="mfa-subtitle">Enter the 6-digit code from your authenticator app.</p>
+        <p class="mfa-subtitle">${msg('Enter the 6-digit code from your authenticator app.')}</p>
 
         <div class="form-field">
-          <label for="mfa-code">Verification code</label>
+          <label for="mfa-code">${msg('Verification code')}</label>
           <input
             id="mfa-code"
             type="text"
@@ -96,12 +100,12 @@ export class TrailAuthMfaView extends LitElement {
           class="btn btn-primary"
           ?disabled=${this.isLoading || this.mfaCode.length !== 6}
         >
-          ${this.isLoading ? 'Verifying\u2026' : 'Verify'}
+          ${this.isLoading ? msg('Verifying\u2026') : msg('Verify')}
         </button>
       </form>
 
       <button class="back-link" @click=${this.handleBack} ?disabled=${this.isLoading}>
-        Back to sign in
+        ${msg('Back to sign in')}
       </button>
     `;
   }

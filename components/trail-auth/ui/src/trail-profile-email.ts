@@ -1,10 +1,13 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { changeEmail, AuthClientError, AuthErrorCode } from './api/auth-client.ts';
 
 type EmailState = 'editing' | 'submitting' | 'verification-sent';
 
 @customElement('trail-profile-email')
+@localized()
 export class TrailProfileEmail extends LitElement {
   @property({ type: String }) currentEmail = '';
 
@@ -24,7 +27,7 @@ export class TrailProfileEmail extends LitElement {
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailPattern.test(this.emailValue)) {
-      this.errorMessage = 'Please enter a valid email address.';
+      this.errorMessage = msg('Please enter a valid email address.');
       return;
     }
 
@@ -41,19 +44,19 @@ export class TrailProfileEmail extends LitElement {
       if (err instanceof AuthClientError) {
         switch (err.code) {
           case AuthErrorCode.EMAIL_TAKEN:
-            this.errorMessage = 'Email already in use';
+            this.errorMessage = msg('Email already in use');
             break;
           case AuthErrorCode.RATE_LIMITED:
-            this.errorMessage = 'Please wait before trying again';
+            this.errorMessage = msg('Please wait before trying again');
             break;
           case AuthErrorCode.BAD_REQUEST:
-            this.errorMessage = err.message || 'Invalid request';
+            this.errorMessage = err.message || msg('Invalid request');
             break;
           default:
-            this.errorMessage = 'Failed to request email change. Please try again.';
+            this.errorMessage = msg('Failed to request email change. Please try again.');
         }
       } else {
-        this.errorMessage = 'Failed to request email change. Please try again.';
+        this.errorMessage = msg('Failed to request email change. Please try again.');
       }
       this.state = 'editing';
     }
@@ -74,7 +77,7 @@ export class TrailProfileEmail extends LitElement {
     return html`
       <form @submit=${this.handleSubmit}>
         <div class="form-field">
-          <label for="trail-email-input">Email</label>
+          <label for="trail-email-input">${msg('Email')}</label>
           <div class="input-wrapper">
             <input
               id="trail-email-input"
@@ -93,7 +96,7 @@ export class TrailProfileEmail extends LitElement {
               class="btn-inline"
               ?disabled=${isSubmitting || isUnchanged || !isValid}
             >
-              ${isSubmitting ? '...' : 'Change'}
+              ${isSubmitting ? msg('...') : msg('Change')}
             </button>
           </div>
         </div>
@@ -108,16 +111,16 @@ export class TrailProfileEmail extends LitElement {
   private renderVerificationSent() {
     return html`
       <div class="success-message">
-        Verification email sent to <strong>${this.emailValue}</strong>. Check your inbox.
+        ${msg('Verification email sent to')} <strong>${this.emailValue}</strong>. ${msg('Check your inbox.')}
       </div>
-      <button class="btn-back" @click=${this.handleBack}>Back</button>
+      <button class="btn-back" @click=${this.handleBack}>${msg('Back')}</button>
     `;
   }
 
   render() {
     return html`
       <div class="card">
-        <h2 class="card-title">Email</h2>
+        <h2 class="card-title">${msg('Email')}</h2>
         ${this.state === 'verification-sent'
           ? this.renderVerificationSent()
           : this.renderEditing()}

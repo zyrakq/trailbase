@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { authSharedStyles } from '../styles.ts';
 import { resendVerificationEmail, AuthClientError, AuthErrorCode } from '../api/auth-client.ts';
 
@@ -13,6 +15,7 @@ type ResendState = 'idle' | 'loading' | 'sent' | 'rate-limited' | 'smtp-error';
  * - trail-auth-close (SMTP broken — no verification possible)
  */
 @customElement('trail-auth-register-success')
+@localized()
 export class TrailAuthRegisterSuccessView extends LitElement {
   @property({ type: String }) email = '';
   @property({ type: Boolean }) emailSent = false;
@@ -62,21 +65,18 @@ export class TrailAuthRegisterSuccessView extends LitElement {
         <div class="success-icon" aria-hidden="true">✓</div>
         ${this.emailSent
           ? html`
-              <p class="success-title">Check your inbox</p>
-              <p class="success-message">
-                If this email isn't registered yet, a verification link has been sent. Please check
-                your inbox and click the link to complete sign in.
-              </p>
+              <p class="success-title">${msg('Check your inbox')}</p>
+              <p class="success-message">${msg("If this email isn't registered yet, a verification link has been sent. Please check your inbox and click the link to complete sign in.")}</p>
 
               ${this.resendState === 'sent'
-                ? html`<p class="resend-confirmation">Verification email resent.</p>`
+                ? html`<p class="resend-confirmation">${msg('Verification email resent.')}</p>`
                 : this.resendState === 'rate-limited'
                   ? html`<p class="resend-rate-limited">
-                      You can request a new link in a few hours.
+                      ${msg('You can request a new link in a few hours.')}
                     </p>`
                   : this.resendState === 'smtp-error'
                     ? html`<p class="resend-smtp-error">
-                        Could not send the email. Please contact support.
+                        ${msg('Could not send the email. Please contact support.')}
                       </p>`
                     : ''}
 
@@ -88,22 +88,18 @@ export class TrailAuthRegisterSuccessView extends LitElement {
                 this.resendState === 'rate-limited' ||
                 this.resendState === 'smtp-error'}
               >
-                ${this.resendState === 'loading' ? 'Sending\u2026' : 'Resend verification email'}
+                ${this.resendState === 'loading' ? msg('Sending…') : msg('Resend verification email')}
               </button>
 
               <button class="btn btn-primary" @click=${this.handleSignInInstead}>
-                Sign in instead
+                ${msg('Sign in instead')}
               </button>
             `
           : html`
-              <p class="success-title">Account created</p>
-              <p class="success-message">
-                Your account has been created, but we could not send a verification email.
-              </p>
-              <p class="success-message">
-                Please contact support to verify your account and complete sign in.
-              </p>
-              <button class="btn btn-primary" @click=${this.handleClose}>Close</button>
+              <p class="success-title">${msg('Account created')}</p>
+              <p class="success-message">${msg('Your account has been created, but we could not send a verification email.')}</p>
+              <p class="success-message">${msg('Please contact support to verify your account and complete sign in.')}</p>
+              <button class="btn btn-primary" @click=${this.handleClose}>${msg('Close')}</button>
             `}
       </div>
     `;

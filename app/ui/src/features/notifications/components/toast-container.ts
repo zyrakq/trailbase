@@ -1,5 +1,7 @@
 import { LitElement, html } from 'lit';
 import { customElement, state, query } from 'lit/decorators.js';
+import { msg, str } from '@lit/localize';
+import { localized } from '@/features/localization';
 import type { Notification } from '../types/notification.types.ts';
 import './toast-notification.ts';
 import './notification-modal.ts';
@@ -15,6 +17,7 @@ interface NotificationTimer {
 }
 
 @customElement('toast-container')
+@localized()
 export class ToastContainer extends LitElement {
   private static readonly MAX_VISIBLE_NOTIFICATIONS = 4;
   private static readonly DEFAULT_DURATION = 5000;
@@ -343,15 +346,16 @@ export class ToastContainer extends LitElement {
           ? html`
               <div class="queue-actions">
                 <div class="queue-badge" @click=${this.handleQueueBadgeClick}>
-                  + ${this.queuedCount}
-                  уведомление${this.queuedCount > 1 ? 'й' : 'е'}
+                  + ${this.queuedCount === 1
+                    ? msg(str`${this.queuedCount} notification`)
+                    : msg(str`${this.queuedCount} notifications`)}
                 </div>
                 <button
                   class="clear-all-button"
                   @click=${this.clearAllNotifications}
-                  title="Закрыть все уведомления"
+                  title=${msg('Close all notifications')}
                 >
-                  <span>✕</span>Закрыть все
+                  <span>✕</span>${msg('Close all')}
                 </button>
               </div>
             `

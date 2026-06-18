@@ -1,11 +1,14 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { msg, str } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { changePassword, setPassword, AuthClientError, AuthErrorCode, type PasswordPolicy } from './api/auth-client.ts';
 import { eyeIcon, eyeSlashIcon } from './icons.ts';
 
 type PasswordState = 'editing' | 'submitting' | 'success';
 
 @customElement('trail-profile-password')
+@localized()
 export class TrailProfilePassword extends LitElement {
   @property({ attribute: false }) passwordPolicy: PasswordPolicy = {
     minLength: 8,
@@ -28,25 +31,26 @@ export class TrailProfilePassword extends LitElement {
   private get validationChecks(): Array<{ requirement: string; met: boolean }> {
     const pw = this.newPassword;
     const checks: Array<{ requirement: string; met: boolean }> = [];
+    const minLength = this.passwordPolicy.minLength;
     checks.push({
-      requirement: `At least ${this.passwordPolicy.minLength} characters`,
+      requirement: msg(str`At least ${minLength} characters`),
       met: pw.length >= this.passwordPolicy.minLength,
     });
     if (this.passwordPolicy.mustContainUpperAndLowerCase) {
       checks.push({
-        requirement: 'Both upper and lower case letters',
+        requirement: msg('Both upper and lower case letters'),
         met: /[a-z]/.test(pw) && /[A-Z]/.test(pw),
       });
     }
     if (this.passwordPolicy.mustContainDigits) {
       checks.push({
-        requirement: 'At least one digit',
+        requirement: msg('At least one digit'),
         met: /\d/.test(pw),
       });
     }
     if (this.passwordPolicy.mustContainSpecialCharacters) {
       checks.push({
-        requirement: 'At least one special character',
+        requirement: msg('At least one special character'),
         met: !/^[a-zA-Z0-9]*$/.test(pw),
       });
     }
@@ -93,22 +97,22 @@ export class TrailProfilePassword extends LitElement {
       if (err instanceof AuthClientError) {
         switch (err.code) {
           case AuthErrorCode.INVALID_CREDENTIALS:
-            this.errorMessage = 'Current password is incorrect';
+            this.errorMessage = msg('Current password is incorrect');
             break;
           case AuthErrorCode.WEAK_PASSWORD:
-            this.errorMessage = 'Password does not meet requirements';
+            this.errorMessage = msg('Password does not meet requirements');
             break;
           case AuthErrorCode.RATE_LIMITED:
-            this.errorMessage = 'Too many attempts. Please try again later.';
+            this.errorMessage = msg('Too many attempts. Please try again later.');
             break;
           case AuthErrorCode.BAD_REQUEST:
-            this.errorMessage = err.message || 'Invalid request';
+            this.errorMessage = err.message || msg('Invalid request');
             break;
           default:
-            this.errorMessage = 'Failed to change password. Please try again.';
+            this.errorMessage = msg('Failed to change password. Please try again.');
         }
       } else {
-        this.errorMessage = 'Failed to change password. Please try again.';
+        this.errorMessage = msg('Failed to change password. Please try again.');
       }
       this.state = 'editing';
     }
@@ -127,7 +131,7 @@ export class TrailProfilePassword extends LitElement {
         ${this.mode === 'change'
           ? html`
               <div class="form-field">
-                <label for="trail-pwd-old">Current password</label>
+                <label for="trail-pwd-old">${msg('Current password')}</label>
                 <div class="password-input-wrapper">
                   <input
                     id="trail-pwd-old"
@@ -146,7 +150,7 @@ export class TrailProfilePassword extends LitElement {
                     class="password-toggle"
                     @click=${() => { this.showOldPassword = !this.showOldPassword; }}
                     ?disabled=${isSubmitting}
-                    aria-label=${this.showOldPassword ? 'Hide password' : 'Show password'}
+                    aria-label=${this.showOldPassword ? msg('Hide password') : msg('Show password')}
                   >
                     ${this.showOldPassword ? eyeSlashIcon() : eyeIcon()}
                   </button>
@@ -156,7 +160,7 @@ export class TrailProfilePassword extends LitElement {
           : ''}
 
         <div class="form-field">
-          <label for="trail-pwd-new">New password</label>
+          <label for="trail-pwd-new">${msg('New password')}</label>
           <div class="password-input-wrapper">
             <input
               id="trail-pwd-new"
@@ -175,7 +179,7 @@ export class TrailProfilePassword extends LitElement {
               class="password-toggle"
               @click=${() => { this.showNewPassword = !this.showNewPassword; }}
               ?disabled=${isSubmitting}
-              aria-label=${this.showNewPassword ? 'Hide password' : 'Show password'}
+              aria-label=${this.showNewPassword ? msg('Hide password') : msg('Show password')}
             >
               ${this.showNewPassword ? eyeSlashIcon() : eyeIcon()}
             </button>
@@ -183,7 +187,7 @@ export class TrailProfilePassword extends LitElement {
         </div>
 
         <div class="form-field">
-          <label for="trail-pwd-repeat">Confirm new password</label>
+          <label for="trail-pwd-repeat">${msg('Confirm new password')}</label>
           <div class="password-input-wrapper">
             <input
               id="trail-pwd-repeat"
@@ -202,7 +206,7 @@ export class TrailProfilePassword extends LitElement {
               class="password-toggle"
               @click=${() => { this.showNewPassword = !this.showNewPassword; }}
               ?disabled=${isSubmitting}
-              aria-label=${this.showNewPassword ? 'Hide password' : 'Show password'}
+              aria-label=${this.showNewPassword ? msg('Hide password') : msg('Show password')}
             >
               ${this.showNewPassword ? eyeSlashIcon() : eyeIcon()}
             </button>
@@ -234,10 +238,10 @@ export class TrailProfilePassword extends LitElement {
           ?disabled=${isSubmitting || !this.canSubmit}
         >
           ${isSubmitting
-            ? 'Changing password...'
+            ? msg('Changing password...')
             : this.mode === 'set'
-              ? 'Create password'
-              : 'Change password'}
+              ? msg('Create password')
+              : msg('Change password')}
         </button>
       </form>
     `;
@@ -247,16 +251,16 @@ export class TrailProfilePassword extends LitElement {
     return html`
       <div class="success-message">
         <span class="success-icon" aria-hidden="true">✓</span>
-        <span>Password changed successfully</span>
+        <span>${msg('Password changed successfully')}</span>
       </div>
-      <button class="btn-back" @click=${this.handleDone}>Done</button>
+      <button class="btn-back" @click=${this.handleDone}>${msg('Done')}</button>
     `;
   }
 
   render() {
     return html`
       <div class="card">
-        <h2 class="card-title">Password</h2>
+        <h2 class="card-title">${msg('Password')}</h2>
         ${this.state === 'success' ? this.renderSuccess() : this.renderForm()}
       </div>
     `;

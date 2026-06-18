@@ -16,7 +16,12 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@lit/localize": ["../../../app/ui/node_modules/@lit/localize"],
+      "@/features/localization": ["../../../app/ui/src/features/localization/index.ts"]
+    }
   },
   "include": ["src"]
 }

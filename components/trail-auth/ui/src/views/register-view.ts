@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { authSharedStyles } from '../styles.ts';
 import { eyeIcon, eyeSlashIcon } from '../icons.ts';
 import {
@@ -18,6 +20,7 @@ import {
  * - trail-auth-navigate: { view: 'choice' }
  */
 @customElement('trail-auth-register')
+@localized()
 export class TrailAuthRegisterView extends LitElement {
   @state() private email = '';
   @state() private password = '';
@@ -71,12 +74,12 @@ export class TrailAuthRegisterView extends LitElement {
     const trimmedConfirm = this.confirmPassword;
 
     if (!trimmedEmail || !trimmedPassword || !trimmedConfirm) {
-      this.errorMessage = 'Please fill in all fields.';
+      this.errorMessage = msg('Please fill in all fields.');
       return;
     }
 
     if (trimmedPassword !== trimmedConfirm) {
-      this.errorMessage = 'Passwords do not match.';
+      this.errorMessage = msg('Passwords do not match.');
       return;
     }
 
@@ -95,27 +98,27 @@ export class TrailAuthRegisterView extends LitElement {
       } else if (err instanceof AuthClientError) {
         switch (err.code) {
           case AuthErrorCode.EMAIL_TAKEN:
-            this.errorMessage = 'This email is already registered. Please sign in instead.';
+            this.errorMessage = msg('This email is already registered. Please sign in instead.');
             break;
           case AuthErrorCode.WEAK_PASSWORD:
             this.errorMessage =
-              'Password does not meet requirements. Please choose a stronger password.';
+              msg('Password does not meet requirements. Please choose a stronger password.');
             break;
           case AuthErrorCode.REGISTRATION_DISABLED:
             this.errorMessage =
-              'Registration is currently disabled. Please contact an administrator.';
+              msg('Registration is currently disabled. Please contact an administrator.');
             break;
           case AuthErrorCode.NETWORK_ERROR:
             this.errorMessage =
-              'Unable to connect. Please check your internet connection and try again.';
+              msg('Unable to connect. Please check your internet connection and try again.');
             break;
           default:
-            this.errorMessage = 'Registration failed. Please try again.';
+            this.errorMessage = msg('Registration failed. Please try again.');
         }
         this.isLoading = false;
         return;
       } else {
-        this.errorMessage = 'Registration failed. Please try again.';
+        this.errorMessage = msg('Registration failed. Please try again.');
         this.isLoading = false;
         return;
       }
@@ -151,7 +154,7 @@ export class TrailAuthRegisterView extends LitElement {
     return html`
       <form class="password-form" @submit=${this.handleSubmit}>
         <div class="form-field">
-          <label for="reg-email">Email address</label>
+          <label for="reg-email">${msg('Email address')}</label>
           <input
             id="reg-email"
             type="email"
@@ -164,7 +167,7 @@ export class TrailAuthRegisterView extends LitElement {
         </div>
 
         <div class="form-field password-field">
-          <label for="reg-password">Password</label>
+          <label for="reg-password">${msg('Password')}</label>
           <div class="password-input-wrapper">
             <input
               id="reg-password"
@@ -179,7 +182,7 @@ export class TrailAuthRegisterView extends LitElement {
               type="button"
               class="password-toggle"
               @click=${this.togglePasswordVisibility}
-              aria-label=${this.showPassword ? 'Hide password' : 'Show password'}
+              aria-label=${this.showPassword ? msg('Hide password') : msg('Show password')}
               ?disabled=${this.isLoading}
             >
               ${this.showPassword ? eyeSlashIcon() : eyeIcon()}
@@ -188,7 +191,7 @@ export class TrailAuthRegisterView extends LitElement {
         </div>
 
         <div class="form-field password-field">
-          <label for="reg-confirm-password">Confirm password</label>
+          <label for="reg-confirm-password">${msg('Confirm password')}</label>
           <div class="password-input-wrapper">
             <input
               id="reg-confirm-password"
@@ -203,7 +206,7 @@ export class TrailAuthRegisterView extends LitElement {
               type="button"
               class="password-toggle"
               @click=${this.toggleConfirmPasswordVisibility}
-              aria-label=${this.showConfirmPassword ? 'Hide password' : 'Show password'}
+              aria-label=${this.showConfirmPassword ? msg('Hide password') : msg('Show password')}
               ?disabled=${this.isLoading}
             >
               ${this.showConfirmPassword ? eyeSlashIcon() : eyeIcon()}
@@ -216,12 +219,12 @@ export class TrailAuthRegisterView extends LitElement {
           : ''}
 
         <button type="submit" class="btn btn-primary" ?disabled=${this.isLoading}>
-          ${this.isLoading ? 'Creating account\u2026' : 'Create account'}
+          ${this.isLoading ? msg('Creating account\u2026') : msg('Create account')}
         </button>
       </form>
 
       <button class="back-link" @click=${this.handleBack} ?disabled=${this.isLoading}>
-        Back to sign in options
+        ${msg('Back to sign in options')}
       </button>
     `;
   }

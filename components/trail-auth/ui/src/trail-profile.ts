@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import {
   fetchCurrentUser,
   fetchProfileCapabilities,
@@ -27,6 +29,7 @@ import './trail-profile-account.ts';
  * - `trail-profile-sign-out` — user clicked Sign Out; host should handle session teardown
  */
 @customElement('trail-profile')
+@localized()
 export class TrailProfile extends LitElement {
   @property({ type: String }) email = '';
   @property({ type: Boolean, attribute: 'has-mfa' }) hasMfa = false;
@@ -90,7 +93,7 @@ export class TrailProfile extends LitElement {
 
     return html`
       <div class="card">
-        <h2 class="card-title">Profile</h2>
+        <h2 class="card-title">${msg('Profile')}</h2>
         <div class="user-info">
           <trail-profile-avatar .userId=${userId}></trail-profile-avatar>
         </div>
@@ -126,7 +129,7 @@ export class TrailProfile extends LitElement {
             @click=${this.handleSignOut}
             ?disabled=${this.signOutLoading}
           >
-            ${this.signOutLoading ? 'Signing out...' : 'Sign Out'}
+            ${this.signOutLoading ? msg('Signing out...') : msg('Sign Out')}
           </button>
         </div>
         <trail-profile-account></trail-profile-account>

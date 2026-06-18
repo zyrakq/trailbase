@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { deleteUser, AuthClientError } from './api/auth-client.ts';
 
 type AccountState = 'idle' | 'confirming' | 'deleting' | 'error';
@@ -15,6 +17,7 @@ type AccountState = 'idle' | 'confirming' | 'deleting' | 'error';
  * - `trail-profile-account-deleted` — fired after successful deletion
  */
 @customElement('trail-profile-account')
+@localized()
 export class TrailProfileAccount extends LitElement {
   @state() private state: AccountState = 'idle';
   @state() private errorMessage = '';
@@ -84,7 +87,7 @@ export class TrailProfileAccount extends LitElement {
       this.errorMessage =
         err instanceof AuthClientError
           ? err.message
-          : 'Failed to delete account. Please try again.';
+          : msg('Failed to delete account. Please try again.');
       this.state = 'error';
     }
   }
@@ -95,13 +98,12 @@ export class TrailProfileAccount extends LitElement {
 
     return html`
       <div class="card danger-zone">
-        <h2 class="card-title">Danger Zone</h2>
+        <h2 class="card-title">${msg('Danger Zone')}</h2>
         <p class="danger-description">
-          Permanently delete your account and all associated data. This action
-          cannot be undone.
+          ${msg('Permanently delete your account and all associated data. This action cannot be undone.')}
         </p>
         <button class="btn btn-danger-outline" @click=${this.openModal}>
-          Delete Account
+          ${msg('Delete Account')}
         </button>
       </div>
 
@@ -114,10 +116,9 @@ export class TrailProfileAccount extends LitElement {
                 aria-modal="true"
                 aria-labelledby="trail-acct-title"
               >
-                <h3 id="trail-acct-title" class="modal-title">Delete Account</h3>
+                <h3 id="trail-acct-title" class="modal-title">${msg('Delete Account')}</h3>
                 <p class="modal-warning">
-                  This action is destructive and cannot be reverted. All your
-                  data will be permanently deleted.
+                  ${msg('This action is destructive and cannot be reverted. All your data will be permanently deleted.')}
                 </p>
 
                 ${this.errorMessage
@@ -132,14 +133,14 @@ export class TrailProfileAccount extends LitElement {
                     @click=${this.closeModal}
                     ?disabled=${isDeleting}
                   >
-                    Back
+                    ${msg('Back')}
                   </button>
                   <button
                     class="btn btn-danger"
                     @click=${this.handleConfirmDelete}
                     ?disabled=${isDeleting}
                   >
-                    ${isDeleting ? 'Deleting...' : 'Delete'}
+                    ${isDeleting ? msg('Deleting...') : msg('Delete')}
                   </button>
                 </div>
               </div>

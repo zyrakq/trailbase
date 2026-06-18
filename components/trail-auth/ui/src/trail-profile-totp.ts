@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import {
   registerTotp,
   confirmTotp,
@@ -12,6 +14,7 @@ import {
 type TotpState = 'idle' | 'loading-qr' | 'qr-ready' | 'confirming' | 'enabled' | 'disabling';
 
 @customElement('trail-profile-totp')
+@localized()
 export class TrailProfileTotp extends LitElement {
   @property({ type: Boolean, attribute: 'has-mfa' }) hasMfa = false;
 
@@ -41,7 +44,7 @@ export class TrailProfileTotp extends LitElement {
   private async handleConfirmTotp() {
     if (this.totpState === 'confirming' || !this.totpSetupData) return;
     if (this.verifyCode.length !== 6) {
-      this.totpError = 'Please enter the 6-digit code from your authenticator app.';
+      this.totpError = msg('Please enter the 6-digit code from your authenticator app.');
       return;
     }
     this.totpState = 'confirming';
@@ -60,9 +63,9 @@ export class TrailProfileTotp extends LitElement {
       );
     } catch (err) {
       if (err instanceof AuthClientError && err.code === AuthErrorCode.INVALID_CREDENTIALS) {
-        this.totpError = 'Invalid code. Please try again.';
+        this.totpError = msg('Invalid code. Please try again.');
       } else {
-        this.totpError = 'Verification failed. Please try again.';
+        this.totpError = msg('Verification failed. Please try again.');
       }
       this.totpState = 'qr-ready';
     }
@@ -70,7 +73,7 @@ export class TrailProfileTotp extends LitElement {
 
   private async handleDisableTotp() {
     if (this.disableCode.length !== 6) {
-      this.totpError = 'Please enter the 6-digit code from your authenticator app.';
+      this.totpError = msg('Please enter the 6-digit code from your authenticator app.');
       return;
     }
     this.totpError = '';
@@ -87,9 +90,9 @@ export class TrailProfileTotp extends LitElement {
       );
     } catch (err) {
       if (err instanceof AuthClientError && err.code === AuthErrorCode.INVALID_CREDENTIALS) {
-        this.totpError = 'Invalid code. Please try again.';
+        this.totpError = msg('Invalid code. Please try again.');
       } else {
-        this.totpError = 'Failed to disable two-factor authentication. Please try again.';
+        this.totpError = msg('Failed to disable two-factor authentication. Please try again.');
       }
     }
   }
@@ -106,15 +109,16 @@ export class TrailProfileTotp extends LitElement {
     const isLoading = this.totpState === 'loading-qr';
     return html`
       <p class="totp-description">
-        Add an extra layer of security to your account by requiring a code from your authenticator
-        app when signing in.
+        ${msg(
+          'Add an extra layer of security to your account by requiring a code from your authenticator app when signing in.'
+        )}
       </p>
       <button
         class="btn btn-secondary"
         @click=${this.handleEnableTotp}
         ?disabled=${isLoading}
       >
-        ${isLoading ? 'Loading...' : 'Enable two-factor authentication'}
+        ${isLoading ? msg('Loading...') : msg('Enable two-factor authentication')}
       </button>
     `;
   }
@@ -125,21 +129,23 @@ export class TrailProfileTotp extends LitElement {
 
     return html`
       <p class="totp-description">
-        Scan the QR code with your authenticator app, then enter the 6-digit code to verify.
+        ${msg(
+          'Scan the QR code with your authenticator app, then enter the 6-digit code to verify.'
+        )}
       </p>
 
       ${this.totpSetupData?.qrPng
         ? html`<div class="qr-container">
             <img
               src="data:image/png;base64,${this.totpSetupData.qrPng}"
-              alt="TOTP QR code"
+              alt=${msg('TOTP QR code')}
               class="qr-image"
             />
           </div>`
         : ''}
       ${secret
         ? html`<div class="manual-key">
-            <span class="manual-key-label">Manual entry key:</span>
+            <span class="manual-key-label">${msg('Manual entry key:')}</span>
             <code class="manual-key-value">${secret}</code>
           </div>`
         : ''}
@@ -152,7 +158,7 @@ export class TrailProfileTotp extends LitElement {
         }}
       >
         <div class="form-field">
-          <label for="trail-profile-verify-code">Verification code</label>
+          <label for="trail-profile-verify-code">${msg('Verification code')}</label>
           <input
             id="trail-profile-verify-code"
             type="text"
@@ -179,7 +185,7 @@ export class TrailProfileTotp extends LitElement {
           class="btn btn-primary"
           ?disabled=${isConfirming || this.verifyCode.length !== 6}
         >
-          ${isConfirming ? 'Verifying...' : 'Verify and enable'}
+          ${isConfirming ? msg('Verifying...') : msg('Verify and enable')}
         </button>
       </form>
     `;
@@ -189,14 +195,14 @@ export class TrailProfileTotp extends LitElement {
     return html`
       <div class="totp-status totp-status--enabled">
         <span class="status-icon" aria-hidden="true">✓</span>
-        <span>Two-factor authentication is enabled</span>
+        <span>${msg('Two-factor authentication is enabled')}</span>
       </div>
       <button class="btn btn-danger-outline" @click=${() => {
         this.disableCode = '';
         this.totpError = '';
         this.totpState = 'disabling';
       }}>
-        Disable two-factor authentication
+        ${msg('Disable two-factor authentication')}
       </button>
     `;
   }
@@ -205,10 +211,12 @@ export class TrailProfileTotp extends LitElement {
     return html`
       <div class="totp-status totp-status--enabled">
         <span class="status-icon" aria-hidden="true">✓</span>
-        <span>Two-factor authentication is enabled</span>
+        <span>${msg('Two-factor authentication is enabled')}</span>
       </div>
       <p class="totp-description">
-        Enter your current authenticator code to disable two-factor authentication.
+        ${msg(
+          'Enter your current authenticator code to disable two-factor authentication.'
+        )}
       </p>
       <form
         class="totp-form"
@@ -218,7 +226,7 @@ export class TrailProfileTotp extends LitElement {
         }}
       >
         <div class="form-field">
-          <label for="trail-profile-disable-code">Current code</label>
+          <label for="trail-profile-disable-code">${msg('Current code')}</label>
           <input
             id="trail-profile-disable-code"
             type="text"
@@ -241,7 +249,7 @@ export class TrailProfileTotp extends LitElement {
 
         <div class="button-row">
           <button type="submit" class="btn btn-danger" ?disabled=${this.disableCode.length !== 6}>
-            Confirm disable
+            ${msg('Confirm disable')}
           </button>
           <button
             type="button"
@@ -252,7 +260,7 @@ export class TrailProfileTotp extends LitElement {
               this.totpError = '';
             }}
           >
-            Cancel
+            ${msg('Cancel')}
           </button>
         </div>
       </form>
@@ -262,9 +270,9 @@ export class TrailProfileTotp extends LitElement {
   render() {
     return html`
       <div class="card">
-        <h2 class="card-title">Security</h2>
+        <h2 class="card-title">${msg('Security')}</h2>
         <div class="security-section">
-          <h3 class="section-subtitle">Two-factor authentication</h3>
+          <h3 class="section-subtitle">${msg('Two-factor authentication')}</h3>
           ${this.totpState === 'idle' || this.totpState === 'loading-qr'
             ? this.renderTotpIdle()
             : this.totpState === 'qr-ready' || this.totpState === 'confirming'

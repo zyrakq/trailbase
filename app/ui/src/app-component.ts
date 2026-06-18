@@ -3,6 +3,7 @@ import { customElement } from 'lit/decorators.js';
 import { Router } from '@lit-labs/router';
 import { authService } from '@/features/auth';
 import { localizationService } from '@/features/localization';
+import '@/features/localization/host-globals';
 import '@/features/theme/services/favicon.service';
 
 // Import components (they will be registered as custom elements)

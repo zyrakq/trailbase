@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { fetchOAuthProviders, type OAuthProvider } from './api/auth-client.ts';
 
 // Internal view registrations (side-effect imports).
@@ -44,6 +46,7 @@ type ViewState =
  *                        Can also be set as a JS property: `el.oauthProviders = [...]`
  */
 @customElement('trail-auth')
+@localized()
 export class TrailAuth extends LitElement {
   @property({ type: String }) mode: 'auth' | 'reset-password' = 'auth';
   @property({ type: String }) token = '';
@@ -111,16 +114,16 @@ export class TrailAuth extends LitElement {
   }
 
   private get viewTitle(): string {
-    if (this.view === 'register' || this.view === 'register-success') return 'Create account';
-    if (this.view === 'mfa') return 'Two-factor authentication';
+    if (this.view === 'register' || this.view === 'register-success') return msg('Create account');
+    if (this.view === 'mfa') return msg('Two-factor authentication');
     if (
       this.view === 'forgot-password' ||
       this.view === 'forgot-password-sent' ||
       this.view === 'reset-password' ||
       this.view === 'reset-password-done'
     )
-      return 'Reset password';
-    return 'Sign in';
+      return msg('Reset password');
+    return msg('Sign in');
   }
 
   private renderView() {

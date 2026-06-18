@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement } from 'lit/decorators.js';
+import { msg } from '@lit/localize';
+import { localized } from '@/features/localization';
 import { authSharedStyles } from '../styles.ts';
 
 /**
@@ -9,6 +11,7 @@ import { authSharedStyles } from '../styles.ts';
  * - trail-auth-navigate: { view: 'choice' }
  */
 @customElement('trail-auth-forgot-password-sent')
+@localized()
 export class TrailAuthForgotPasswordSentView extends LitElement {
   private handleBackToSignIn() {
     this.dispatchEvent(
@@ -24,10 +27,11 @@ export class TrailAuthForgotPasswordSentView extends LitElement {
     return html`
       <div class="success-view">
         <p class="success-message">
-          If this email address is registered, you'll receive a reset link shortly. Check your
-          inbox.
+          ${msg("If this email address is registered, you'll receive a reset link shortly. Check your inbox.")}
         </p>
-        <button class="btn btn-primary" @click=${this.handleBackToSignIn}>Back to sign in</button>
+        <button class="btn btn-primary" @click=${this.handleBackToSignIn}>
+          ${msg('Back to sign in')}
+        </button>
       </div>
     `;
   }
