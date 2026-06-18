@@ -1,3 +1,4 @@
+import './init.ts';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import {
   LOCALE_STATUS_EVENT,
