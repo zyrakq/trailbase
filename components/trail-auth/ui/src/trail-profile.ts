@@ -34,6 +34,7 @@ export class TrailProfile extends LitElement {
   @state() private user: CurrentUser | null = null;
   @state() private showOtpSection = false;
   @state() private showChangePassword = false;
+  @state() private canSetPassword = false;
   @state() private signOutLoading = false;
   @state() private loading = true;
   @state() private passwordPolicy: PasswordPolicy = {
@@ -69,6 +70,7 @@ export class TrailProfile extends LitElement {
       .then((caps) => {
         this.showOtpSection = caps.showOtpSection;
         this.showChangePassword = caps.showChangePassword;
+        this.canSetPassword = caps.canSetPassword;
         this.passwordPolicy = caps.passwordPolicy;
       })
       .catch(() => {
@@ -109,8 +111,9 @@ export class TrailProfile extends LitElement {
         <trail-profile-email
           .currentEmail=${email}
         ></trail-profile-email>
-        ${this.showChangePassword
+        ${this.showChangePassword || this.canSetPassword
           ? html`<trail-profile-password
+              .mode=${this.canSetPassword ? 'set' : 'change'}
               .passwordPolicy=${this.passwordPolicy}
             ></trail-profile-password>`
           : ''}

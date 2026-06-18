@@ -110,6 +110,7 @@ const defaultPasswordPolicy: PasswordPolicy = {
 export interface ProfileCapabilities {
   showOtpSection: boolean;
   showChangePassword: boolean;
+  canSetPassword: boolean;
   passwordPolicy: PasswordPolicy;
 }
 
@@ -128,6 +129,7 @@ export async function fetchProfileCapabilities(): Promise<ProfileCapabilities> {
     return {
       showOtpSection: false,
       showChangePassword: false,
+      canSetPassword: false,
       passwordPolicy: defaultPasswordPolicy,
     };
   }
@@ -135,6 +137,7 @@ export async function fetchProfileCapabilities(): Promise<ProfileCapabilities> {
     return {
       showOtpSection: false,
       showChangePassword: false,
+      canSetPassword: false,
       passwordPolicy: defaultPasswordPolicy,
     };
   }
@@ -142,6 +145,7 @@ export async function fetchProfileCapabilities(): Promise<ProfileCapabilities> {
   const data = (await response.json()) as {
     show_otp_section?: boolean;
     show_change_password?: boolean;
+    can_set_password?: boolean;
     password_policy?: {
       min_length?: number;
       max_length?: number;
@@ -155,6 +159,7 @@ export async function fetchProfileCapabilities(): Promise<ProfileCapabilities> {
   return {
     showOtpSection: data.show_otp_section ?? false,
     showChangePassword: data.show_change_password ?? false,
+    canSetPassword: data.can_set_password ?? false,
     passwordPolicy: {
       minLength: policy?.min_length ?? defaultPasswordPolicy.minLength,
       maxLength: policy?.max_length ?? defaultPasswordPolicy.maxLength,
@@ -588,6 +593,38 @@ export async function changePassword(
   throw new AuthClientError(
     AuthErrorCode.UNKNOWN,
     text || `Password change failed: ${response.status}`
+  );
+}
+
+export async function setPassword(newPassword: string, newPasswordRepeat: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch('/api/auth/v1/set_password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ new_password: newPassword, new_password_repeat: newPasswordRepeat }),
+    });
+  } catch {
+    throw new AuthClientError(AuthErrorCode.NETWORK_ERROR, 'Network error during password set');
+  }
+
+  if (response.ok) return;
+
+  const text = await response.text().catch(() => '');
+  if (response.status === 400) {
+    const lower = text.toLowerCase();
+    if (lower.includes('weak') || lower.includes('short')) {
+      throw new AuthClientError(AuthErrorCode.WEAK_PASSWORD, 'Password does not meet requirements');
+    }
+    throw new AuthClientError(AuthErrorCode.BAD_REQUEST, text || 'Invalid password set request');
+  }
+  if (response.status === 429) {
+    throw new AuthClientError(AuthErrorCode.RATE_LIMITED, 'Password set rate limited');
+  }
+  throw new AuthClientError(
+    AuthErrorCode.UNKNOWN,
+    text || `Password set failed: ${response.status}`
   );
 }
 

@@ -7,6 +7,9 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
+argon2 = "^0.5"
+password-hash = { version = "^0.5", features = ["alloc", "getrandom"] }
+rand = "0.8"
 rust-embed = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

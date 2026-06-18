@@ -6145,6 +6145,9 @@ dependencies = [
 name = "trail-auth-component"
 version = "0.1.0"
 dependencies = [
+ "argon2",
+ "password-hash",
+ "rand 0.8.6",
  "rust-embed",
  "serde",
  "serde_json",

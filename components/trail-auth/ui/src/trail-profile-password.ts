@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { changePassword, AuthClientError, AuthErrorCode, type PasswordPolicy } from './api/auth-client.ts';
+import { changePassword, setPassword, AuthClientError, AuthErrorCode, type PasswordPolicy } from './api/auth-client.ts';
 import { eyeIcon, eyeSlashIcon } from './icons.ts';
 
 type PasswordState = 'editing' | 'submitting' | 'success';
@@ -14,6 +14,8 @@ export class TrailProfilePassword extends LitElement {
     mustContainDigits: false,
     mustContainSpecialCharacters: false,
   };
+
+  @property({ type: String }) mode: 'change' | 'set' = 'change';
 
   @state() private state: PasswordState = 'editing';
   @state() private oldPassword = '';
@@ -52,8 +54,9 @@ export class TrailProfilePassword extends LitElement {
   }
 
   private get canSubmit(): boolean {
+    const oldPasswordOk = this.mode === 'set' || !!this.oldPassword;
     return (
-      !!this.oldPassword &&
+      oldPasswordOk &&
       !!this.newPassword &&
       !!this.newPasswordRepeat &&
       this.newPassword === this.newPasswordRepeat &&
@@ -79,7 +82,11 @@ export class TrailProfilePassword extends LitElement {
     this.state = 'submitting';
 
     try {
-      await changePassword(this.oldPassword, this.newPassword, this.newPasswordRepeat);
+      if (this.mode === 'set') {
+        await setPassword(this.newPassword, this.newPasswordRepeat);
+      } else {
+        await changePassword(this.oldPassword, this.newPassword, this.newPasswordRepeat);
+      }
       this.resetForm();
       this.state = 'success';
     } catch (err) {
@@ -117,32 +124,36 @@ export class TrailProfilePassword extends LitElement {
 
     return html`
       <form @submit=${this.handleSubmit}>
-        <div class="form-field">
-          <label for="trail-pwd-old">Current password</label>
-          <div class="password-input-wrapper">
-            <input
-              id="trail-pwd-old"
-              type=${this.showOldPassword ? 'text' : 'password'}
-              autocomplete="current-password"
-              .value=${this.oldPassword}
-              @input=${(e: Event) => {
-                this.oldPassword = (e.target as HTMLInputElement).value;
-                if (this.errorMessage) this.errorMessage = '';
-              }}
-              ?disabled=${isSubmitting}
-              required
-            />
-            <button
-              type="button"
-              class="password-toggle"
-              @click=${() => { this.showOldPassword = !this.showOldPassword; }}
-              ?disabled=${isSubmitting}
-              aria-label=${this.showOldPassword ? 'Hide password' : 'Show password'}
-            >
-              ${this.showOldPassword ? eyeSlashIcon() : eyeIcon()}
-            </button>
-          </div>
-        </div>
+        ${this.mode === 'change'
+          ? html`
+              <div class="form-field">
+                <label for="trail-pwd-old">Current password</label>
+                <div class="password-input-wrapper">
+                  <input
+                    id="trail-pwd-old"
+                    type=${this.showOldPassword ? 'text' : 'password'}
+                    autocomplete="current-password"
+                    .value=${this.oldPassword}
+                    @input=${(e: Event) => {
+                      this.oldPassword = (e.target as HTMLInputElement).value;
+                      if (this.errorMessage) this.errorMessage = '';
+                    }}
+                    ?disabled=${isSubmitting}
+                    required
+                  />
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    @click=${() => { this.showOldPassword = !this.showOldPassword; }}
+                    ?disabled=${isSubmitting}
+                    aria-label=${this.showOldPassword ? 'Hide password' : 'Show password'}
+                  >
+                    ${this.showOldPassword ? eyeSlashIcon() : eyeIcon()}
+                  </button>
+                </div>
+              </div>
+            `
+          : ''}
 
         <div class="form-field">
           <label for="trail-pwd-new">New password</label>
@@ -222,7 +233,11 @@ export class TrailProfilePassword extends LitElement {
           class="btn btn-primary"
           ?disabled=${isSubmitting || !this.canSubmit}
         >
-          ${isSubmitting ? 'Changing password...' : 'Change password'}
+          ${isSubmitting
+            ? 'Changing password...'
+            : this.mode === 'set'
+              ? 'Create password'
+              : 'Change password'}
         </button>
       </form>
     `;

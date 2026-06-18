@@ -2,8 +2,6 @@
 #![allow(clippy::needless_return)]
 
 use rust_embed::RustEmbed;
-use serde::{Deserialize, Serialize};
-use trailbase_wasm::db;
 use trailbase_wasm::http::{
     Html, HttpError, HttpRoute, IntoBody, IntoResponse, Json, Request, Response, StatusCode,
     header, routing,
@@ -11,8 +9,18 @@ use trailbase_wasm::http::{
 use trailbase_wasm::kv::Store;
 use trailbase_wasm::{Guest, export};
 
-const KV_RESET_PASSWORD_URL: &str = "reset_password_redirect_url";
-const DEFAULT_RESET_PASSWORD_URL: &str = "/reset-password?token={token}";
+mod config;
+mod error;
+mod pages;
+mod password;
+mod profile;
+mod set_password;
+
+use config::{read_reset_password_url, TrailAuthConfig, KV_RESET_PASSWORD_URL};
+use error::{bad_request, internal};
+use pages::verify_email_page;
+use profile::profile_capabilities_handler;
+use set_password::set_password_handler;
 
 #[derive(RustEmbed)]
 #[folder = "ui/dist/"]
@@ -64,6 +72,16 @@ impl Guest for Endpoints {
                         .user()
                         .ok_or_else(|| HttpError::status(StatusCode::UNAUTHORIZED))?;
                     return profile_capabilities_handler(user).await;
+                },
+            ),
+            routing::post(
+                "/api/auth/v1/set_password",
+                async |mut req: Request| -> Result<Response, HttpError> {
+                    let body = req.body().bytes().await.map_err(internal)?;
+                    let user = req
+                        .user()
+                        .ok_or_else(|| HttpError::status(StatusCode::UNAUTHORIZED))?;
+                    return set_password_handler(user, body.to_vec()).await;
                 },
             ),
             // Reset-password email links point to this route.
@@ -150,175 +168,3 @@ impl Guest for Endpoints {
 }
 
 export!(Endpoints);
-
-// ---------------------------------------------------------------------------
-// Profile capabilities
-// ---------------------------------------------------------------------------
-
-#[derive(Serialize)]
-struct ProfileResponse {
-    show_otp_section: bool,
-    show_change_password: bool,
-    password_policy: PasswordPolicy,
-}
-
-#[derive(Serialize)]
-struct PasswordPolicy {
-    min_length: u32,
-    must_contain_upper_and_lower_case: bool,
-    must_contain_digits: bool,
-    must_contain_special_characters: bool,
-}
-
-impl Default for PasswordPolicy {
-    fn default() -> Self {
-        return Self {
-            min_length: default_min_length(),
-            must_contain_upper_and_lower_case: false,
-            must_contain_digits: false,
-            must_contain_special_characters: false,
-        };
-    }
-}
-
-fn default_min_length() -> u32 {
-    return 8;
-}
-
-#[derive(serde::Deserialize, Default)]
-struct AuthConfig {
-    disable_password_auth: bool,
-    #[serde(default = "default_min_length")]
-    password_minimal_length: u32,
-    #[serde(default)]
-    password_must_contain_upper_and_lower_case: bool,
-    #[serde(default)]
-    password_must_contain_digits: bool,
-    #[serde(default)]
-    password_must_contain_special_characters: bool,
-}
-
-async fn profile_capabilities_handler(
-    user: &trailbase_wasm::http::User,
-) -> Result<Response, HttpError> {
-    let rows = db::query(
-        r#"SELECT provider_id, password_hash FROM "_user" WHERE email = ?"#,
-        vec![db::Value::Text(user.email.clone())],
-    )
-    .await
-    .map_err(internal)?;
-
-    let is_oauth_only = rows
-        .first()
-        .and_then(|row| {
-            let is_oauth = match row.first()? {
-                db::Value::Integer(n) => *n != 0,
-                _ => false,
-            };
-            let no_password = match row.get(1)? {
-                db::Value::Text(s) => s.is_empty(),
-                _ => true,
-            };
-            Some(is_oauth && no_password)
-        })
-        .unwrap_or(false);
-
-    let (password_auth_enabled, password_policy) = {
-        let store = Store::open().map_err(internal)?;
-        match store.get("config:auth").map_err(internal)? {
-            Some(bytes) if !bytes.is_empty() => serde_json::from_slice::<AuthConfig>(&bytes)
-                .map(|c| {
-                    (
-                        !c.disable_password_auth,
-                        PasswordPolicy {
-                            min_length: c.password_minimal_length,
-                            must_contain_upper_and_lower_case: c
-                                .password_must_contain_upper_and_lower_case,
-                            must_contain_digits: c.password_must_contain_digits,
-                            must_contain_special_characters: c
-                                .password_must_contain_special_characters,
-                        },
-                    )
-                })
-                .unwrap_or((true, PasswordPolicy::default())),
-            _ => (true, PasswordPolicy::default()),
-        }
-    };
-
-    return Ok(Json(ProfileResponse {
-        show_otp_section: !is_oauth_only && password_auth_enabled,
-        show_change_password: !is_oauth_only && password_auth_enabled,
-        password_policy,
-    })
-    .into_response());
-}
-
-// ---------------------------------------------------------------------------
-// Config helpers
-// ---------------------------------------------------------------------------
-
-#[derive(Serialize, Deserialize)]
-struct TrailAuthConfig {
-    reset_password_redirect_url: String,
-}
-
-fn read_reset_password_url() -> Result<String, HttpError> {
-    let store = Store::open().map_err(internal)?;
-    match store.get(KV_RESET_PASSWORD_URL).map_err(internal)? {
-        Some(bytes) if !bytes.is_empty() => {
-            String::from_utf8(bytes).map_err(|e| internal(format!("invalid UTF-8 in KV: {e}")))
-        }
-        _ => Ok(DEFAULT_RESET_PASSWORD_URL.to_string()),
-    }
-}
-
-// ---------------------------------------------------------------------------
-// HTML page helpers
-// ---------------------------------------------------------------------------
-
-fn verify_email_page() -> String {
-    format!(
-        r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Verify email</title>
-  <style>
-    body {{
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f3f4f6;
-      font-family: -apple-system, sans-serif;
-    }}
-    .card {{
-      background: white;
-      border-radius: 12px;
-      padding: 2rem;
-      max-width: 400px;
-      width: 100%;
-      margin: 1rem;
-      text-align: center;
-    }}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <p>Your email has been verified. You can close this tab and sign in.</p>
-    <a href="/">Go to sign in</a>
-  </div>
-</body>
-</html>"#
-    )
-}
-
-fn internal(err: impl std::string::ToString) -> HttpError {
-    return HttpError::message(StatusCode::INTERNAL_SERVER_ERROR, err);
-}
-
-fn bad_request(err: impl std::string::ToString) -> HttpError {
-    return HttpError::message(StatusCode::BAD_REQUEST, err);
-}
