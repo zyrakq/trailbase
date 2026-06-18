@@ -6,5 +6,10 @@ password_auth_enabled = true
 dev_intercept = true
 
 [components]
-active = "trail_auth"
-vendor_auth_ui = true
+rebuild = true
+refetch = false
+
+[[components.items]]
+name = "trail_auth"
+wasm = "trail_auth_component.wasm"
+source = { build = "trail-auth-component" }

@@ -1,3 +1,4 @@
+#[cfg(test)] mod build_settings;
 mod components;
 mod frontend;
 mod logging;
@@ -7,7 +8,7 @@ mod settings;
 mod smtp;
 mod trailbase_bootstrap;
 
-use settings::{components::ActiveComponent, frontend::PublicConfig, loader::Settings};
+use settings::{frontend::PublicConfig, loader::Settings};
 use std::path::PathBuf;
 use tracing::info;
 
@@ -24,15 +25,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let settings = Settings::load()?;
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-    let force_replace = settings.components.force_replace;
-    match settings.components.active {
-        ActiveComponent::AuthUi => {
-            components::ensure_auth_ui(&manifest_dir, settings.components.vendor_auth_ui, force_replace)?
-        }
-        ActiveComponent::TrailAuth => {
-            components::ensure_trail_auth(&manifest_dir, settings.components.vendor_auth_ui, force_replace)?
-        }
-    };
+    for entry in &settings.components.items {
+        components::ensure_component(entry, &settings.components, &manifest_dir)?;
+    }
 
     let _bun_watch = frontend::start(&settings.frontend, &manifest_dir.join("ui"))?;
 

@@ -31,3 +31,17 @@ user_api_url = "https://idm.argiago.ru/oauth2/openid/argiago/userinfo"
 [trailbase.smtp]
 sender_name = "Argiago Notifications"
 sender_address = "notifications@argiago.ru"
+
+[components]
+rebuild = false
+refetch = false
+
+[[components.items]]
+name = "auth_ui"
+wasm = "auth_ui_component.wasm"
+source = { fetch = "trailbase/auth_ui" }
+
+# [[components.items]]
+# name = "trail_auth"
+# wasm = "trail_auth_component.wasm"
+# source = { build = "trail-auth-component" }

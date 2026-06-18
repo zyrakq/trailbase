@@ -21,3 +21,7 @@ mailcrab-server = { workspace = true }
 [dev-dependencies]
 indoc = "2"
 tempfile = "3"
+
+[build-dependencies]
+config = { workspace = true }
+serde = { workspace = true }

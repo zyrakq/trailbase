@@ -57,6 +57,85 @@ smtp_host = "127.0.0.1"
 smtp_port = 1025
 
 # ------------------------------------------------------------------------------
+# WASM components
+#
+# Single source of truth for the WASM components the app installs at
+# startup. Both runtime (settings::loader -> main) and build.rs read
+# the same `[components]` block — change entries here, not in each
+# consumer.
+#
+# Each `[[components.items]]` entry pairs a `wasm` file name (the file
+# that must end up in traildepot/wasm/) with a `source` describing how
+# to obtain it. Two source variants are supported:
+#
+#   source = { build = "<cargo-package>" }
+#     Compile a local cargo package for wasm32-wasip2. Value is the
+#     package name (`cargo build -p <value>`).
+#
+#   source = { fetch = "<name-or-url>" }
+#     Download via `trail components add <value>`. Accepts a short
+#     registry name (e.g. "trailbase/auth_ui") or a direct URL to a
+#     release artifact.
+#
+# Switching workflow:
+#   To switch the live component, comment out one `[[components.items]]`
+#   block and uncomment another — the change takes effect on the next
+#   startup (and the next build.rs run for build-sourced items).
+#
+# Overlay caveat:
+#   The `config` crate replaces arrays wholesale when overlaying files.
+#   That means env-specific files (appsettings.{APP_ENV}.toml and
+#   appsettings.local.toml) cannot *append* a new item to the list —
+#   they must redeclare the full `[[components.items]]` array. Put
+#   shared entries in appsettings.toml; per-env overrides belong in
+#   the env-specific file.
+# ------------------------------------------------------------------------------
+
+[components]
+# Global default for build-sourced items: always copy the fresh artifact
+# from target/ over the existing one in traildepot/wasm/ on each install.
+rebuild = false
+
+# Global default for fetch-sourced items: always re-run `trail components
+# add` even when the wasm file is already present in traildepot/wasm/.
+refetch = false
+
+# Live example — fetch the pre-built auth_ui component from the registry.
+# This block is active by default. Comment it out (and uncomment the
+# trail_auth block below) to switch to the locally-built variant.
+[[components.items]]
+name = "auth_ui"
+# File name the component must install into traildepot/wasm/. Plain
+# filename only — no path separators, no `..`, no absolute paths.
+wasm = "auth_ui_component.wasm"
+# Short registry name (resolved by `trail components add`).
+source = { fetch = "trailbase/auth_ui" }
+
+# Alternative — compile a local cargo package. Uncomment this block and
+# comment out the auth_ui block above to switch to the build variant.
+# The package is built with `cargo build -p <value> --target wasm32-wasip2`.
+# [[components.items]]
+# name = "trail_auth"
+# wasm = "trail_auth_component.wasm"
+# source = { build = "trail-auth-component" }
+
+# Per-item overrides (optional): any entry may set `rebuild` (build-kind
+# only) or `refetch` (fetch-kind only) to override the global default
+# above. Absent or null → use the global default.
+#
+# [[components.items]]
+# name = "trail_auth"
+# wasm = "trail_auth_component.wasm"
+# source = { build = "trail-auth-component" }
+# rebuild = true
+#
+# [[components.items]]
+# name = "auth_ui"
+# wasm = "auth_ui_component.wasm"
+# source = { fetch = "trailbase/auth_ui" }
+# refetch = true
+
+# ------------------------------------------------------------------------------
 # TrailBase bootstrap
 #
 # Applied ONCE — on the very first startup when

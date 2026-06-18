@@ -4,5 +4,3 @@
 
 [env]
 APP_SKIP_WASM = "0"
-APP_WASM_PACKAGE = "trail-auth-component"
-APP_COMPONENTS__FORCE_REPLACE = "true"

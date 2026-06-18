@@ -1,4 +1,5 @@
 use super::bootstrap::SmtpEncryptionSetting;
+use super::components::ComponentSource;
 use super::loader::Settings;
 use config::{Config, ConfigError, FileFormat};
 use indoc::indoc;
@@ -333,5 +334,203 @@ fn email_template_all_four_parse() {
     assert_eq!(
         s.trailbase.email.password_reset.subject,
         "Reset your password"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Component settings tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn component_source_build_round_trips_through_config() {
+    let overlay = indoc! {r#"
+        [[components.items]]
+        name = "auth_ui"
+        wasm = "auth_ui_component.wasm"
+        source = { build = "auth-ui-component" }
+    "#};
+    let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+    assert_eq!(s.components.items.len(), 1);
+    assert_eq!(s.components.items[0].name, "auth_ui");
+    assert_eq!(
+        s.components.items[0].source,
+        ComponentSource::Build("auth-ui-component".to_string())
+    );
+}
+
+#[test]
+fn component_source_fetch_round_trips_through_config() {
+    let overlay = indoc! {r#"
+        [[components.items]]
+        name = "auth_ui"
+        wasm = "auth_ui_component.wasm"
+        source = { fetch = "trailbase/auth_ui" }
+    "#};
+    let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+    assert_eq!(s.components.items.len(), 1);
+    assert_eq!(
+        s.components.items[0].source,
+        ComponentSource::Fetch("trailbase/auth_ui".to_string())
+    );
+}
+
+#[test]
+fn component_settings_default_to_empty() {
+    let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
+    assert!(!s.components.rebuild);
+    assert!(!s.components.refetch);
+    assert!(s.components.items.is_empty());
+}
+
+#[test]
+fn component_global_rebuild_refetch_parse() {
+    let overlay = indoc! {r#"
+        [components]
+        rebuild = true
+        refetch = true
+    "#};
+    let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+    assert!(s.components.rebuild);
+    assert!(s.components.refetch);
+}
+
+#[test]
+fn per_item_rebuild_override_parses() {
+    let overlay = indoc! {r#"
+        [[components.items]]
+        name = "trail_auth"
+        wasm = "trail_auth_component.wasm"
+        source = { build = "trail-auth-component" }
+        rebuild = true
+    "#};
+    let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+    assert_eq!(s.components.items[0].rebuild, Some(true));
+    assert_eq!(s.components.items[0].refetch, None);
+}
+
+#[test]
+fn multiple_items_parse_in_order() {
+    let overlay = indoc! {r#"
+        [[components.items]]
+        name = "auth_ui"
+        wasm = "auth_ui_component.wasm"
+        source = { fetch = "trailbase/auth_ui" }
+
+        [[components.items]]
+        name = "trail_auth"
+        wasm = "trail_auth_component.wasm"
+        source = { build = "trail-auth-component" }
+    "#};
+    let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+    assert_eq!(s.components.items.len(), 2);
+    assert_eq!(s.components.items[0].name, "auth_ui");
+    assert_eq!(s.components.items[1].name, "trail_auth");
+}
+
+#[test]
+fn overlay_replaces_items_array_wholesale() {
+    // Base has two items; overlay provides one item.
+    // The config crate replaces arrays wholesale — result has 1 item, not 3.
+    let base = indoc! {r#"
+        [server]
+        address = "0.0.0.0:4000"
+
+        [frontend]
+        build = false
+        watch = false
+        public_dir = ""
+
+        [mailcrab]
+        dev_intercept = false
+        path = "/_/mailcrab"
+        smtp_host = "127.0.0.1"
+        smtp_port = 1025
+
+        [trailbase.server]
+        application_name = "Argiago"
+        site_url = "http://localhost:4000"
+        logs_retention_sec = 604800
+
+        [trailbase.auth]
+        disable_password_auth = false
+        enable_otp_signin = false
+
+        [[components.items]]
+        name = "auth_ui"
+        wasm = "auth_ui_component.wasm"
+        source = { fetch = "trailbase/auth_ui" }
+
+        [[components.items]]
+        name = "trail_auth"
+        wasm = "trail_auth_component.wasm"
+        source = { build = "trail-auth-component" }
+    "#};
+    let overlay = indoc! {r#"
+        [[components.items]]
+        name = "trail_auth"
+        wasm = "trail_auth_component.wasm"
+        source = { build = "trail-auth-component" }
+    "#};
+    let s = settings_from_toml(base, overlay).expect("should deserialize");
+    assert_eq!(
+        s.components.items.len(),
+        1,
+        "overlay must replace the items array wholesale, not merge"
+    );
+    assert_eq!(s.components.items[0].name, "trail_auth");
+}
+
+#[test]
+fn env_override_sets_components_rebuild() {
+    // This test uses the real Environment source with prefix APP.
+    // Safe because no other test in this module reads env vars.
+    // SAFETY: no other test in this module reads env vars concurrently.
+    unsafe { std::env::set_var("APP_COMPONENTS__REBUILD", "true"); }
+    let result = Config::builder()
+        .add_source(config::File::from_str(BASE_TOML, FileFormat::Toml))
+        .add_source(
+            config::Environment::with_prefix("APP")
+                .prefix_separator("_")
+                .separator("__")
+                .try_parsing(true),
+        )
+        .build()
+        .unwrap()
+        .try_deserialize::<Settings>();
+    // SAFETY: test teardown — removing our own env var.
+    unsafe { std::env::remove_var("APP_COMPONENTS__REBUILD"); }
+    let s = result.expect("should deserialize with env override");
+    assert!(
+        s.components.rebuild,
+        "APP_COMPONENTS__REBUILD=true should set components.rebuild"
+    );
+}
+
+#[test]
+fn appsettings_example_toml_parses() {
+    // The example file is the canonical reference for all available settings.
+    // It must remain in sync with the `Settings` struct — this test guards that
+    // contract by parsing it through the same config builder the app uses.
+    let example = include_str!("../../appsettings.example.toml");
+    let s = settings_from_toml(example, "").expect("example should deserialize as Settings");
+    assert_eq!(s.server.address, "0.0.0.0:4000");
+    assert!(!s.frontend.build);
+    assert!(!s.frontend.watch);
+    assert_eq!(s.trailbase.server.application_name, "Argiago");
+    assert!(
+        s.trailbase.auth.oidc0.is_some(),
+        "oidc0 should be Some when client_id is set in the example"
+    );
+    assert!(
+        !s.trailbase.smtp.is_configured(),
+        "smtp should not be configured when smtp_host is empty in the example"
+    );
+    // Live example shows the auth_ui fetch variant. The trail_auth build
+    // variant is commented out in the example file — see file for details.
+    assert_eq!(s.components.items.len(), 1);
+    assert_eq!(s.components.items[0].name, "auth_ui");
+    assert_eq!(
+        s.components.items[0].source,
+        ComponentSource::Fetch("trailbase/auth_ui".to_string())
     );
 }

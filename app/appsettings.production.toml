@@ -8,3 +8,13 @@ site_url = "https://argiago.ru"
 [trailbase.auth]
 disable_password_auth = true
 enable_otp_signin = false
+
+[components]
+rebuild = false
+refetch = false
+
+[[components.items]]
+name = "trail_auth"
+wasm = "trail_auth_component.wasm"
+[components.items.source]
+fetch = "https://github.com/zyrakq/trail-auth/releases/latest/download/trail_auth_component.wasm"
