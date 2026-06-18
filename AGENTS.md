@@ -46,6 +46,24 @@ The logging setup is a two-system arrangement that must not be broken:
 
 This constraint was discovered and fixed in the mailcrab integration (Jun 2026).
 
+## sccache — DO NOT BYPASS
+
+`sccache` is configured in `.cargo/config.toml` as `rustc-wrapper = "sccache"`.
+It is an intentional, project-wide setup that caches Cargo compilations across
+invocations and is essential to keep rebuild times bearable on this workspace.
+
+**Never:**
+
+- Set `RUSTC_WRAPPER=""` (or any empty value) to disable the wrapper — even for a
+  "single invocation"
+- Override `RUSTC_WRAPPER` or `SCCACHE_*` env vars to work around sccache
+- Strip `.cargo/config.toml`'s `rustc-wrapper` line to "fix" a failing build
+- Recommend disabling sccache as a workaround for any build issue
+
+**If sccache appears missing or a build fails because of it, the correct response is
+to install it** (`cargo install sccache` or your distro's package), not to bypass it.
+Stop and ask the user instead of unilaterally disabling the cache.
+
 ## Future Considerations
 
 - **Tauri**: Planned for future desktop distribution (not yet implemented)
