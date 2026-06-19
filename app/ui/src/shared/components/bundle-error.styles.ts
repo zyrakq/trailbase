@@ -5,21 +5,19 @@ export const bundleErrorStyles = css`
     display: block;
   }
 
-  .status-card {
-    background: var(--theme-color-surface);
-    border-radius: 8px;
-    box-shadow: var(--theme-shadow-md);
-    padding: 2rem;
+  /*
+   * Generic centered layout for the error content. Deliberately NOT a card —
+   * background, shadow, padding and max-width belong to the consumer's
+   * container (modal, page, etc.). Prescribing them here caused width
+   * conflicts and double-card nesting when embedded inside another surface.
+   */
+  .status-content {
     width: 100%;
-    max-width: 420px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.75rem;
     text-align: center;
-    transition:
-      background-color 0.2s ease,
-      box-shadow 0.2s ease;
   }
 
   .status-icon {
@@ -78,11 +76,5 @@ export const bundleErrorStyles = css`
 
   .btn-primary:active {
     background: var(--theme-color-primary-active);
-  }
-
-  @media (max-width: 640px) {
-    .status-card {
-      padding: 1.5rem 1rem;
-    }
   }
 `;

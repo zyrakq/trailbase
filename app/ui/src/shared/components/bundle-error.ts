@@ -22,7 +22,7 @@ export class BundleError extends LitElement {
 
   render() {
     return html`
-      <div class="status-card">
+      <div class="status-content">
         <div class="status-icon error-icon">✕</div>
         <h2 class="status-title">${msg('Something went wrong')}</h2>
         <p class="status-message">${this.message}</p>
