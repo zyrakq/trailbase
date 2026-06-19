@@ -1,67 +1,48 @@
 # Argiago — Agent Reference
 
-Primary documentation is in two canonical files:
-
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** — Tech stack, repo layout, feature modules,
-  data flows, build & deploy commands
-- **[CODE_STYLE.md](./CODE_STYLE.md)** — Naming, component structure, imports, theming,
-  localization, code patterns, error handling
+Primary docs: [ARCHITECTURE.md](./ARCHITECTURE.md) (stack, layout, flows) and
+[CODE_STYLE.md](./CODE_STYLE.md) (naming, components, theming, i18n).
 
 ## Essential Constraints
 
-- `vendor/react/src/web` is a **read-only** reference folder — never modify
-- `vendor/trailbase/` may be patched to fix upstream bugs — keep changes minimal and documented
-- `vendor/mailcrab/backend/` has a minimal lib-target patch — do not add further
-  modifications beyond what is already in `src/lib.rs` and `src/app_state.rs`
-- Use **bun** for frontend tasks, **cargo** for backend
-- All comments and documentation must be in **English**
-- **NEVER run `cargo clean`** — it wipes the entire build cache and forces a
-  full recompilation of every crate, which is extremely costly on this workspace.
-  If a build artifact is stale, rebuild the specific package instead.
+- `vendor/react/src/web` — **read-only**, never modify
+- `vendor/trailbase/` — patches allowed only to fix upstream bugs; keep minimal + documented
+- `vendor/mailcrab/backend/` — no changes beyond existing `src/lib.rs` and `src/app_state.rs`
+- **bun** for frontend, **cargo** for backend; all comments/docs in **English**
+- **NEVER `cargo clean`** — rebuild specific packages instead
 
 ## Comments
 
-Add comments only when the code cannot speak for itself — non-obvious side-effects,
-counter-intuitive decisions, or subtle invariants. Do not add doc-comments (`///`, `/** */`)
-to every struct, field, or function; do not narrate what the code obviously does with
-inline comments. Match the comment density of the surrounding file.
+Comment only non-obvious side-effects, counter-intuitive decisions, or invariants.
+No doc-comments on every struct/field/function; don't narrate obvious code. Match
+surrounding density.
 
 ## Logging — DO NOT TOUCH
 
-The logging setup is a two-system arrangement that must not be broken:
+Two coexisting systems; breaking either panics: `pretty_env_logger` owns the `log`
+global logger (`logging::init()`), **TrailBase** owns the `tracing` subscriber
+(`Server::init()`).
 
-- `pretty_env_logger` owns the **`log` crate** global logger (set via `logging::init()`)
-- **TrailBase** owns the **`tracing` subscriber** (set in `Server::init()`)
-- `tracing-subscriber` must be built **without** the `tracing-log` feature; otherwise
-  its `LogTracer` bridge tries to call `log::set_logger()` a second time and **panics**
+**Never:** remove `pretty_env_logger`; call `tracing_subscriber::*init*` in argiago
+code; enable `tracing-log` feature (or omit `default-features = false`) on
+`tracing-subscriber`; move `logging::init()` after `Server::init()`. Discovered
+during mailcrab integration (Jun 2026).
 
-**Never:**
+## Build cache — sccache & cargo subagents
 
-- Remove or replace `pretty_env_logger` — it is the only `log` output for non-tracing crates
-- Call `tracing_subscriber::...init()` or `tracing_subscriber::...try_init()` anywhere in
-  argiago code — TrailBase owns that
-- Add `default-features = true` (or omit `default-features = false`) to any new dependency
-  on `tracing-subscriber` — the `tracing-log` default feature breaks the setup
-- Move `logging::init()` after `trailbase::Server::init()` — the env var must be set first
+`sccache` (`.cargo/config.toml`) is mandatory for tolerable rebuilds.
 
-This constraint was discovered and fixed in the mailcrab integration (Jun 2026).
+**Never:** bypass it (`RUSTC_WRAPPER=""`, override `SCCACHE_*`) — reinstall if broken;
+run `cargo` in **parallel subagents** (locks + cache thrash). All cargo verification
+(`check`/`build`/`test`) runs in the **main thread, sequentially**; subagents edit only.
 
-## Build cache — sccache and cargo subagent discipline
+## `thoughts/` — never commit
 
-`sccache` is configured in `.cargo/config.toml` (`rustc-wrapper = "sccache"`) and
-is essential for tolerable rebuild times on this workspace.
+Gitignored (`.gitignore` entry `thoughts`): design docs, plans, ledgers stay local.
 
-**Never:**
+**Never:** `git add thoughts/...`, or `git add .`/`-A`/`-f` to work around the ignore.
+Writing a doc/plan is the final step — don't follow it with `git add` + `git commit`.
 
-- Bypass sccache by setting `RUSTC_WRAPPER=""` or overriding `SCCACHE_*` env vars
-  — not even for a "single invocation". If sccache is missing or broken, install
-  it (`cargo install sccache`) instead of disabling it.
-- Run `cargo` commands inside **parallel subagents**. Cargo locks the build
-  directory and concurrent invocations thrash sccache, triggering full rebuilds
-  that wipe the cache for everyone. All `cargo` verification (`check`, `build`,
-  `test`) belongs in the **main agent thread, executed sequentially**. Subagents
-  (implementer, reviewer, etc.) must edit files only — never invoke the toolchain.
+## Future
 
-## Future Considerations
-
-- **Tauri**: Planned for future desktop distribution (not yet implemented)
+- **Tauri** — planned desktop distribution (not yet implemented)
