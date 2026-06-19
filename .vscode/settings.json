@@ -49,9 +49,15 @@
     "app/ui"
   ],
   "rust-analyzer.server.extraEnv": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER": "clang",
+    "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS": "-C link-arg=-fuse-ld=mold -C link-arg=-Wl,--icf=all",
     "RUSTC_WRAPPER": "sccache"
   },
   "rust-analyzer.cargo.extraEnv": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER": "clang",
+    "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS": "-C link-arg=-fuse-ld=mold -C link-arg=-Wl,--icf=all",
     "RUSTC_WRAPPER": "sccache"
   }
 }
