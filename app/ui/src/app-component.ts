@@ -55,9 +55,9 @@ export class AppComponent extends LitElement {
       enter: async () => {
         await authService.init();
         if (!authService.isAuthenticated()) {
-          this._router.goto('/');
+          window.location.href = '/';
         } else {
-          this._router.goto('/profile');
+          window.location.href = '/profile';
         }
         return false;
       },
@@ -68,7 +68,7 @@ export class AppComponent extends LitElement {
       enter: async () => {
         await authService.init();
         if (!authService.isAuthenticated()) {
-          this._router.goto('/');
+          window.location.href = '/';
           return false;
         }
         return true;
