@@ -1,45 +1,19 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, type TemplateResult } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
+import { bundleLoader } from '@/shared';
+import type { BundleStatus } from '@/shared';
+import '@/shared/components/bundle-error';
+import { configService } from '../services/config.service';
 import { authModalStyles } from './auth-modal.styles';
-import { configService } from '@/features/auth/services/config.service';
 import { authService } from '../services/auth.service';
-
-// trail-auth bundle is loaded lazily on first open via a <script> tag.
-// The bundle URL is served by the trail-auth-component WASM.
-const TRAIL_AUTH_BUNDLE = '/_/auth/bundle.js';
-
-let bundleLoaded = false;
-
-function loadTrailAuthBundle(): Promise<void> {
-  if (bundleLoaded) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(
-      `script[src="${TRAIL_AUTH_BUNDLE}"]`
-    );
-    if (existing) {
-      bundleLoaded = true;
-      resolve();
-      return;
-    }
-    const script = document.createElement('script');
-    script.type = 'module';
-    script.src = TRAIL_AUTH_BUNDLE;
-    script.onload = () => {
-      bundleLoaded = true;
-      resolve();
-    };
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-}
 
 @customElement('auth-modal')
 @localized()
 export class AuthModal extends LitElement {
   @state() private isOpen = false;
-  @state() private bundleReady = false;
+  @state() private bundleStatus: BundleStatus = bundleLoader.getStatus();
 
   @state() private passwordAuthEnabled = true;
   @state() private registrationEnabled = true;
@@ -60,28 +34,17 @@ export class AuthModal extends LitElement {
       });
     }
 
-    if (!this.bundleReady) {
-      loadTrailAuthBundle()
-        .then(() => customElements.whenDefined('trail-auth'))
-        .then(() => {
-          this.bundleReady = true;
-          // Reset trail-auth state if already in DOM.
-          const el = this.shadowRoot?.querySelector('trail-auth') as
-            | (HTMLElement & { reset?: () => void })
-            | null;
-          el?.reset?.();
-        })
-        .catch(() => {
-          // Bundle load failure is non-fatal — the component won't render but
-          // the host app remains functional.
-        });
-    } else {
-      // Bundle already loaded — reset view state.
-      const el = this.shadowRoot?.querySelector('trail-auth') as
-        | (HTMLElement & { reset?: () => void })
-        | null;
-      el?.reset?.();
+    void bundleLoader.loadTrailAuth();
+    if (bundleLoader.getStatus() === 'ready') {
+      this.resetTrailAuth();
     }
+  }
+
+  private resetTrailAuth() {
+    const el = this.shadowRoot?.querySelector('trail-auth') as
+      | (HTMLElement & { reset?: () => void })
+      | null;
+    el?.reset?.();
   }
 
   close() {
@@ -106,15 +69,29 @@ export class AuthModal extends LitElement {
     if (e.key === 'Escape' && this.isOpen) this.close();
   };
 
+  private handleBundleStatusChanged = (e: Event): void => {
+    const detail = (e as CustomEvent<{ status: BundleStatus }>).detail;
+    this.bundleStatus = detail.status;
+  };
+
   connectedCallback() {
     super.connectedCallback();
     window.addEventListener('keydown', this.handleKeyDown);
+    this.bundleStatus = bundleLoader.getStatus();
+    window.addEventListener(
+      'bundle-status-changed',
+      this.handleBundleStatusChanged
+    );
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener('keydown', this.handleKeyDown);
     document.body.style.overflow = '';
+    window.removeEventListener(
+      'bundle-status-changed',
+      this.handleBundleStatusChanged
+    );
   }
 
   private async handleAuthSuccess() {
@@ -155,25 +132,36 @@ export class AuthModal extends LitElement {
             </button>
           </div>
           <div class="modal-content">
-            ${this.bundleReady
-              ? html`<trail-auth
-                  ?no-password-auth=${!this.passwordAuthEnabled}
-                  ?no-registration=${!this.registrationEnabled}
-                ></trail-auth>`
-              : html`
-                  <div
-                    class="auth-skeleton"
-                    aria-busy="true"
-                    aria-label=${msg('Loading sign-in form')}
-                  >
-                    <div class="skeleton-title"></div>
-                    <div class="skeleton-field"></div>
-                    <div class="skeleton-field"></div>
-                    <div class="skeleton-btn"></div>
-                  </div>
-                `}
+            ${this.renderAuthContent()}
           </div>
         </div>
+      </div>
+    `;
+  }
+
+  private renderAuthContent(): TemplateResult {
+    if (this.bundleStatus === 'ready') {
+      return html`<trail-auth
+        ?no-password-auth=${!this.passwordAuthEnabled}
+        ?no-registration=${!this.registrationEnabled}
+      ></trail-auth>`;
+    }
+    if (this.bundleStatus === 'error') {
+      return html`<bundle-error
+        message=${msg('Failed to load authentication module')}
+        @bundle-error-retry=${() => bundleLoader.retry()}
+      ></bundle-error>`;
+    }
+    return html`
+      <div
+        class="auth-skeleton"
+        aria-busy="true"
+        aria-label=${msg('Loading sign-in form')}
+      >
+        <div class="skeleton-title"></div>
+        <div class="skeleton-field"></div>
+        <div class="skeleton-field"></div>
+        <div class="skeleton-btn"></div>
       </div>
     `;
   }

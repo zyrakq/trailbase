@@ -314,6 +314,14 @@
   <source>Close all</source>
   <target>全部关闭</target>
 </trans-unit>
+<trans-unit id="sac591431ed17ae9f">
+  <source>Failed to load authentication module</source>
+  <target>无法加载身份验证模块</target>
+</trans-unit>
+<trans-unit id="s2c8189544e3ea679">
+  <source>Retry</source>
+  <target>重试</target>
+</trans-unit>
 </body>
 </file>
 </xliff>

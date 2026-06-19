@@ -1,4 +1,4 @@
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
@@ -7,41 +7,33 @@ import { notificationService } from '@/features/notifications';
 import type { User } from '@/features/auth';
 import '@/shared/components/app-header';
 import '@/shared/components/footer-info';
-
-const TRAIL_AUTH_BUNDLE = '/_/auth/bundle.js';
-let bundleLoaded = false;
-
-function loadBundle(): Promise<void> {
-  if (bundleLoaded) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${TRAIL_AUTH_BUNDLE}"]`);
-    if (existing) { bundleLoaded = true; resolve(); return; }
-    const script = document.createElement('script');
-    script.type = 'module';
-    script.src = TRAIL_AUTH_BUNDLE;
-    script.onload = () => { bundleLoaded = true; resolve(); };
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-}
+import { bundleLoader } from '@/shared';
+import type { BundleStatus } from '@/shared';
+import '@/shared/components/bundle-error';
 
 @customElement('profile-page')
 @localized()
 export class ProfilePage extends LitElement {
   @state() private user: User | null = null;
-  @state() private bundleReady = false;
+  @state() private bundleStatus: BundleStatus = bundleLoader.getStatus();
 
-  async connectedCallback() {
+  private handleBundleStatusChanged = (event: Event): void => {
+    const detail = (event as CustomEvent<{ status: BundleStatus }>).detail;
+    this.bundleStatus = detail.status;
+  };
+
+  connectedCallback() {
     super.connectedCallback();
     const authState = authService.getAuthState();
     this.user = authState.user;
-    try {
-      await loadBundle();
-      await customElements.whenDefined('trail-profile');
-      this.bundleReady = true;
-    } catch {
-      // Bundle failed to load — profile component stays hidden
-    }
+    this.bundleStatus = bundleLoader.getStatus();
+    window.addEventListener('bundle-status-changed', this.handleBundleStatusChanged);
+    bundleLoader.loadTrailAuth();
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener('bundle-status-changed', this.handleBundleStatusChanged);
   }
 
   private async handleSignOut() {
@@ -59,22 +51,37 @@ export class ProfilePage extends LitElement {
     window.location.href = '/';
   }
 
+  private renderProfileContent(): TemplateResult {
+    if (this.bundleStatus === 'ready') {
+      return html`
+        <trail-profile
+          .email=${this.user?.email ?? ''}
+          ?has-mfa=${authService.getAuthState().hasMfa}
+          @trail-profile-sign-out=${this.handleSignOut}
+          @trail-profile-account-deleted=${this.handleAccountDeleted}
+        ></trail-profile>
+      `;
+    }
+
+    if (this.bundleStatus === 'error') {
+      return html`
+        <bundle-error
+          message=${msg('Failed to load authentication module')}
+          @bundle-error-retry=${() => bundleLoader.retry()}
+        ></bundle-error>
+      `;
+    }
+
+    return html`<div class="skeleton"></div>`;
+  }
+
   render() {
     return html`
       <div class="page">
         <app-header></app-header>
         <main class="main-content">
           <div class="profile-container">
-            ${this.bundleReady
-              ? html`
-                  <trail-profile
-                    .email=${this.user?.email ?? ''}
-                    ?has-mfa=${authService.getAuthState().hasMfa}
-                    @trail-profile-sign-out=${this.handleSignOut}
-                    @trail-profile-account-deleted=${this.handleAccountDeleted}
-                  ></trail-profile>
-                `
-              : html`<div class="skeleton"></div>`}
+            ${this.renderProfileContent()}
           </div>
         </main>
         <footer-info></footer-info>

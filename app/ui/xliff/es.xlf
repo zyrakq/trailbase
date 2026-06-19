@@ -314,6 +314,14 @@
   <source>Close all</source>
   <target>Cerrar todo</target>
 </trans-unit>
+<trans-unit id="sac591431ed17ae9f">
+  <source>Failed to load authentication module</source>
+  <target>No se pudo cargar el módulo de autenticación</target>
+</trans-unit>
+<trans-unit id="s2c8189544e3ea679">
+  <source>Retry</source>
+  <target>Reintentar</target>
+</trans-unit>
 </body>
 </file>
 </xliff>

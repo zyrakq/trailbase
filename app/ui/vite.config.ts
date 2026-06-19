@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -21,5 +22,10 @@ export default defineConfig(({ mode }) => ({
   build: {
     sourcemap: mode === 'development',
     minify: mode === 'production',
+  },
+  test: {
+    environment: 'happy-dom',
+    include: ['src/**/*.test.ts'],
+    passWithNoTests: true,
   },
 }));
