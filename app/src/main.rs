@@ -1,4 +1,3 @@
-#[cfg(test)] mod build_settings;
 mod components;
 mod frontend;
 mod frontend_assets;
