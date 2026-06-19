@@ -85,10 +85,10 @@
 'sf3fda5790cfa46f6': `Error al conectar con el servidor de autenticación. La conexión fue rechazada debido a tiempo de espera de red (código de error: ETIMEDOUT). Por favor verifica tu conexión a internet e intenta de nuevo. Si el problema persiste, contacta a tu administrador del sistema.`,
 'sf5944cc0bdc8bc60': `Cerrar todo`,
 'sffef1a8596bc58bb': `Autenticando...`,
-'s75cd2f130b244369': `Welcome to velora`,
 'sec617ad1a555a9ac': `velora`,
 's5b8b13ceea6996fb': `Velora GitHub`,
 'sa1eda5e887fbd9eb': `Velora Docs`,
 's8acef63bc6775608': `Velora Repository`,
+'s75cd2f130b244369': `Welcome to velora`,
     };
   

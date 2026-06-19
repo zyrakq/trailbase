@@ -85,10 +85,10 @@
 'sf3fda5790cfa46f6': `无法连接到身份验证服务器。由于网络超时，连接被拒绝（错误代码：ETIMEDOUT）。请检查您的互联网连接并重试。如果问题仍然存在，请联系系统管理员寻求帮助。`,
 'sf5944cc0bdc8bc60': `全部关闭`,
 'sffef1a8596bc58bb': `正在验证身份...`,
-'s75cd2f130b244369': `Welcome to velora`,
 'sec617ad1a555a9ac': `velora`,
 's5b8b13ceea6996fb': `Velora GitHub`,
 'sa1eda5e887fbd9eb': `Velora Docs`,
 's8acef63bc6775608': `Velora Repository`,
+'s75cd2f130b244369': `Welcome to velora`,
     };
   
