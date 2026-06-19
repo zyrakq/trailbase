@@ -68,7 +68,7 @@ impl Guest for Endpoints {
                         .map_err(internal);
                 },
             ),
-            // Profile capabilities endpoint — required by the Argiago host app
+            // Profile capabilities endpoint — required by the Velora host app
             // to determine whether to show the OTP/change-password sections.
             routing::get(
                 "/api/auth/v1/profile",

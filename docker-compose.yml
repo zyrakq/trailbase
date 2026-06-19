@@ -6,17 +6,17 @@ x-logging: &default-logging
     compress: ${LOG_COMPRESS:-true}
 
 services:
-  argiago-web:
-    container_name: argiago-web
-    image: argiago
+  velora-web:
+    container_name: velora-web
+    image: velora
     build: .
     restart: unless-stopped
     logging: *default-logging
     ports:
       - 4000:4000
     volumes:
-      - argiago-traildepot:/workspace/app/traildepot
+      - velora-traildepot:/workspace/app/traildepot
 
 volumes:
-  argiago-traildepot:
+  velora-traildepot:
     name: argiago-traildepot

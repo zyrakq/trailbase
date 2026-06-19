@@ -20,27 +20,27 @@ export class FooterInfo extends LitElement {
         </div>
         <div class="right">
           <a
-            href="https://github.com/zyrakq/argiago"
+            href="https://github.com/zyrakq/velora"
             target="_blank"
             rel="noopener noreferrer"
           >
-            ${msg('Argiago GitHub')}
+            ${msg('Velora GitHub')}
           </a>
           <span class="separator">•</span>
           <a
-            href="https://github.com/zyrakq/argiago#readme"
+            href="https://github.com/zyrakq/velora#readme"
             target="_blank"
             rel="noopener noreferrer"
           >
-            ${msg('Argiago Docs')}
+            ${msg('Velora Docs')}
           </a>
           <span class="separator">•</span>
           <a
-            href="https://github.com/zyrakq/argiago"
+            href="https://github.com/zyrakq/velora"
             target="_blank"
             rel="noopener noreferrer"
           >
-            ${msg('Argiago Repository')}
+            ${msg('Velora Repository')}
           </a>
           <span class="separator">•</span>
         </div>

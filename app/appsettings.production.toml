@@ -3,7 +3,7 @@ serve_from = "embedded"
 password_auth_enabled = false
 
 [trailbase.server]
-site_url = "https://argiago.ru"
+site_url = "https://velora.ru"
 
 [trailbase.auth]
 disable_password_auth = true

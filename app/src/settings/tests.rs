@@ -29,7 +29,7 @@ const BASE_TOML: &str = indoc! {r#"
     smtp_port = 1025
 
     [trailbase.server]
-    application_name = "Argiago"
+    application_name = "Velora"
     site_url = "http://localhost:4000"
     logs_retention_sec = 604800
 
@@ -150,7 +150,7 @@ fn email_dev_intercept_can_be_enabled() {
         smtp_port = 1025
 
         [trailbase.server]
-        application_name = "Argiago"
+        application_name = "Velora"
         site_url = "http://localhost:4000"
         logs_retention_sec = 604800
 
@@ -169,7 +169,7 @@ fn email_dev_intercept_can_be_enabled() {
 #[test]
 fn trailbase_bootstrap_defaults_parse_without_oidc() {
     let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
-    assert_eq!(s.trailbase.server.application_name, "Argiago");
+    assert_eq!(s.trailbase.server.application_name, "Velora");
     assert_eq!(s.trailbase.server.site_url, "http://localhost:4000");
     assert_eq!(s.trailbase.server.logs_retention_sec, 604800);
     assert!(!s.trailbase.auth.disable_password_auth);
@@ -201,15 +201,15 @@ fn trailbase_oidc0_is_none_when_client_id_empty() {
 fn trailbase_oidc0_is_some_when_client_id_set() {
     let overlay = indoc! {r#"
         [trailbase.auth.oidc0]
-        client_id = "argiago"
+        client_id = "velora"
         client_secret = "s3cr3t"
         auth_url = "https://idm.example.com/ui/oauth2"
         token_url = "https://idm.example.com/oauth2/token"
-        user_api_url = "https://idm.example.com/oauth2/openid/argiago/userinfo"
+        user_api_url = "https://idm.example.com/oauth2/openid/velora/userinfo"
     "#};
     let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
     let oidc = s.trailbase.auth.oidc0.expect("oidc0 should be Some");
-    assert_eq!(oidc.client_id, "argiago");
+    assert_eq!(oidc.client_id, "velora");
     assert_eq!(oidc.client_secret, "s3cr3t");
 }
 
@@ -233,8 +233,8 @@ fn trailbase_smtp_with_host_is_configured() {
         smtp_host = "mail.example.com"
         smtp_port = 465
         smtp_encryption = "tls"
-        sender_name = "Argiago"
-        sender_address = "noreply@argiago.ru"
+        sender_name = "Velora"
+        sender_address = "noreply@velora.ru"
     "#};
     let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
     assert!(s.trailbase.smtp.is_configured());
@@ -244,8 +244,8 @@ fn trailbase_smtp_with_host_is_configured() {
         s.trailbase.smtp.smtp_encryption,
         SmtpEncryptionSetting::Tls
     ));
-    assert_eq!(s.trailbase.smtp.sender_name, "Argiago");
-    assert_eq!(s.trailbase.smtp.sender_address, "noreply@argiago.ru");
+    assert_eq!(s.trailbase.smtp.sender_name, "Velora");
+    assert_eq!(s.trailbase.smtp.sender_address, "noreply@velora.ru");
 }
 
 #[test]
@@ -266,16 +266,16 @@ fn trailbase_smtp_encryption_none_parses() {
 fn trailbase_smtp_sender_only_without_host_is_not_configured() {
     let overlay = indoc! {r#"
         [trailbase.smtp]
-        sender_name = "Argiago"
-        sender_address = "noreply@argiago.ru"
+        sender_name = "Velora"
+        sender_address = "noreply@velora.ru"
     "#};
     let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
     assert!(
         !s.trailbase.smtp.is_configured(),
         "smtp.is_configured() must be false when only sender fields are set"
     );
-    assert_eq!(s.trailbase.smtp.sender_name, "Argiago");
-    assert_eq!(s.trailbase.smtp.sender_address, "noreply@argiago.ru");
+    assert_eq!(s.trailbase.smtp.sender_name, "Velora");
+    assert_eq!(s.trailbase.smtp.sender_address, "noreply@velora.ru");
 }
 
 #[test]
@@ -456,7 +456,7 @@ fn overlay_replaces_items_array_wholesale() {
         smtp_port = 1025
 
         [trailbase.server]
-        application_name = "Argiago"
+        application_name = "Velora"
         site_url = "http://localhost:4000"
         logs_retention_sec = 604800
 
@@ -525,7 +525,7 @@ fn appsettings_example_toml_parses() {
     assert_eq!(s.server.address, "0.0.0.0:4000");
     assert_eq!(s.frontend.effective_serve_from(), "disk");
     assert!(!s.frontend.watch);
-    assert_eq!(s.trailbase.server.application_name, "Argiago");
+    assert_eq!(s.trailbase.server.application_name, "Velora");
     assert!(
         s.trailbase.auth.oidc0.is_some(),
         "oidc0 should be Some when client_id is set in the example"
@@ -566,7 +566,7 @@ fn serve_from_defaults_to_disk_when_absent() {
         smtp_port = 1025
 
         [trailbase.server]
-        application_name = "Argiago"
+        application_name = "Velora"
         site_url = "http://localhost:4000"
         logs_retention_sec = 604800
 

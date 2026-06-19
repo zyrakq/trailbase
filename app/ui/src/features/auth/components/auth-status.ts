@@ -61,9 +61,9 @@ export class AuthStatus extends LitElement {
 
     return html`
       <div class="auth-card">
-        <img src=${logo} alt="argiago" class="logo" />
+        <img src=${logo} alt="velora" class="logo" />
 
-        <h1 class="title">${msg('Welcome to argiago')}</h1>
+        <h1 class="title">${msg('Welcome to velora')}</h1>
         <p class="subtitle">${msg('Sign in to continue')}</p>
 
         ${this.isAuthenticated

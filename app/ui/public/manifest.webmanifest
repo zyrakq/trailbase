@@ -1,7 +1,7 @@
 {
-  "name": "argiago",
-  "short_name": "argiago",
-  "description": "argiago application",
+  "name": "velora",
+  "short_name": "velora",
+  "description": "velora application",
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#ff6b35",

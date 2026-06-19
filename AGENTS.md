@@ -1,11 +1,10 @@
-# Argiago — Agent Reference
+# Velora — Agent Reference
 
 Primary docs: [ARCHITECTURE.md](./ARCHITECTURE.md) (stack, layout, flows) and
 [CODE_STYLE.md](./CODE_STYLE.md) (naming, components, theming, i18n).
 
 ## Essential Constraints
 
-- `vendor/react/src/web` — **read-only**, never modify
 - `vendor/trailbase/` — patches allowed only to fix upstream bugs; keep minimal + documented
 - `vendor/mailcrab/backend/` — no changes beyond existing `src/lib.rs` and `src/app_state.rs`
 - **bun** for frontend, **cargo** for backend; all comments/docs in **English**
@@ -30,7 +29,12 @@ during mailcrab integration (Jun 2026).
 
 ## Build cache — sccache & cargo subagents
 
-`sccache` (`.cargo/config.toml`) is mandatory for tolerable rebuilds.
+- Remove or replace `pretty_env_logger` — it is the only `log` output for non-tracing crates
+- Call `tracing_subscriber::...init()` or `tracing_subscriber::...try_init()` anywhere in
+  velora code — TrailBase owns that
+- Add `default-features = true` (or omit `default-features = false`) to any new dependency
+  on `tracing-subscriber` — the `tracing-log` default feature breaks the setup
+- Move `logging::init()` after `trailbase::Server::init()` — the env var must be set first
 
 **Never:** bypass it (`RUSTC_WRAPPER=""`, override `SCCACHE_*`) — reinstall if broken;
 run `cargo` in **parallel subagents** (locks + cache thrash). All cargo verification

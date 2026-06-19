@@ -40,7 +40,7 @@ export const localizationService = new LocalizationService();
 // (see app/ui/src/features/localization/data/locale-metadata.ts).
 // Reading it on bundle load lets trail-auth render in the user's
 // chosen language without the host having to call init() explicitly.
-const ARGIAGO_LOCALE_STORAGE_KEY = 'argiago-locale';
+const VELORA_LOCALE_STORAGE_KEY = 'velora-locale';
 
 // Listen for locale changes dispatched by the host app's own
 // @lit/localize instance. When the host switches locale, this listener
@@ -58,7 +58,7 @@ window.addEventListener(LOCALE_STATUS_EVENT, (event) => {
 });
 
 try {
-  const stored = localStorage.getItem(ARGIAGO_LOCALE_STORAGE_KEY);
+  const stored = localStorage.getItem(VELORA_LOCALE_STORAGE_KEY);
   if (stored && stored !== sourceLocale) {
     void localizationService.setLocale(stored);
   }

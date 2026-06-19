@@ -150,7 +150,7 @@ source = { fetch = "trailbase/auth_ui" }
 
 [trailbase.server]
 # Name shown in the TrailBase admin UI and email subjects.
-application_name = "Argiago"
+application_name = "Velora"
 
 # Canonical public URL; used in OAuth redirects and email links.
 site_url = "http://localhost:4000"
@@ -175,11 +175,11 @@ enable_otp_signin = false
 # ------------------------------------------------------------------------------
 
 [trailbase.auth.oidc0]
-client_id = "argiago"
+client_id = "velora"
 client_secret = ""
-auth_url = "https://idm.argiago.ru/ui/oauth2"
-token_url = "https://idm.argiago.ru/oauth2/token"
-user_api_url = "https://idm.argiago.ru/oauth2/openid/argiago/userinfo"
+auth_url = "https://idm.velora.ru/ui/oauth2"
+token_url = "https://idm.velora.ru/oauth2/token"
+user_api_url = "https://idm.velora.ru/oauth2/openid/velora/userinfo"
 
 # ------------------------------------------------------------------------------
 # Outgoing SMTP for TrailBase (password resets, OTP emails, etc.)

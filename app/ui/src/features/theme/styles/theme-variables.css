@@ -43,7 +43,7 @@
 
 /* ========== Dark Theme ========== */
 :root[theme="dark"] {
-  /* Primary colors - matching argiago design (orange) */
+  /* Primary colors - matching velora design (orange) */
   --theme-color-primary: #f97316;
   --theme-color-primary-hover: #ea580c;
   --theme-color-primary-active: #c2410c;
@@ -51,11 +51,11 @@
   /* Elevated surface for modals and toasts */
   --theme-color-surface-elevated: #343a40;
 
-  /* Background colors - argiago dark theme colors */
+  /* Background colors - velora dark theme colors */
   --theme-color-background: #212529;
   --theme-color-surface: #2c3136;
 
-  /* Text colors - argiago dark theme colors */
+  /* Text colors - velora dark theme colors */
   --theme-color-text-primary: #dee2e6;
   --theme-color-text-secondary: #adb5bd;
   --theme-color-text-muted: #6c757d;

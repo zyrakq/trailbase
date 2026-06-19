@@ -190,26 +190,6 @@
   <source>v0.0.0</source>
   <target>v0.0.0</target>
 </trans-unit>
-<trans-unit id="sf2c19b921d23f6a0">
-  <source>Welcome to argiago</source>
-  <target>欢迎使用 argiago</target>
-</trans-unit>
-<trans-unit id="sd5ce7d0a7aec4cb7">
-  <source>argiago</source>
-  <target>argiago</target>
-</trans-unit>
-<trans-unit id="sb1971760847d4502">
-  <source>Argiago GitHub</source>
-  <target>Argiago GitHub</target>
-</trans-unit>
-<trans-unit id="s69e6697ac7730542">
-  <source>Argiago Docs</source>
-  <target>Argiago 文档</target>
-</trans-unit>
-<trans-unit id="s78c4bde18c238d45">
-  <source>Argiago Repository</source>
-  <target>Argiago 仓库</target>
-</trans-unit>
 <trans-unit id="sc5161bbf7fbb7647">
   <source>Successfully signed in.</source>
   <target>登录成功。</target>
@@ -325,6 +305,20 @@
 <trans-unit id="s890a7ae7f9730ba3">
   <source>Retrying...</source>
   <target>重试中...</target>
+<trans-unit id="s75cd2f130b244369">
+  <source>Welcome to velora</source>
+</trans-unit>
+<trans-unit id="sec617ad1a555a9ac">
+  <source>velora</source>
+</trans-unit>
+<trans-unit id="s5b8b13ceea6996fb">
+  <source>Velora GitHub</source>
+</trans-unit>
+<trans-unit id="sa1eda5e887fbd9eb">
+  <source>Velora Docs</source>
+</trans-unit>
+<trans-unit id="s8acef63bc6775608">
+  <source>Velora Repository</source>
 </trans-unit>
 </body>
 </file>

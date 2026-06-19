@@ -122,7 +122,7 @@ class TotpService {
    * Extract the TOTP secret from an otpauth:// URL for manual entry display.
    * Returns null if the URL cannot be parsed.
    *
-   * Example: otpauth://totp/argiago:user@example.com?secret=JBSWY3DPEHPK3PXP&...
+   * Example: otpauth://totp/velora:user@example.com?secret=JBSWY3DPEHPK3PXP&...
    */
   extractSecret(totpUrl: string): string | null {
     try {

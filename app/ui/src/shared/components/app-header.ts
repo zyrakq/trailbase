@@ -20,8 +20,8 @@ export class AppHeader extends LitElement {
       <header>
         <div class="header-content">
           <div class="logo-section">
-            <img src=${logo} alt="argiago" class="logo" />
-            <span class="app-name">${msg('argiago')}</span>
+            <img src=${logo} alt="velora" class="logo" />
+            <span class="app-name">${msg('velora')}</span>
           </div>
           <div class="actions">
             <theme-toggler></theme-toggler>

@@ -2,13 +2,10 @@
 
 ## Overview
 
-Argiago is a content platform (author profiles, posts, subscriptions, comments) currently being
-migrated from React to Lit web components. The backend is a Rust/Axum server that embeds
-**TrailBase** — an open-source database + auth backend. The frontend is built with **Lit 3**,
-Vite, and TypeScript following a feature-based modular architecture.
-
-> **Migration status**: The `vendor/react/src/web` folder is legacy reference code — read-only,
-> do not modify. The active codebase lives entirely in `app/`.
+Velora is a subscription portal where users pay for access to third-party services. The
+backend is a Rust/Axum server that embeds **TrailBase** — an open-source database + auth
+backend. The frontend is built with **Lit 3**, Vite, and TypeScript following a feature-based
+modular architecture.
 
 ---
 
@@ -32,7 +29,7 @@ Vite, and TypeScript following a feature-based modular architecture.
 ## Repository Layout
 
 ```
-argiago/
+velora/
 ├── app/                    # Active application
 │   ├── src/                # Rust backend source
 │   │   ├── main.rs         # Backend entry point
@@ -46,7 +43,6 @@ argiago/
 │   ├── ui/                 # Frontend application (Lit + Vite)
 │   └── Cargo.toml
 ├── vendor/
-│   ├── react/              # Legacy React code — READ ONLY, do not modify
 │   ├── trailbase/          # Cloned TrailBase repo — READ ONLY, reference only
 │   │   └── crates/
 │   │       ├── auth-ui/    # Official TrailBase auth UI — reference for auth flow internals
@@ -334,7 +330,7 @@ Data lives in `app/traildepot/`.
 
 ## Configuration
 
-Argiago uses a **two-tier configuration system**: runtime settings that apply on every
+Velora uses a **two-tier configuration system**: runtime settings that apply on every
 startup, and bootstrap settings that apply only once on first start.
 
 ### Runtime Settings (`app/src/settings.rs`)
@@ -422,44 +418,6 @@ Any code → notificationService.error('msg')
          → window.dispatchEvent(CustomEvent('notification-add', { detail: {...} }))
          → <toast-container> listens → renders <toast-notification>
 ```
-
----
-
-## Migration Context (React → Lit)
-
-The `vendor/react/src/web` folder is a **read-only reference** for what features need to be built.
-The React code was never refactored and should not be used as a structural guide.
-
-### Features to Migrate (from React reference)
-
-| Feature                                       | Status                      |
-| --------------------------------------------- | --------------------------- |
-| Auth (login/logout/OAuth callback)            | ✅ Done                     |
-| Theme (light/dark toggle)                     | ✅ Done                     |
-| Localization (i18n, locale switcher)          | ✅ Done                     |
-| Notifications (toasts)                        | ✅ Done                     |
-| Welcome page                                  | ✅ Done                     |
-| Dashboard page (basic)                        | ✅ Done (stub)              |
-| Home page (landing)                           | Pending                     |
-| Profile page (author + posts + subscriptions) | Pending                     |
-| Post detail page (single post + comments)     | Pending                     |
-| New post page (rich text editor + drafts)     | Pending                     |
-| Account settings (avatar upload + currency)   | Pending                     |
-| 404 / 403 error pages                         | Pending                     |
-| Header (subscriptions drawer, profile menu)   | Partial (basic header done) |
-| Footer                                        | Partial                     |
-| Post card (rich text, access gating)          | Pending                     |
-| Comment / Reply system                        | Pending                     |
-| Subscription tier cards                       | Pending                     |
-| Follow / Unfollow button                      | Pending                     |
-| Draft management                              | Pending                     |
-| Post access control UI                        | Pending                     |
-| Currency selector                             | Pending                     |
-
-### Mock Data Strategy
-
-For development without a live backend, use **Convex** (`https://github.com/get-convex/convex-backend`)
-as the mock data backend instead of hardcoded fixtures.
 
 ---
 

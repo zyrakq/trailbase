@@ -1,4 +1,4 @@
-// Public config service — fetches argiago-specific feature flags for the frontend.
+// Public config service — fetches velora-specific feature flags for the frontend.
 // No caching: each call fetches fresh data from the server.
 
 export interface PublicConfig {

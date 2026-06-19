@@ -30,7 +30,7 @@ Runtime i18n/l10n support for Lit-based web applications using @lit/localize.
 import { msg } from '@lit/localize';
 
 render() {
-  return html`<h1>${msg('Welcome to Argiago')}</h1>`;
+  return html`<h1>${msg('Welcome to Velora')}</h1>`;
 }
 ```
 
@@ -84,8 +84,8 @@ Edit XLIFF files, adding `<target>` elements:
 
 ```xml
 <trans-unit id="s8a4d6da58d9acb76">
-  <source>Welcome to Argiago</source>
-  <target>Добро пожаловать в Argiago</target>
+  <source>Welcome to Velora</source>
+  <target>Добро пожаловать в Velora</target>
 </trans-unit>
 ```
 
