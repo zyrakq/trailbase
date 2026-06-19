@@ -36,6 +36,25 @@ export const bundleErrorStyles = css`
     background: var(--theme-color-error);
   }
 
+  /*
+   * Same size as .status-icon so the block does not shift height when the
+   * consumer toggles the loading flag. Mirrors the spinner pattern used by
+   * oauth-callback.
+   */
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid var(--theme-color-border);
+    border-top-color: var(--theme-color-primary);
+    border-radius: 50%;
+    animation: bundle-error-spin 1s linear infinite;
+  }
+
+  @keyframes bundle-error-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
   .status-title {
     font-size: 1rem;
     font-weight: 600;
@@ -76,5 +95,10 @@ export const bundleErrorStyles = css`
 
   .btn-primary:active {
     background: var(--theme-color-primary-active);
+  }
+
+  .btn-primary:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
   }
 `;

@@ -16,10 +16,22 @@ import '@/shared/components/bundle-error';
 export class ProfilePage extends LitElement {
   @state() private user: User | null = null;
   @state() private bundleStatus: BundleStatus = bundleLoader.getStatus();
+  /*
+   * True while a retry is in-flight after an error. Keeps the error block
+   * visible with a loading indicator instead of snapping back to the
+   * first-load skeleton.
+   */
+  @state() private retryInFlight = false;
 
   private handleBundleStatusChanged = (event: Event): void => {
     const detail = (event as CustomEvent<{ status: BundleStatus }>).detail;
-    this.bundleStatus = detail.status;
+    const next = detail.status;
+    if (this.bundleStatus === 'error' && next === 'loading') {
+      this.retryInFlight = true;
+    } else if (next === 'ready' || next === 'error') {
+      this.retryInFlight = false;
+    }
+    this.bundleStatus = next;
   };
 
   connectedCallback() {
@@ -63,10 +75,11 @@ export class ProfilePage extends LitElement {
       `;
     }
 
-    if (this.bundleStatus === 'error') {
+    if (this.bundleStatus === 'error' || this.retryInFlight) {
       return html`
         <bundle-error
           message=${msg('Failed to load authentication module')}
+          ?loading=${this.retryInFlight}
           @bundle-error-retry=${() => bundleLoader.retry()}
         ></bundle-error>
       `;

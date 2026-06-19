@@ -49,6 +49,7 @@
 's74693aa15a1926a9': `Probar Notificaciones`,
 's78c4bde18c238d45': `Repositorio Argiago`,
 's7fee95b66225e1fb': `Panel de Control`,
+'s890a7ae7f9730ba3': `Reintentando...`,
 's8fa032cdafb3c9b0': `Cerrar Sesión`,
 's92a0d19a28995530': `Éxito`,
 's92a60207dec300c0': `Enlace expirado`,

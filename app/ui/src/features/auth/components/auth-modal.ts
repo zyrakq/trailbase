@@ -14,6 +14,12 @@ import { authService } from '../services/auth.service';
 export class AuthModal extends LitElement {
   @state() private isOpen = false;
   @state() private bundleStatus: BundleStatus = bundleLoader.getStatus();
+  /*
+   * True while a retry is in-flight after an error. Keeps the error block
+   * visible with a loading indicator instead of snapping back to the
+   * first-load skeleton, which caused a jarring layout shift.
+   */
+  @state() private retryInFlight = false;
 
   @state() private passwordAuthEnabled = true;
   @state() private registrationEnabled = true;
@@ -71,7 +77,13 @@ export class AuthModal extends LitElement {
 
   private handleBundleStatusChanged = (e: Event): void => {
     const detail = (e as CustomEvent<{ status: BundleStatus }>).detail;
-    this.bundleStatus = detail.status;
+    const next = detail.status;
+    if (this.bundleStatus === 'error' && next === 'loading') {
+      this.retryInFlight = true;
+    } else if (next === 'ready' || next === 'error') {
+      this.retryInFlight = false;
+    }
+    this.bundleStatus = next;
   };
 
   connectedCallback() {
@@ -146,9 +158,10 @@ export class AuthModal extends LitElement {
         ?no-registration=${!this.registrationEnabled}
       ></trail-auth>`;
     }
-    if (this.bundleStatus === 'error') {
+    if (this.bundleStatus === 'error' || this.retryInFlight) {
       return html`<bundle-error
         message=${msg('Failed to load authentication module')}
+        ?loading=${this.retryInFlight}
         @bundle-error-retry=${() => bundleLoader.retry()}
       ></bundle-error>`;
     }

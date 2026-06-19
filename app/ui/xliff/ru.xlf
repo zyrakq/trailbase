@@ -322,6 +322,10 @@
   <source>Retry</source>
   <target>Повторить</target>
 </trans-unit>
+<trans-unit id="s890a7ae7f9730ba3">
+  <source>Retrying...</source>
+  <target>Повтор...</target>
+</trans-unit>
 </body>
 </file>
 </xliff>

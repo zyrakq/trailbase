@@ -90,6 +90,20 @@ export const authModalStyles = css`
     overflow-y: auto;
   }
 
+  /*
+   * Gentle fade-in for whichever block (skeleton, trail-auth, bundle-error)
+   * is currently mounted. Softens the visual jump when the bundle finishes
+   * loading and the real form replaces the placeholder.
+   */
+  .modal-content > :not(style) {
+    animation: contentFadeIn 0.2s ease-out;
+  }
+
+  @keyframes contentFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   @media (max-width: 640px) {
     .modal-card { max-width: 100%; }
     .modal-header { padding: 0.875rem 1rem; }

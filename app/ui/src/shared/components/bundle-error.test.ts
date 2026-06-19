@@ -42,6 +42,36 @@ describe('bundle-error', () => {
     expect(button?.textContent?.trim()).toBe('Try again');
   });
 
+  it('swaps the error icon for a spinner and disables the button when loading', async () => {
+    element.loading = true;
+    await element.updateComplete;
+
+    const spinner = element.shadowRoot?.querySelector('.spinner');
+    const icon = element.shadowRoot?.querySelector('.status-icon.error-icon');
+    const button = element.shadowRoot?.querySelector(
+      'button',
+    ) as HTMLButtonElement | null;
+
+    expect(spinner).toBeTruthy();
+    expect(icon).toBeFalsy();
+    expect(button?.disabled).toBe(true);
+    expect(button?.textContent?.trim()).toBe('Retrying...');
+  });
+
+  it('does not dispatch a retry event when loading and clicked', () => {
+    element.loading = true;
+    const handler = vi.fn();
+    document.addEventListener('bundle-error-retry', handler);
+
+    const button = element.shadowRoot?.querySelector(
+      'button',
+    ) as HTMLButtonElement | null;
+    button?.click();
+
+    expect(handler).not.toHaveBeenCalled();
+    document.removeEventListener('bundle-error-retry', handler);
+  });
+
   it('dispatches a bubbling, composed bundle-error-retry event on click', () => {
     const handler = vi.fn();
     document.addEventListener('bundle-error-retry', handler);
