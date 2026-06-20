@@ -494,7 +494,9 @@ fn env_override_sets_components_rebuild() {
     // This test uses the real Environment source with prefix APP.
     // Safe because no other test in this module reads env vars.
     // SAFETY: no other test in this module reads env vars concurrently.
-    unsafe { std::env::set_var("APP_COMPONENTS__REBUILD", "true"); }
+    unsafe {
+        std::env::set_var("APP_COMPONENTS__REBUILD", "true");
+    }
     let result = Config::builder()
         .add_source(config::File::from_str(BASE_TOML, FileFormat::Toml))
         .add_source(
@@ -507,7 +509,9 @@ fn env_override_sets_components_rebuild() {
         .unwrap()
         .try_deserialize::<Settings>();
     // SAFETY: test teardown — removing our own env var.
-    unsafe { std::env::remove_var("APP_COMPONENTS__REBUILD"); }
+    unsafe {
+        std::env::remove_var("APP_COMPONENTS__REBUILD");
+    }
     let s = result.expect("should deserialize with env override");
     assert!(
         s.components.rebuild,
@@ -542,7 +546,7 @@ fn appsettings_example_toml_parses() {
         s.components.items[0].source,
         ComponentSource::Fetch("trailbase/auth_ui".to_string())
     );
-    assert_eq!(s.branding.brand_name, Some("argiago".to_string()));
+    assert_eq!(s.branding.brand_name, Some("velora".to_string()));
     assert_eq!(s.branding.theme_color, Some("#ff6b35".to_string()));
     assert_eq!(s.branding.branding_dir, "");
 }
@@ -640,7 +644,9 @@ fn branding_toml_overrides_all_fields() {
 #[test]
 fn env_override_sets_branding_brand_name() {
     // SAFETY: no other test in this module reads APP_BRANDING__* env vars.
-    unsafe { std::env::set_var("APP_BRANDING__BRAND_NAME", "EnvBrand"); }
+    unsafe {
+        std::env::set_var("APP_BRANDING__BRAND_NAME", "EnvBrand");
+    }
     let result = Config::builder()
         .add_source(config::File::from_str(BASE_TOML, FileFormat::Toml))
         .add_source(
@@ -653,7 +659,9 @@ fn env_override_sets_branding_brand_name() {
         .unwrap()
         .try_deserialize::<Settings>();
     // SAFETY: test teardown — removing our own env var.
-    unsafe { std::env::remove_var("APP_BRANDING__BRAND_NAME"); }
+    unsafe {
+        std::env::remove_var("APP_BRANDING__BRAND_NAME");
+    }
     let s = result.expect("should deserialize with env override");
     assert_eq!(
         s.branding.brand_name,

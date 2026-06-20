@@ -14,7 +14,7 @@ export class AuthStatus extends LitElement {
   private theme = new ThemeController(this);
 
   @state()
-  private brandName = 'argiago';
+  private brandName = 'velora';
 
   @state()
   private isAuthenticated = false;

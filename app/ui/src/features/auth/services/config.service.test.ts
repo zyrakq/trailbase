@@ -85,7 +85,7 @@ describe('ConfigService', () => {
       passwordAuthEnabled: true,
       registrationEnabled: true,
       otpEnabled: true,
-      brandName: 'argiago',
+      brandName: 'velora',
       themeColor: '#ff6b35',
     });
     expect(configService.getConfig()).toEqual(config);
@@ -97,7 +97,7 @@ describe('ConfigService', () => {
     const { configService } = await loadService();
     const config = await configService.init();
 
-    expect(config.brandName).toBe('argiago');
+    expect(config.brandName).toBe('velora');
     expect(config.themeColor).toBe('#ff6b35');
   });
 
@@ -128,7 +128,7 @@ describe('ConfigService', () => {
     const { configService } = await loadService();
     await configService.init();
 
-    expect(document.title).toBe('argiago');
+    expect(document.title).toBe('velora');
     const meta = document.head.querySelector<HTMLMetaElement>(
       'meta[name="theme-color"]'
     );
@@ -166,7 +166,7 @@ describe('ConfigService', () => {
       passwordAuthEnabled: true,
       registrationEnabled: true,
       otpEnabled: true,
-      brandName: 'argiago',
+      brandName: 'velora',
       themeColor: '#ff6b35',
     });
     expect(fetchMock).not.toHaveBeenCalled();

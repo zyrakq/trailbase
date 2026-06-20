@@ -33,7 +33,7 @@ address = "0.0.0.0:4000"
 
 [branding]
 # Brand name shown in the UI.
-brand_name = "argiago"
+brand_name = "velora"
 
 # Primary theme color (hex).
 theme_color = "#ff6b35"

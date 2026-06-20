@@ -14,7 +14,7 @@ const DEFAULT_CONFIG: PublicConfig = {
   passwordAuthEnabled: true,
   registrationEnabled: true,
   otpEnabled: true,
-  brandName: 'argiago',
+  brandName: 'velora',
   themeColor: '#ff6b35',
 };
 

@@ -12,7 +12,7 @@ export class AppHeader extends LitElement {
   private theme = new ThemeController(this);
 
   @state()
-  private brandName = 'argiago';
+  private brandName = 'velora';
 
   connectedCallback(): void {
     super.connectedCallback();

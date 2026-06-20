@@ -22,7 +22,7 @@ Two coexisting systems; breaking either panics: `pretty_env_logger` owns the `lo
 global logger (`logging::init()`), **TrailBase** owns the `tracing` subscriber
 (`Server::init()`).
 
-**Never:** remove `pretty_env_logger`; call `tracing_subscriber::*init*` in argiago
+**Never:** remove `pretty_env_logger`; call `tracing_subscriber::*init*` in velora
 code; enable `tracing-log` feature (or omit `default-features = false`) on
 `tracing-subscriber`; move `logging::init()` after `Server::init()`. Discovered
 during mailcrab integration (Jun 2026).

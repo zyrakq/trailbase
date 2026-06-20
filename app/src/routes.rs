@@ -26,7 +26,7 @@ pub fn build(state: AppState) -> Router {
         .route("/api/health", get(health_check))
         .route("/api/hello", get(hello_handler))
         .route("/api/config/public", get(public_config_handler))
-        .route("/branding/*path", get(branding_handler))
+        .route("/branding/{*path}", get(branding_handler))
         .with_state(state)
 }
 

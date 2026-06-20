@@ -19,4 +19,4 @@ services:
 
 volumes:
   velora-traildepot:
-    name: argiago-traildepot
+    name: velora-traildepot

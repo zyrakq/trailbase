@@ -18,20 +18,20 @@ Three pieces make up a deployment's brand:
 ## Configuration
 
 The `[branding]` block lives in `app/appsettings.toml`. The defaults are
-suitable for the upstream Argiago build; override them per deployment.
+suitable for the upstream Velora build; override them per deployment.
 
 ### TOML
 
 ```toml
 [branding]
-brand_name = "argiago"
+brand_name = "velora"
 theme_color = "#ff6b35"
 branding_dir = ""
 ```
 
 | Key           | Default      | Meaning                                                      |
 | ------------- | ------------ | ------------------------------------------------------------ |
-| `brand_name`  | `argiago`    | Brand name shown in the header, document title, and welcome. |
+| `brand_name`  | `velora`    | Brand name shown in the header, document title, and welcome. |
 | `theme_color` | `#ff6b35`    | Hex color applied to the `<meta name="theme-color">` tag.    |
 | `branding_dir`| `""`         | Filesystem path to override assets; empty disables override. |
 
@@ -91,7 +91,7 @@ frontend as JSON:
   "passwordAuthEnabled": true,
   "registrationEnabled": true,
   "otpEnabled": true,
-  "brandName": "argiago",
+  "brandName": "velora",
   "themeColor": "#ff6b35"
 }
 ```
@@ -144,8 +144,8 @@ point the app at it via `APP_BRANDING__BRANDING_DIR`:
 
 ```yaml
 services:
-  argiago-web:
-    image: argiago
+  velora-web:
+    image: velora
     volumes:
       - ./my-brand:/workspace/app/traildepot/branding
     environment:
