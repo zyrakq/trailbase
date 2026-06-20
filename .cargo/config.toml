@@ -9,3 +9,4 @@ rustflags = ["-C", "link-arg=-fuse-ld=mold", "-C", "link-arg=-Wl,--icf=all"]
 
 [env]
 APP_SKIP_WASM = "0"
+CARGO_TARGET_DIR = "target/builder"

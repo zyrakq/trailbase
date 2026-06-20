@@ -56,9 +56,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .await?;
     }
 
-    let public_config = PublicConfig {
-        password_auth_enabled: settings.frontend.password_auth_enabled.unwrap_or(true),
-    };
+    let public_config = PublicConfig::from_settings(&settings.frontend, &settings.branding);
+    let branding_overlay_config = settings
+        .branding
+        .overlay_config(&settings.frontend, &manifest_dir);
 
     let interceptor = smtp::setup(&settings.mailcrab);
 
@@ -73,12 +74,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
         _ => {
             info!("Serving frontend from disk (ui/dist)");
-            base_router
-                .fallback_service(routes::static_files(&settings.frontend, &manifest_dir))
+            base_router.fallback_service(routes::static_files(&settings.frontend, &manifest_dir))
         }
     };
 
-    let base_router = base_router.layer(axum::Extension(public_config));
+    let base_router = base_router
+        .layer(axum::Extension(public_config))
+        .layer(axum::Extension(branding_overlay_config));
 
     let (router, smtp_handle) = smtp::mount(interceptor, base_router);
 

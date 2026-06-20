@@ -542,6 +542,9 @@ fn appsettings_example_toml_parses() {
         s.components.items[0].source,
         ComponentSource::Fetch("trailbase/auth_ui".to_string())
     );
+    assert_eq!(s.branding.brand_name, Some("argiago".to_string()));
+    assert_eq!(s.branding.theme_color, Some("#ff6b35".to_string()));
+    assert_eq!(s.branding.branding_dir, "");
 }
 
 // ---------------------------------------------------------------------------
@@ -606,4 +609,55 @@ fn serve_from_embedded_parses() {
     let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
     assert_eq!(s.frontend.serve_from, "embedded");
     assert_eq!(s.frontend.effective_serve_from(), "embedded");
+}
+
+// ---------------------------------------------------------------------------
+// Branding settings tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn branding_absent_section_uses_defaults() {
+    let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
+    assert_eq!(s.branding.brand_name, None);
+    assert_eq!(s.branding.theme_color, None);
+    assert_eq!(s.branding.branding_dir, "");
+}
+
+#[test]
+fn branding_toml_overrides_all_fields() {
+    let overlay = indoc! {r##"
+        [branding]
+        brand_name = "Acme Co"
+        theme_color = "#123456"
+        branding_dir = "assets/branding"
+    "##};
+    let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+    assert_eq!(s.branding.brand_name, Some("Acme Co".to_string()));
+    assert_eq!(s.branding.theme_color, Some("#123456".to_string()));
+    assert_eq!(s.branding.branding_dir, "assets/branding");
+}
+
+#[test]
+fn env_override_sets_branding_brand_name() {
+    // SAFETY: no other test in this module reads APP_BRANDING__* env vars.
+    unsafe { std::env::set_var("APP_BRANDING__BRAND_NAME", "EnvBrand"); }
+    let result = Config::builder()
+        .add_source(config::File::from_str(BASE_TOML, FileFormat::Toml))
+        .add_source(
+            config::Environment::with_prefix("APP")
+                .prefix_separator("_")
+                .separator("__")
+                .try_parsing(true),
+        )
+        .build()
+        .unwrap()
+        .try_deserialize::<Settings>();
+    // SAFETY: test teardown — removing our own env var.
+    unsafe { std::env::remove_var("APP_BRANDING__BRAND_NAME"); }
+    let s = result.expect("should deserialize with env override");
+    assert_eq!(
+        s.branding.brand_name,
+        Some("EnvBrand".to_string()),
+        "APP_BRANDING__BRAND_NAME should set branding.brand_name"
+    );
 }

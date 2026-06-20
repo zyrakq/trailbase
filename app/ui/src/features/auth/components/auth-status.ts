@@ -3,16 +3,18 @@ import { customElement, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
 import { authService } from '../services/auth.service';
+import { configService } from '../services/config.service';
 import { ThemeController } from '@/features/theme';
 import { authStatusStyles } from './auth-status.styles';
 import type { User } from '@/features/auth';
-import logoLight from '@/assets/logo-light.svg';
-import logoDark from '@/assets/logo-dark.svg';
 
 @customElement('auth-status')
 @localized()
 export class AuthStatus extends LitElement {
   private theme = new ThemeController(this);
+
+  @state()
+  private brandName = 'argiago';
 
   @state()
   private isAuthenticated = false;
@@ -22,6 +24,7 @@ export class AuthStatus extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
+    this.brandName = configService.getConfig().brandName;
     await this.checkAuthStatus();
     window.addEventListener('auth-state-updated', this.handleAuthStateUpdated);
   }
@@ -57,13 +60,13 @@ export class AuthStatus extends LitElement {
   }
 
   render() {
-    const logo = this.theme.theme === 'dark' ? logoDark : logoLight;
+    const logo = `/branding/logo-${this.theme.theme}.svg`;
 
     return html`
       <div class="auth-card">
-        <img src=${logo} alt="velora" class="logo" />
+        <img src=${logo} alt=${this.brandName} class="logo" />
 
-        <h1 class="title">${msg('Welcome to velora')}</h1>
+        <h1 class="title">${msg('Welcome to')} ${this.brandName}</h1>
         <p class="subtitle">${msg('Sign in to continue')}</p>
 
         ${this.isAuthenticated

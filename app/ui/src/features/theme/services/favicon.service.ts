@@ -23,9 +23,9 @@ export class FaviconService {
   private unsubscribe?: () => void;
 
   private readonly faviconPaths = {
-    ico: (theme: string) => `/favicon-${theme}.ico`,
-    svg: (theme: string) => `/favicon-${theme}.svg`,
-    apple: (theme: string) => `/favicons/apple-${theme}.png`,
+    ico: (theme: string) => `/branding/favicon-${theme}.ico`,
+    svg: (theme: string) => `/branding/favicon-${theme}.svg`,
+    apple: (theme: string) => `/branding/favicons/apple-${theme}.png`,
   };
 
   private constructor() {

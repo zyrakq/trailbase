@@ -2,6 +2,7 @@ use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 
 use super::bootstrap::TrailbaseBootstrap;
+use super::branding::BrandingSettings;
 use super::components::ComponentSettings;
 use super::email::EmailSettings;
 use super::frontend::FrontendSettings;
@@ -18,6 +19,9 @@ pub struct Settings {
     /// WASM component loading settings.
     #[serde(default)]
     pub components: ComponentSettings,
+    /// Branding (brand name, theme color, optional assets directory).
+    #[serde(default)]
+    pub branding: BrandingSettings,
 }
 
 impl Settings {

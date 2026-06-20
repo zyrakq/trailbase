@@ -1,4 +1,4 @@
-use std::path::{Component, Path};
+use std::{env, path::{Component, Path}};
 use tracing::info;
 
 use crate::settings::components::{ComponentEntry, ComponentSettings, ComponentSource};
@@ -10,7 +10,7 @@ pub async fn ensure_component(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     validate_wasm_filename(&entry.wasm)?;
 
-    let target = manifest_dir
+    let target_wasm = manifest_dir
         .join("traildepot")
         .join("wasm")
         .join(&entry.wasm);
@@ -18,7 +18,7 @@ pub async fn ensure_component(
     match &entry.source {
         ComponentSource::Build(package) => {
             let rebuild = entry.rebuild.unwrap_or(settings.rebuild);
-            if target.exists() && !rebuild {
+            if target_wasm.exists() && !rebuild {
                 info!(
                     name = %entry.name,
                     wasm = %entry.wasm,
@@ -27,10 +27,12 @@ pub async fn ensure_component(
                 return Ok(());
             }
 
+            let target_dir = env::var("CARGO_TARGET_DIR").unwrap_or("target".to_string());
+
             let source = manifest_dir
                 .parent()
                 .ok_or("cannot determine parent directory of manifest_dir")?
-                .join("target")
+                .join(&target_dir)
                 .join("wasm32-wasip2")
                 .join("release")
                 .join(&entry.wasm);
@@ -44,11 +46,11 @@ pub async fn ensure_component(
                 .into());
             }
 
-            let target_dir = target
+            let target_wasm_dir = target_wasm
                 .parent()
                 .ok_or("cannot determine wasm output directory")?;
-            std::fs::create_dir_all(target_dir)?;
-            std::fs::copy(&source, &target)?;
+            std::fs::create_dir_all(target_wasm_dir)?;
+            std::fs::copy(&source, &target_wasm)?;
             info!(
                 name = %entry.name,
                 "copied component wasm from build output: {}",
@@ -58,7 +60,7 @@ pub async fn ensure_component(
         }
         ComponentSource::Fetch(url) => {
             let refetch = entry.refetch.unwrap_or(settings.refetch);
-            if target.exists() && !refetch {
+            if target_wasm.exists() && !refetch {
                 info!(
                     name = %entry.name,
                     wasm = %entry.wasm,
@@ -84,34 +86,29 @@ pub async fn ensure_component(
 
             let bytes = resp.bytes().await?;
 
-            let target_dir = target
+            let target_wasm_dir = target_wasm
                 .parent()
                 .ok_or("cannot determine wasm output directory")?;
-            std::fs::create_dir_all(target_dir)?;
-            std::fs::write(&target, &bytes)?;
+            std::fs::create_dir_all(target_wasm_dir)?;
+            std::fs::write(&target_wasm, &bytes)?;
 
             info!(
                 name = %entry.name,
                 wasm = %entry.wasm,
                 "component wasm fetched and written to {}",
-                target.display()
+                target_wasm.display()
             );
             Ok(())
         }
     }
 }
 
-fn validate_wasm_filename(
-    wasm: &str,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn validate_wasm_filename(wasm: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let path = Path::new(wasm);
     if path.is_absolute() || wasm.contains('/') || wasm.contains('\\') {
         return Err(format!("wasm filename must be a plain filename, got: {wasm}").into());
     }
-    if path
-        .components()
-        .any(|c| matches!(c, Component::ParentDir))
-    {
+    if path.components().any(|c| matches!(c, Component::ParentDir)) {
         return Err(format!("wasm filename must be a plain filename, got: {wasm}").into());
     }
     Ok(())
@@ -182,7 +179,11 @@ mod tests {
         ensure_component(&entry, &settings, &manifest)
             .await
             .expect("should skip");
-        assert_eq!(fs::read(&target).unwrap(), b"existing", "must not overwrite");
+        assert_eq!(
+            fs::read(&target).unwrap(),
+            b"existing",
+            "must not overwrite"
+        );
     }
 
     #[tokio::test]
@@ -216,7 +217,9 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("build artifact not found at"), "got: {msg}");
         assert!(
-            msg.contains("Build it first: cargo build --target wasm32-wasip2 --release -p test-pkg"),
+            msg.contains(
+                "Build it first: cargo build --target wasm32-wasip2 --release -p test-pkg"
+            ),
             "got: {msg}"
         );
     }
@@ -241,7 +244,10 @@ mod tests {
         let err = ensure_component(&entry, &ComponentSettings::default(), Path::new("/tmp"))
             .await
             .expect_err(".. must be rejected");
-        assert_eq!(err.to_string(), "wasm filename must be a plain filename, got: ..");
+        assert_eq!(
+            err.to_string(),
+            "wasm filename must be a plain filename, got: .."
+        );
     }
 
     #[tokio::test]

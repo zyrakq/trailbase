@@ -3,6 +3,7 @@ pub mod frontend;
 pub mod email;
 pub mod components;
 pub mod bootstrap;
+pub mod branding;
 pub mod loader;
 
 #[cfg(test)]

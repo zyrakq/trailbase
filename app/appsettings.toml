@@ -24,13 +24,13 @@ enable_otp_signin = false
 [trailbase.auth.oidc0]
 client_id = "velora"
 client_secret = ""
-auth_url = "https://idm.velora.ru/ui/oauth2"
-token_url = "https://idm.velora.ru/oauth2/token"
-user_api_url = "https://idm.velora.ru/oauth2/openid/velora/userinfo"
+auth_url = "https://idm.argiago.ru/ui/oauth2"
+token_url = "https://idm.argiago.ru/oauth2/token"
+user_api_url = "https://idm.argiago.ru/oauth2/openid/velora/userinfo"
 
 [trailbase.smtp]
 sender_name = "Velora Notifications"
-sender_address = "notifications@velora.ru"
+sender_address = "notifications@argiago.ru"
 
 [components]
 rebuild = false
@@ -40,3 +40,6 @@ refetch = false
 name = "trail_auth"
 wasm = "trail_auth_component.wasm"
 source = { build = "trail-auth-component" }
+
+[branding]
+branding_dir = ""

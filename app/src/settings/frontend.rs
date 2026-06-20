@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use super::branding::BrandingSettings;
+
 #[derive(Debug, Deserialize)]
 pub struct FrontendSettings {
     /// Where to serve frontend assets from.
@@ -31,9 +33,21 @@ fn default_serve_from() -> String {
 ///
 /// Add fields here when a handler needs a value from `appsettings.toml`
 /// without requiring access to the full `Settings` tree.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct PublicConfig {
     pub password_auth_enabled: bool,
+    pub brand_name: Option<String>,
+    pub theme_color: Option<String>,
+}
+
+impl PublicConfig {
+    pub fn from_settings(frontend: &FrontendSettings, branding: &BrandingSettings) -> Self {
+        Self {
+            password_auth_enabled: frontend.password_auth_enabled.unwrap_or(true),
+            brand_name: branding.brand_name.clone(),
+            theme_color: branding.theme_color.clone(),
+        }
+    }
 }
 
 impl FrontendSettings {

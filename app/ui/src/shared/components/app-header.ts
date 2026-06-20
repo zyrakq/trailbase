@@ -1,27 +1,33 @@
 import { LitElement, html } from 'lit';
-import { customElement } from 'lit/decorators.js';
-import { msg } from '@lit/localize';
+import { customElement, state } from 'lit/decorators.js';
 import { localized } from '@/features/localization';
 import { ThemeController } from '@/features/theme';
 import { appHeaderStyles } from './app-header.styles';
+import { configService } from '@/features/auth/services/config.service';
 import '@/features/localization/components/locale-switcher';
-import logoLight from '@/assets/logo-light.svg';
-import logoDark from '@/assets/logo-dark.svg';
 
 @customElement('app-header')
 @localized()
 export class AppHeader extends LitElement {
   private theme = new ThemeController(this);
 
+  @state()
+  private brandName = 'argiago';
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.brandName = configService.getConfig().brandName;
+  }
+
   render() {
-    const logo = this.theme.theme === 'dark' ? logoDark : logoLight;
+    const logo = `/branding/logo-${this.theme.theme}.svg`;
 
     return html`
       <header>
         <div class="header-content">
           <div class="logo-section">
-            <img src=${logo} alt="velora" class="logo" />
-            <span class="app-name">${msg('velora')}</span>
+            <img src=${logo} alt=${this.brandName} class="logo" />
+            <span class="app-name">${this.brandName}</span>
           </div>
           <div class="actions">
             <theme-toggler></theme-toggler>

@@ -305,8 +305,6 @@
 <trans-unit id="s890a7ae7f9730ba3">
   <source>Retrying...</source>
   <target>Reintentando...</target>
-<trans-unit id="s75cd2f130b244369">
-  <source>Welcome to velora</source>
 </trans-unit>
 <trans-unit id="sec617ad1a555a9ac">
   <source>velora</source>
@@ -319,6 +317,10 @@
 </trans-unit>
 <trans-unit id="s8acef63bc6775608">
   <source>Velora Repository</source>
+</trans-unit>
+<trans-unit id="s1fa96bca92224298">
+  <source>Welcome to</source>
+  <target>Bienvenido a</target>
 </trans-unit>
 </body>
 </file>

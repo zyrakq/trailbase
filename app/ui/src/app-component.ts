@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { Router } from '@lit-labs/router';
-import { authService } from '@/features/auth';
+import { authService, configService } from '@/features/auth';
 import { localizationService } from '@/features/localization';
 import '@/features/theme/services/favicon.service';
 
@@ -18,6 +18,7 @@ export class AppComponent extends LitElement {
   constructor() {
     super();
     localizationService.init();
+    void configService.init();
   }
 
   private _router = new Router(this, [
