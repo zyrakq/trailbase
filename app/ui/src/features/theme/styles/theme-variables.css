@@ -43,10 +43,10 @@
 
 /* ========== Dark Theme ========== */
 :root[theme="dark"] {
-  /* Primary colors - matching velora design (orange) */
-  --theme-color-primary: #f97316;
-  --theme-color-primary-hover: #ea580c;
-  --theme-color-primary-active: #c2410c;
+  /* Primary colors - matching velora dark branding (green) */
+  --theme-color-primary: #10b981;
+  --theme-color-primary-hover: #059669;
+  --theme-color-primary-active: #047857;
 
   /* Elevated surface for modals and toasts */
   --theme-color-surface-elevated: #343a40;
