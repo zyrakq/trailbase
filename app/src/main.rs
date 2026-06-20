@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
     for entry in &settings.components.items {
-        components::ensure_component(entry, &settings.components, &manifest_dir)?;
+        components::ensure_component(entry, &settings.components, &manifest_dir).await?;
     }
 
     let _frontend_handle = frontend::start(&settings.frontend, &manifest_dir)?;

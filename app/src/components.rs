@@ -1,27 +1,9 @@
-// app/src/components.rs
-//
-// TrailBase component lifecycle: ensure component wasm files are present,
-// either by copying from a local build output or installing via the trail CLI.
-
 use std::path::{Component, Path};
 use tracing::info;
 
 use crate::settings::components::{ComponentEntry, ComponentSettings, ComponentSource};
 
-/// Ensure a TrailBase component wasm file is present in
-/// `{manifest_dir}/traildepot/wasm/<entry.wasm>`.
-///
-/// The action taken depends on `entry.source`:
-///   - `Build(package)` — copy the artifact from
-///     `{manifest_dir}/../target/wasm32-wasip2/release/<entry.wasm>`. The
-///     artifact must already exist; this function only copies it.
-///   - `Fetch(name)` — invoke `trail components add <name>`.
-///
-/// Both branches honour the per-item `rebuild` / `refetch` override, falling
-/// back to the global `settings.rebuild` / `settings.refetch` default.
-/// When the target file already exists and the corresponding flag is `false`,
-/// the function returns immediately — no filesystem writes, no subprocess.
-pub fn ensure_component(
+pub async fn ensure_component(
     entry: &ComponentEntry,
     settings: &ComponentSettings,
     manifest_dir: &Path,
@@ -74,7 +56,7 @@ pub fn ensure_component(
             );
             Ok(())
         }
-        ComponentSource::Fetch(name) => {
+        ComponentSource::Fetch(url) => {
             let refetch = entry.refetch.unwrap_or(settings.refetch);
             if target.exists() && !refetch {
                 info!(
@@ -85,36 +67,40 @@ pub fn ensure_component(
                 return Ok(());
             }
 
-            crate::preflight::check_dependency(
-                "trail",
-                "https://trailbase.io/getting-started/install/",
-            )?;
-
             info!(
                 name = %entry.name,
-                "fetching component via `trail components add {name}`"
+                "fetching component wasm from {url}"
             );
 
-            let status = std::process::Command::new("trail")
-                .args(["components", "add", name])
-                .current_dir(manifest_dir)
-                .status()?;
-
-            if !status.success() {
+            let resp = reqwest::get(url).await?;
+            if !resp.status().is_success() {
                 return Err(format!(
-                    "Failed to fetch component {name}: exit status {status}"
+                    "Failed to fetch component wasm for {name}: HTTP {status} from {url}",
+                    name = entry.name,
+                    status = resp.status(),
                 )
                 .into());
             }
 
-            info!(name = %entry.name, "component installed via trail");
+            let bytes = resp.bytes().await?;
+
+            let target_dir = target
+                .parent()
+                .ok_or("cannot determine wasm output directory")?;
+            std::fs::create_dir_all(target_dir)?;
+            std::fs::write(&target, &bytes)?;
+
+            info!(
+                name = %entry.name,
+                wasm = %entry.wasm,
+                "component wasm fetched and written to {}",
+                target.display()
+            );
             Ok(())
         }
     }
 }
 
-/// Reject wasm names that are not plain filenames: no absolute paths, no path
-/// separators (`/` or `\`), no `..` path component.
 fn validate_wasm_filename(
     wasm: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -131,10 +117,6 @@ fn validate_wasm_filename(
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,8 +126,6 @@ mod tests {
     const WASM: &str = "comp.wasm";
     const SOURCE_BYTES: &[u8] = b"fake-wasm-source";
 
-    /// Build a tempdir layout where `manifest_dir.parent()` is the workspace
-    /// root, mirroring the real `app/..` relationship.
     fn make_layout() -> (tempfile::TempDir, PathBuf) {
         let workspace = tempfile::tempdir().expect("tempdir");
         let manifest = workspace.path().join("app");
@@ -185,30 +165,28 @@ mod tests {
         ComponentEntry {
             name: "test".into(),
             wasm: wasm.into(),
-            source: ComponentSource::Fetch("trailbase/test".into()),
+            source: ComponentSource::Fetch("https://example.com/test.wasm".into()),
             rebuild: None,
             refetch,
         }
     }
 
-    // ----- build variants ---------------------------------------------------
-
-    #[test]
-    fn build_skips_when_wasm_exists_and_no_rebuild() {
+    #[tokio::test]
+    async fn build_skips_when_wasm_exists_and_no_rebuild() {
         let (_workspace, manifest) = make_layout();
         let target = write_target(&manifest, WASM, b"existing");
 
-        // settings.rebuild = false (default); entry.rebuild = None.
-        // Target exists, so function should early-return without copying.
         let entry = build_entry(WASM, None);
         let settings = ComponentSettings::default();
 
-        ensure_component(&entry, &settings, &manifest).expect("should skip");
+        ensure_component(&entry, &settings, &manifest)
+            .await
+            .expect("should skip");
         assert_eq!(fs::read(&target).unwrap(), b"existing", "must not overwrite");
     }
 
-    #[test]
-    fn build_copies_when_rebuild_true() {
+    #[tokio::test]
+    async fn build_copies_when_rebuild_true() {
         let (workspace, manifest) = make_layout();
         make_source(workspace.path(), WASM);
         let target = write_target(&manifest, WASM, b"stale");
@@ -216,7 +194,9 @@ mod tests {
         let entry = build_entry(WASM, Some(true));
         let settings = ComponentSettings::default();
 
-        ensure_component(&entry, &settings, &manifest).expect("should copy");
+        ensure_component(&entry, &settings, &manifest)
+            .await
+            .expect("should copy");
         assert_eq!(
             fs::read(&target).unwrap(),
             SOURCE_BYTES,
@@ -224,14 +204,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn build_errors_when_source_missing() {
+    #[tokio::test]
+    async fn build_errors_when_source_missing() {
         let (_workspace, manifest) = make_layout();
-        // No source file. Force rebuild so function actually attempts to copy.
         let entry = build_entry(WASM, Some(true));
         let settings = ComponentSettings::default();
 
-        let err = ensure_component(&entry, &settings, &manifest).expect_err("should fail");
+        let err = ensure_component(&entry, &settings, &manifest)
+            .await
+            .expect_err("should fail");
         let msg = err.to_string();
         assert!(msg.contains("build artifact not found at"), "got: {msg}");
         assert!(
@@ -240,57 +221,34 @@ mod tests {
         );
     }
 
-    // ----- fetch variants ---------------------------------------------------
-
-    #[test]
-    fn fetch_skips_when_wasm_exists_and_no_refetch() {
+    #[tokio::test]
+    async fn fetch_skips_when_wasm_exists_and_no_refetch() {
         let (_workspace, manifest) = make_layout();
         let _target = write_target(&manifest, WASM, b"existing");
 
-        // Critical regression: with target present and no refetch, the
-        // function must return Ok without invoking `trail` (which would
-        // require network access and may not be installed in CI).
+        // Must short-circuit before any HTTP request: CI has no network.
         let entry = fetch_entry(WASM, None);
         let settings = ComponentSettings::default();
 
         ensure_component(&entry, &settings, &manifest)
-            .expect("must skip fetch without calling trail");
+            .await
+            .expect("must skip fetch without network access");
     }
 
-    #[test]
-    #[ignore = "requires `trail` CLI to be missing from PATH; run with `cargo test -- --ignored` to verify"]
-    fn fetch_errors_when_trail_missing() {
-        // Documents the expected error path: with no pre-existing target and
-        // a refetch forced, preflight must reject the missing `trail` binary
-        // with a message that mentions the install URL.
-        let (_workspace, manifest) = make_layout();
-        let entry = fetch_entry(WASM, Some(true));
-        let settings = ComponentSettings::default();
-
-        let err = ensure_component(&entry, &settings, &manifest)
-            .expect_err("preflight should fail when trail is missing");
-        let msg = err.to_string();
-        assert!(msg.contains("trail"), "error should mention trail: {msg}");
-        assert!(
-            msg.contains("https://trailbase.io/getting-started/install/"),
-            "error should include install URL: {msg}"
-        );
-    }
-
-    // ----- wasm filename validation ----------------------------------------
-
-    #[test]
-    fn wasm_filename_rejects_dotdot() {
+    #[tokio::test]
+    async fn wasm_filename_rejects_dotdot() {
         let entry = build_entry("..", None);
         let err = ensure_component(&entry, &ComponentSettings::default(), Path::new("/tmp"))
+            .await
             .expect_err(".. must be rejected");
         assert_eq!(err.to_string(), "wasm filename must be a plain filename, got: ..");
     }
 
-    #[test]
-    fn wasm_filename_rejects_absolute() {
+    #[tokio::test]
+    async fn wasm_filename_rejects_absolute() {
         let entry = build_entry("/etc/passwd", None);
         let err = ensure_component(&entry, &ComponentSettings::default(), Path::new("/tmp"))
+            .await
             .expect_err("absolute path must be rejected");
         assert_eq!(
             err.to_string(),
@@ -298,14 +256,11 @@ mod tests {
         );
     }
 
-    // ----- effective-rebuild / effective-refetch priority ------------------
-
-    #[test]
-    fn effective_rebuild_priority() {
+    #[tokio::test]
+    async fn effective_rebuild_priority() {
         let (workspace, manifest) = make_layout();
         make_source(workspace.path(), WASM);
 
-        // Case 1: entry.rebuild = Some(true) overrides settings.rebuild = false → copy.
         let target = write_target(&manifest, WASM, b"stale");
         let entry = build_entry(WASM, Some(true));
         let settings = ComponentSettings {
@@ -313,10 +268,11 @@ mod tests {
             refetch: false,
             items: vec![],
         };
-        ensure_component(&entry, &settings, &manifest).expect("per-item true should copy");
+        ensure_component(&entry, &settings, &manifest)
+            .await
+            .expect("per-item true should copy");
         assert_eq!(fs::read(&target).unwrap(), SOURCE_BYTES);
 
-        // Case 2: entry.rebuild = Some(false) overrides settings.rebuild = true → skip.
         fs::write(&target, b"stale").unwrap();
         let entry = build_entry(WASM, Some(false));
         let settings = ComponentSettings {
@@ -324,10 +280,11 @@ mod tests {
             refetch: false,
             items: vec![],
         };
-        ensure_component(&entry, &settings, &manifest).expect("per-item false should skip");
+        ensure_component(&entry, &settings, &manifest)
+            .await
+            .expect("per-item false should skip");
         assert_eq!(fs::read(&target).unwrap(), b"stale", "must not overwrite");
 
-        // Case 3: entry.rebuild = None falls back to settings.rebuild = true → copy.
         fs::write(&target, b"stale").unwrap();
         let entry = build_entry(WASM, None);
         let settings = ComponentSettings {
@@ -335,16 +292,15 @@ mod tests {
             refetch: false,
             items: vec![],
         };
-        ensure_component(&entry, &settings, &manifest).expect("None should fall back to true");
+        ensure_component(&entry, &settings, &manifest)
+            .await
+            .expect("None should fall back to true");
         assert_eq!(fs::read(&target).unwrap(), SOURCE_BYTES);
     }
 
-    #[test]
-    fn effective_refetch_priority() {
+    #[tokio::test]
+    async fn effective_refetch_priority() {
         let (_workspace, manifest) = make_layout();
-        // Pre-existing target. With per-item refetch=false, the function must
-        // skip — even though global settings.refetch=true would normally
-        // force a refetch. This proves the per-item override is respected.
         let _target = write_target(&manifest, WASM, b"existing");
 
         let entry = fetch_entry(WASM, Some(false));
@@ -354,6 +310,7 @@ mod tests {
             items: vec![],
         };
         ensure_component(&entry, &settings, &manifest)
-            .expect("per-item refetch=false should override global refetch=true → skip");
+            .await
+            .expect("per-item refetch=false should override global refetch=true -> skip");
     }
 }

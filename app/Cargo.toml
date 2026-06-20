@@ -19,6 +19,7 @@ config = { workspace = true }
 mailcrab-server = { workspace = true }
 rust-embed = { workspace = true }
 mime_guess = "2"
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 
 [dev-dependencies]
 indoc = "2"

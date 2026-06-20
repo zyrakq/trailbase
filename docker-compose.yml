@@ -1,9 +1,9 @@
 x-logging: &default-logging
-  driver: "json-file"
+  driver: json-file
   options:
-    max-size: "${LOG_MAX_SIZE:-10m}"
-    max-file: "${LOG_MAX_FILE:-3}"
-    compress: "${LOG_COMPRESS:-true}"
+    max-size: ${LOG_MAX_SIZE:-10m}
+    max-file: ${LOG_MAX_FILE:-3}
+    compress: ${LOG_COMPRESS:-true}
 
 services:
   argiago-web:
@@ -15,17 +15,8 @@ services:
     ports:
       - 4000:4000
     volumes:
-      - argiago-data:/workspace/app/traildepot/data
-      - argiago-backups:/workspace/app/traildepot/backups
-      - argiago-secrets:/workspace/app/traildepot/secrets
-      - argiago-uploads:/workspace/app/traildepot/uploads
+      - argiago-traildepot:/workspace/app/traildepot
 
 volumes:
-  argiago-data:
-    name: argiago-data
-  argiago-backups:
-    name: argiago-backups
-  argiago-secrets:
-    name: argiago-secrets
-  argiago-uploads:
-    name: argiago-uploads
+  argiago-traildepot:
+    name: argiago-traildepot
