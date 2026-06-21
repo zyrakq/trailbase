@@ -130,6 +130,56 @@ pub(crate) async fn install_routes_and_jobs(
       .await?
   };
 
+  let component_name = runtime
+    .read()
+    .await
+    .component_path()
+    .file_stem()
+    .and_then(|s| s.to_str())
+    .unwrap_or("unknown")
+    .to_string();
+  let manifest_path = format!("/_/wasm/{component_name}/manifest");
+  let manifest_uri = format!("http://localhost/_/wasm/{component_name}/manifest");
+  if let (Ok(manifest_store), Ok(context_header)) = (
+    HttpStore::new(&*runtime.read().await).await,
+    to_header_value(&HttpContext {
+      kind: HttpContextKind::Http,
+      registered_path: manifest_path,
+      path_params: vec![],
+      user: None,
+    }),
+  ) {
+    if let Ok(probe_req) = hyper::Request::builder()
+      .method(hyper::Method::GET)
+      .uri(manifest_uri)
+      .header("__context", context_header)
+      .body(empty())
+    {
+      if let Ok(resp) = manifest_store.call_incoming_http_handler(probe_req).await {
+        if resp.status() == hyper::StatusCode::OK {
+          let (_, body) = resp.into_parts();
+          if let Ok(collected) = body.collect().await {
+            match serde_json::from_slice::<crate::app_state::WasmManifest>(
+              &collected.to_bytes(),
+            ) {
+              Ok(manifest) => {
+                info!("Registering manifest for WASM component '{component_name}'");
+                state
+                  .wasm_manifests()
+                  .write()
+                  .await
+                  .insert(component_name, manifest);
+              }
+              Err(err) => warn!(
+                "Component '{component_name}': manifest endpoint returned invalid JSON: {err}"
+              ),
+            }
+          }
+        }
+      }
+    }
+  }
+
   for (name, spec) in init_result.job_handlers {
     let schedule = cron::Schedule::from_str(&spec)?;
     let store = HttpStore::new(&*runtime.read().await).await?;
