@@ -40,6 +40,15 @@ during mailcrab integration (Jun 2026).
 run `cargo` in **parallel subagents** (locks + cache thrash). All cargo verification
 (`check`/`build`/`test`) runs in the **main thread, sequentially**; subagents edit only.
 
+## trailbase submodules & tests — DO NOT TOUCH
+
+`vendor/trailbase/` is not prepped for direct execution from this worktree.
+
+**Never:** `git submodule update --init` (or `--recursive`) inside
+`vendor/trailbase/`; run `cargo test` inside `vendor/trailbase/` or any of its
+crates; or attempt to build/run trailbase binaries directly. The user runs all
+trailbase verification themselves.
+
 ## `thoughts/` — never commit
 
 Gitignored (`.gitignore` entry `thoughts`): design docs, plans, ledgers stay local.
