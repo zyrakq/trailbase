@@ -706,3 +706,200 @@ export async function deleteUser(): Promise<void> {
     text || `Account deletion failed: ${response.status}`
   );
 }
+
+// ---------------------------------------------------------------------------
+// Trail Auth admin — config (require_admin + CSRF)
+// ---------------------------------------------------------------------------
+
+// Admin SPA login uses the JSON path (no cookies). Tokens are stored in
+// localStorage under "auth_tokens" by @nanostores/persistent. When present,
+// we send an Authorization: Bearer header; otherwise we fall back to cookies.
+interface AdminTokens {
+  auth_token: string;
+  refresh_token: string;
+  csrf_token: string;
+}
+
+function readAdminTokens(): AdminTokens | null {
+  try {
+    const raw = localStorage.getItem('auth_tokens');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AdminTokens>;
+    if (!parsed.auth_token) return null;
+    return {
+      auth_token: parsed.auth_token,
+      refresh_token: parsed.refresh_token ?? '',
+      csrf_token: parsed.csrf_token ?? '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+function adminHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  const tokens = readAdminTokens();
+  if (tokens) {
+    headers['Authorization'] = `Bearer ${tokens.auth_token}`;
+    if (tokens.csrf_token && !headers['CSRF-Token']) {
+      headers['CSRF-Token'] = tokens.csrf_token;
+    }
+  }
+  return headers;
+}
+
+export interface TrailAuthConfig {
+  reset_password_redirect_url: string;
+  verify_email_redirect_url: string;
+}
+
+export async function fetchTrailAuthConfig(): Promise<TrailAuthConfig> {
+  let response: Response;
+  try {
+    response = await fetch('/_/wasm/trail-auth/config', {
+      credentials: 'include',
+      headers: adminHeaders(),
+    });
+  } catch {
+    throw new AuthClientError(
+      AuthErrorCode.NETWORK_ERROR,
+      'Network error fetching trail-auth config'
+    );
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new AuthClientError(
+      AuthErrorCode.UNKNOWN,
+      text || `Failed to fetch config: ${response.status}`
+    );
+  }
+
+  return (await response.json()) as TrailAuthConfig;
+}
+
+export async function updateTrailAuthConfig(
+  config: TrailAuthConfig
+): Promise<TrailAuthConfig> {
+  let response: Response;
+  try {
+    response = await fetch('/_/wasm/trail-auth/config', {
+      method: 'POST',
+      headers: adminHeaders({ 'Content-Type': 'application/json' }),
+      credentials: 'include',
+      body: JSON.stringify(config),
+    });
+  } catch {
+    throw new AuthClientError(
+      AuthErrorCode.NETWORK_ERROR,
+      'Network error updating trail-auth config'
+    );
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new AuthClientError(
+      AuthErrorCode.UNKNOWN,
+      text || `Failed to update config: ${response.status}`
+    );
+  }
+
+  return (await response.json()) as TrailAuthConfig;
+}
+
+// ---------------------------------------------------------------------------
+// Trail Auth admin — i18n overrides (require_admin + CSRF)
+// ---------------------------------------------------------------------------
+
+export interface I18nEntry {
+  id: string;
+  value: string;
+}
+
+export interface TrailAuthI18n {
+  default: I18nEntry[];
+  override: I18nEntry[];
+}
+
+export async function fetchTrailAuthI18n(locale: string): Promise<TrailAuthI18n> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `/_/wasm/trail-auth/i18n/${encodeURIComponent(locale)}`,
+      { credentials: 'include', headers: adminHeaders() }
+    );
+  } catch {
+    throw new AuthClientError(
+      AuthErrorCode.NETWORK_ERROR,
+      'Network error fetching i18n overrides'
+    );
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new AuthClientError(
+      AuthErrorCode.UNKNOWN,
+      text || `Failed to fetch i18n: ${response.status}`
+    );
+  }
+
+  return (await response.json()) as TrailAuthI18n;
+}
+
+export async function updateTrailAuthI18n(
+  locale: string,
+  entries: I18nEntry[]
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `/_/wasm/trail-auth/i18n/${encodeURIComponent(locale)}`,
+      {
+        method: 'PUT',
+        headers: adminHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include',
+        body: JSON.stringify(entries),
+      }
+    );
+  } catch {
+    throw new AuthClientError(
+      AuthErrorCode.NETWORK_ERROR,
+      'Network error updating i18n overrides'
+    );
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new AuthClientError(
+      AuthErrorCode.UNKNOWN,
+      text || `Failed to update i18n: ${response.status}`
+    );
+  }
+}
+
+export async function deleteTrailAuthI18n(locale: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `/_/wasm/trail-auth/i18n/${encodeURIComponent(locale)}`,
+      {
+        method: 'DELETE',
+        headers: adminHeaders(),
+        credentials: 'include',
+      }
+    );
+  } catch {
+    throw new AuthClientError(
+      AuthErrorCode.NETWORK_ERROR,
+      'Network error deleting i18n overrides'
+    );
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new AuthClientError(
+      AuthErrorCode.UNKNOWN,
+      text || `Failed to delete i18n: ${response.status}`
+    );
+  }
+}

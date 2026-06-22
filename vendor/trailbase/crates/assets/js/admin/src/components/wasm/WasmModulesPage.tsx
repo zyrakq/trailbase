@@ -1,17 +1,19 @@
-import { createMemo } from "solid-js";
+import { createMemo, For, Show } from "solid-js";
 import { useQuery } from "@tanstack/solid-query";
-import { TbOutlineRefresh, TbOutlinePuzzle } from "solid-icons/tb";
-import type { ColumnDef } from "@tanstack/solid-table";
+import {
+  TbOutlinePackage,
+  TbOutlinePuzzle,
+  TbOutlineSettings,
+} from "solid-icons/tb";
 
 import { Header } from "@/components/Header";
-import { Table, buildTable } from "@/components/Table";
-import { IconButton } from "@/components/IconButton";
+import { Spinner } from "@/components/Spinner";
 
 import { fetchWasmModules } from "@/lib/api/wasm-modules";
 
 import type { WasmModuleEntry } from "@bindings/WasmModuleEntry";
 
-function IconCell(props: { icon?: string }) {
+function ModuleIcon(props: { icon?: string }) {
   const src = (): string | undefined => {
     const icon = props.icon;
     if (icon === undefined) {
@@ -27,55 +29,54 @@ function IconCell(props: { icon?: string }) {
   };
 
   return (
-    <div class="flex items-center justify-center px-2">
-      {src() === undefined ? (
-        <TbOutlinePuzzle size={20} />
-      ) : (
-        <img src={src()} alt="" class="size-5" />
-      )}
-    </div>
+    <Show
+      when={src() !== undefined}
+      fallback={<TbOutlinePuzzle size={24} />}
+    >
+      <img src={src()!} alt="" class="size-6" />
+    </Show>
   );
 }
 
-function buildColumns(): ColumnDef<WasmModuleEntry>[] {
-  return [
-    {
-      id: "icon",
-      header: "",
-      enableSorting: false,
-      size: 56,
-      cell: (ctx) => <IconCell icon={ctx.row.original.icon ?? undefined} />,
-    },
-    {
-      accessorKey: "display_name",
-      header: "name",
-      size: 240,
-    },
-    {
-      id: "config",
-      header: "config",
-      enableSorting: false,
-      cell: (ctx) => {
-        const row = ctx.row.original;
-        if (!row.has_config || row.config_path === null) {
-          return <span class="text-muted-foreground">—</span>;
-        }
-        return (
-          <a
-            class="text-accent-600 underline"
-            href={row.config_path}
-          >
-            {row.config_path}
-          </a>
-        );
-      },
-    },
-    {
-      accessorKey: "name",
-      header: "file",
-      size: 200,
-    },
-  ];
+function ModuleCard(props: { module: WasmModuleEntry }) {
+  const hasManifest = createMemo(
+    () =>
+      props.module.display_name !== props.module.name ||
+      props.module.icon !== null,
+  );
+
+  return (
+    <div class="flex items-center gap-3 rounded-lg border border-border p-4">
+      <div class="flex size-10 shrink-0 items-center justify-center text-muted-foreground">
+        <ModuleIcon icon={props.module.icon ?? undefined} />
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <div class="flex items-baseline gap-2">
+          <h3 class="truncate font-medium">{props.module.display_name}</h3>
+          <Show when={hasManifest()}>
+            <span class="shrink-0 text-xs text-muted-foreground">
+              {props.module.name}
+            </span>
+          </Show>
+        </div>
+        <Show when={props.module.description}>
+          <p class="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
+            {props.module.description}
+          </p>
+        </Show>
+      </div>
+
+      <Show when={props.module.config_path !== null}>
+        <a
+          href={props.module.config_path!}
+          class="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          <TbOutlineSettings size={18} />
+        </a>
+      </Show>
+    </div>
+  );
 }
 
 export function WasmModulesPage() {
@@ -84,29 +85,34 @@ export function WasmModulesPage() {
     queryFn: fetchWasmModules,
   }));
 
-  const refetch = () => wasmModules.refetch();
-
-  const table = createMemo(() => {
-    return buildTable({
-      columns: buildColumns(),
-      data: wasmModules.data?.modules ?? [],
-      rowCount: wasmModules.data?.modules.length ?? 0,
-    });
-  });
+  const modules = createMemo(() => wasmModules.data?.modules ?? []);
 
   return (
     <div class="h-full">
-      <Header
-        title="WASM Modules"
-        left={
-          <IconButton onClick={() => refetch()}>
-            <TbOutlineRefresh />
-          </IconButton>
-        }
-      />
+      <Header title="WASM Modules" />
 
-      <div class="flex flex-col gap-4 p-4">
-        <Table table={table()} loading={wasmModules.isLoading} />
+      <div class="flex flex-col gap-3 p-4">
+        <Show
+          when={!wasmModules.isLoading}
+          fallback={
+            <div class="flex h-64 items-center justify-center">
+              <Spinner size={32} class="text-muted-foreground" />
+            </div>
+          }
+        >
+          <Show
+            when={modules().length > 0}
+            fallback={
+              <div class="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
+                <TbOutlinePackage size={48} />
+              </div>
+            }
+          >
+            <For each={modules()}>
+              {(module) => <ModuleCard module={module} />}
+            </For>
+          </Show>
+        </Show>
       </div>
     </div>
   );

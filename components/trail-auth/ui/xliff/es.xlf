@@ -470,6 +470,150 @@
   <source>Set new password</source>
   <target>Establecer nueva contraseña</target>
 </trans-unit>
+<trans-unit id="s4697cc2dfd70449d">
+  <source>Failed to load settings. Please try again.</source>
+  <target>No se pudo cargar la configuración. Inténtelo de nuevo.</target>
+</trans-unit>
+<trans-unit id="sdc2508aba9b9ef42">
+  <source>Settings saved successfully.</source>
+  <target>Configuración guardada correctamente.</target>
+</trans-unit>
+<trans-unit id="s16cc0c31cc93bc6f">
+  <source>Failed to save settings.</source>
+  <target>No se pudo guardar la configuración.</target>
+</trans-unit>
+<trans-unit id="scbb851063af815d9">
+  <source>Failed to load translations.</source>
+  <target>No se pudieron cargar las traducciones.</target>
+</trans-unit>
+<trans-unit id="s69daa98384fdb7b7">
+  <source>Translations saved successfully.</source>
+  <target>Traducciones guardadas correctamente.</target>
+</trans-unit>
+<trans-unit id="s9b4a67b333fd0bf8">
+  <source>Failed to save translations.</source>
+  <target>No se pudieron guardar las traducciones.</target>
+</trans-unit>
+<trans-unit id="s7e419dd887f998c0">
+  <source>Translations reset to default.</source>
+  <target>Traducciones restablecidas a los valores predeterminados.</target>
+</trans-unit>
+<trans-unit id="s7ac43705f83aea04">
+  <source>Failed to reset translations.</source>
+  <target>No se pudieron restablecer las traducciones.</target>
+</trans-unit>
+<trans-unit id="s56e2655fe1958c53">
+  <source>Invalid XLIFF file</source>
+  <target>Archivo XLIFF no válido</target>
+</trans-unit>
+<trans-unit id="sa53d47da734122e4">
+  <source>XLIFF loaded. Review and save when ready.</source>
+  <target>XLIFF cargado. Revise y guarde cuando esté listo.</target>
+</trans-unit>
+<trans-unit id="s4d3d736a36be38e1">
+  <source>Failed to parse XLIFF file.</source>
+  <target>No se pudo analizar el archivo XLIFF.</target>
+</trans-unit>
+<trans-unit id="se64886ffc27562a2">
+  <source>Reset password redirect URL</source>
+  <target>URL de redirección para restablecer contraseña</target>
+</trans-unit>
+<trans-unit id="s7c053e7eb7bbc3fb">
+  <source>Use {token} as a placeholder for the reset token.</source>
+  <target>Use {token} como marcador de posición para el token de restablecimiento.</target>
+</trans-unit>
+<trans-unit id="s20c8f42ba4926cb5">
+  <source>Verify email redirect URL</source>
+  <target>URL de redirección para verificar email</target>
+</trans-unit>
+<trans-unit id="sd1124a79aaa6eea1">
+  <source>Use {token} as a placeholder for the verification token.</source>
+  <target>Use {token} como marcador de posición para el token de verificación.</target>
+</trans-unit>
+<trans-unit id="s717d4a2cd3f7d66f">
+  <source>Saving...</source>
+  <target>Guardando...</target>
+</trans-unit>
+<trans-unit id="s33f85f24c0f5f008">
+  <source>Save</source>
+  <target>Guardar</target>
+</trans-unit>
+<trans-unit id="s506b6a19d12f414c">
+  <source>Key</source>
+  <target>Clave</target>
+</trans-unit>
+<trans-unit id="s41f7dca46d3f1b4a">
+  <source>Value</source>
+  <target>Valor</target>
+</trans-unit>
+<trans-unit id="s6dba646770efe34c">
+  <source>Download XLIFF Template</source>
+  <target>Descargar plantilla XLIFF</target>
+</trans-unit>
+<trans-unit id="s11326fd2590f4e5e">
+  <source>Default</source>
+  <target>Predeterminado</target>
+</trans-unit>
+<trans-unit id="s749e8ca6ae962ffd">
+  <source>Override</source>
+  <target>Sobrescribir</target>
+</trans-unit>
+<trans-unit id="s4acb8d19c4b38541">
+  <source>Save Overrides</source>
+  <target>Guardar sobrescrituras</target>
+</trans-unit>
+<trans-unit id="s826f40bb1c0c03db">
+  <source>Upload XLIFF</source>
+  <target>Subir XLIFF</target>
+</trans-unit>
+<trans-unit id="sc9cc72361e6b922e">
+  <source>Download XLIFF</source>
+  <target>Descargar XLIFF</target>
+</trans-unit>
+<trans-unit id="sf786171004dde79c">
+  <source>Reset to Default</source>
+  <target>Restablecer a predeterminado</target>
+</trans-unit>
+<trans-unit id="s170319768bda4977">
+  <source>Locale</source>
+  <target>Idioma</target>
+</trans-unit>
+<trans-unit id="s3979c21646967091">
+  <source>Loading translations...</source>
+  <target>Cargando traducciones...</target>
+</trans-unit>
+<trans-unit id="s1c5464d547242a34">
+  <source>Trail Auth Settings</source>
+  <target>Configuración de Trail Auth</target>
+</trans-unit>
+<trans-unit id="sc3ac225273c8316b">
+  <source>General</source>
+  <target>General</target>
+</trans-unit>
+<trans-unit id="sebe1e01d3ce62fcd">
+  <source>Translations</source>
+  <target>Traducciones</target>
+</trans-unit>
+<trans-unit id="s551c5dbba77608db">
+  <source>Reset all overrides to default?</source>
+  <target>¿Restablecer todas las sobrescrituras a los valores predeterminados?</target>
+</trans-unit>
+<trans-unit id="s933414dccd5e2e52">
+  <source>Resetting...</source>
+  <target>Restableciendo...</target>
+</trans-unit>
+<trans-unit id="sb85774dc5d18ff0f">
+  <source>Confirm</source>
+  <target>Confirmar</target>
+</trans-unit>
+<trans-unit id="s3810f26bfdec8d85">
+  <source>Email verified</source>
+  <target>Email verificado</target>
+</trans-unit>
+<trans-unit id="se7f2d88b36214086">
+  <source>Your email has been verified.</source>
+  <target>Su email ha sido verificado.</target>
+</trans-unit>
 </body>
 </file>
 </xliff>

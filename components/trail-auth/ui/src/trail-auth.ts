@@ -14,6 +14,7 @@ import './views/forgot-password-view.ts';
 import './views/forgot-password-sent-view.ts';
 import './views/reset-password-view.ts';
 import './views/reset-password-done-view.ts';
+import './views/verify-email-view.ts';
 
 type ViewState =
   | 'choice'
@@ -24,7 +25,8 @@ type ViewState =
   | 'forgot-password'
   | 'forgot-password-sent'
   | 'reset-password'
-  | 'reset-password-done';
+  | 'reset-password-done'
+  | 'verify-email';
 
 /**
  * `<trail-auth>` — drop-in auth UI web component.
@@ -38,7 +40,7 @@ type ViewState =
  * - trail-auth-close   — user wants to dismiss (before OAuth redirect or explicit close)
  *
  * Attributes:
- * - `mode`            — `"auth"` (default) | `"reset-password"` (requires `token`)
+ * - `mode`            — `"auth"` (default) | `"reset-password"` (requires `token`) | `"verify-email"`
  * - `token`           — password-reset JWT; used only when `mode="reset-password"`
  * - `no-password-auth` — boolean; disables password login/registration UI
  * - `no-registration`  — boolean; hides the "Create account" path
@@ -48,7 +50,7 @@ type ViewState =
 @customElement('trail-auth')
 @localized()
 export class TrailAuth extends LitElement {
-  @property({ type: String }) mode: 'auth' | 'reset-password' = 'auth';
+  @property({ type: String }) mode: 'auth' | 'reset-password' | 'verify-email' = 'auth';
   @property({ type: String }) token = '';
 
   @property({ type: Boolean, attribute: 'no-password-auth' }) noPasswordAuth = false;
@@ -63,16 +65,22 @@ export class TrailAuth extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this.view = this.mode === 'reset-password' ? 'reset-password' : 'choice';
+    this.view = this.initialView();
     if (this.mode === 'auth') this.loadProviders();
   }
 
   // Exposed method so the host can reset state when re-opening.
   reset() {
-    this.view = this.mode === 'reset-password' ? 'reset-password' : 'choice';
+    this.view = this.initialView();
     this.sharedEmail = '';
     this.mfaToken = '';
     this.registerSuccessEmailSent = false;
+  }
+
+  private initialView(): ViewState {
+    if (this.mode === 'reset-password') return 'reset-password';
+    if (this.mode === 'verify-email') return 'verify-email';
+    return 'choice';
   }
 
   private loadProviders() {
@@ -123,6 +131,7 @@ export class TrailAuth extends LitElement {
       this.view === 'reset-password-done'
     )
       return msg('Reset password');
+    if (this.view === 'verify-email') return msg('Email verified');
     return msg('Sign in');
   }
 
@@ -167,6 +176,9 @@ export class TrailAuth extends LitElement {
 
       case 'reset-password-done':
         return html`<trail-auth-reset-password-done></trail-auth-reset-password-done>`;
+
+      case 'verify-email':
+        return html`<trail-auth-verify-email></trail-auth-verify-email>`;
     }
   }
 

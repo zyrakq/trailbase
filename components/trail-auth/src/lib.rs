@@ -6,40 +6,219 @@ use trailbase_wasm::http::{
     Html, HttpError, HttpRoute, IntoBody, IntoResponse, Json, Method, Request, Response, StatusCode,
     header, routing,
 };
-use trailbase_wasm::kv::Store;
 use trailbase_wasm::{Guest, export};
 
 mod config;
+mod db_kv;
 mod error;
 mod i18n;
-mod pages;
 mod password;
 mod profile;
 mod set_password;
+mod settings;
 
-use config::{read_reset_password_url, TrailAuthConfig, KV_RESET_PASSWORD_URL};
+use config::{
+    read_reset_password_url, read_verify_email_url, TrailAuthConfig, KV_RESET_PASSWORD_URL,
+    KV_VERIFY_EMAIL_URL,
+};
 use error::{bad_request, internal};
 use i18n::{
-    delete_override, load_default_xliff, parse_xliff, read_override, serialize_js_module,
-    write_override,
+    delete_override, load_default_xliff, merge_entries, parse_xliff, parse_xliff_sources,
+    read_override, serialize_js_module, write_override, I18nEditorResponse, I18nEntry,
 };
-use pages::verify_email_page;
 use profile::profile_capabilities_handler;
+use settings::settings_page;
 use set_password::set_password_handler;
 
 #[derive(RustEmbed)]
 #[folder = "ui/dist/"]
 pub(crate) struct Assets;
 
+#[derive(serde::Serialize)]
+struct WasmManifest {
+    display_name: String,
+    icon: Option<String>,
+    config_path: Option<String>,
+    description: Option<String>,
+}
+
 struct Endpoints;
 
 impl Guest for Endpoints {
     fn http_handlers() -> Vec<HttpRoute> {
         return vec![
+            // Manifest — probed by the host at startup to discover the module's
+            // display name, icon, and config link for the admin WASM Modules section.
+            routing::get(
+                "/_/wasm/trail-auth/manifest",
+                async |_req: Request| -> Result<Response, HttpError> {
+                    return Ok(Json(WasmManifest {
+                        display_name: "Trail Auth".to_string(),
+                        icon: Some(
+                            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" \
+                             fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" \
+                             stroke-linecap=\"round\" stroke-linejoin=\"round\">\
+                             <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 \
+                             18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 \
+                             1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>\
+                             <path d=\"m9 12 2 2 4-4\"/></svg>"
+                                .to_string(),
+                        ),
+                        config_path: Some("/_/wasm/trail-auth/settings".to_string()),
+                        description: Some(
+                            "Authentication module: login, registration, password reset, \
+                             MFA, and i18n management."
+                                .to_string(),
+                        ),
+                    })
+                    .into_response());
+                },
+            ),
+            // Settings page — HTML wrapper that loads the bundle and mounts
+            // <trail-auth-settings>. Linked from the admin WASM Modules section
+            // via the manifest's config_path. No admin guard on the page itself;
+            // the component's API calls are admin-guarded.
+            routing::get(
+                "/_/wasm/trail-auth/settings",
+                async |_req: Request| -> Result<Response, HttpError> {
+                    return Ok(Html(settings_page()).into_response());
+                },
+            ),
+            // Admin config — read current trail-auth settings.
+            routing::get(
+                "/_/wasm/trail-auth/config",
+                async |_req: Request| -> Result<Response, HttpError> {
+                    let reset_password_redirect_url = read_reset_password_url()?;
+                    let verify_email_redirect_url = read_verify_email_url()?;
+                    return Ok(Json(TrailAuthConfig {
+                        reset_password_redirect_url,
+                        verify_email_redirect_url,
+                    })
+                    .into_response());
+                },
+            )
+            .require_admin(),
+            // Admin config — update trail-auth settings.
+            routing::post(
+                "/_/wasm/trail-auth/config",
+                async |mut req: Request| -> Result<Response, HttpError> {
+                    let body = req.body().bytes().await.map_err(internal)?;
+                    let config: TrailAuthConfig =
+                        serde_json::from_slice(&body).map_err(bad_request)?;
+
+                    if config.reset_password_redirect_url.is_empty() {
+                        return Err(bad_request("reset_password_redirect_url must not be empty"));
+                    }
+                    if config.verify_email_redirect_url.is_empty() {
+                        return Err(bad_request("verify_email_redirect_url must not be empty"));
+                    }
+
+                    db_kv::kv_set(
+                        KV_RESET_PASSWORD_URL,
+                        config.reset_password_redirect_url.as_bytes(),
+                    )?;
+                    db_kv::kv_set(
+                        KV_VERIFY_EMAIL_URL,
+                        config.verify_email_redirect_url.as_bytes(),
+                    )?;
+
+                    return Ok(Json(config).into_response());
+                },
+            )
+            .require_admin(),
+            // Admin i18n — read default XLIFF entries + override for the editor.
+            // Returns JSON { default: [{id, value}], override: [{id, value}] }.
+            routing::get(
+                "/_/wasm/trail-auth/i18n/{locale}",
+                async |req: Request| -> Result<Response, HttpError> {
+                    let locale = req
+                        .path_param("locale")
+                        .ok_or_else(|| internal("missing locale"))?;
+
+                    // English is the source language; its text lives in <source>
+                    // elements of the other locales' XLIFF files. Use the first
+                    // available XLIFF to populate the read-only editor view.
+                    let default_entries = if locale == "en" {
+                        Assets::iter()
+                            .filter(|name| {
+                                name.starts_with("xliff/") && name.ends_with(".xlf")
+                            })
+                            .find_map(|name| {
+                                Assets::get(name.as_ref()).and_then(|f| {
+                                    let xml = String::from_utf8_lossy(&f.data).into_owned();
+                                    parse_xliff_sources(&xml).ok()
+                                })
+                            })
+                            .unwrap_or_default()
+                    } else {
+                        match load_default_xliff(locale) {
+                            Some(xml) => parse_xliff(&xml).map_err(internal)?,
+                            None => Vec::new(),
+                        }
+                    };
+
+                    let override_entries = read_override(locale)?.unwrap_or_default();
+
+                    return Ok(Json(I18nEditorResponse {
+                        default: default_entries
+                            .into_iter()
+                            .map(|(id, value)| I18nEntry { id, value })
+                            .collect(),
+                        override_: override_entries
+                            .into_iter()
+                            .map(|(id, value)| I18nEntry { id, value })
+                            .collect(),
+                    })
+                    .into_response());
+                },
+            )
+            .require_admin(),
+            // Admin i18n — replace the per-locale override stored in KV.
+            // Accepts JSON [{id, value}]. No PUT helper in routing, so use
+            // HttpRoute::new directly.
+            HttpRoute::new(
+                Method::PUT,
+                "/_/wasm/trail-auth/i18n/{locale}",
+                async |mut req: Request| -> Result<Response, HttpError> {
+                    let body = req.body().bytes().await.map_err(internal)?;
+                    let entries: Vec<I18nEntry> =
+                        serde_json::from_slice(&body).map_err(bad_request)?;
+
+                    let locale = req
+                        .path_param("locale")
+                        .ok_or_else(|| internal("missing locale"))?
+                        .to_string();
+
+                    let pairs: Vec<(String, String)> =
+                        entries.into_iter().map(|e| (e.id, e.value)).collect();
+                    write_override(&locale, &pairs)?;
+
+                    return Response::builder()
+                        .status(StatusCode::OK)
+                        .body(b"".into_body())
+                        .map_err(internal);
+                },
+            )
+            .require_admin(),
+            // Admin i18n — drop the per-locale override from KV.
+            routing::delete(
+                "/_/wasm/trail-auth/i18n/{locale}",
+                async |req: Request| -> Result<Response, HttpError> {
+                    let locale = req
+                        .path_param("locale")
+                        .ok_or_else(|| internal("missing locale"))?;
+
+                    delete_override(locale)?;
+
+                    return Response::builder()
+                        .status(StatusCode::OK)
+                        .body(b"".into_body())
+                        .map_err(internal);
+                },
+            )
+            .require_admin(),
             // Serve the compiled JS bundle with ETag-based cache validation.
-            // Cache-Control: no-cache means the browser always revalidates with the server.
-            // The ETag is derived from the file's SHA-256 hash embedded at compile time,
-            // so it automatically changes whenever the bundle is rebuilt.
+            // Cache-Control: no-cache means the browser always revalidates.
             routing::get(
                 "/_/auth/bundle.js",
                 async |req: Request| -> Result<Response, HttpError> {
@@ -52,7 +231,6 @@ impl Guest for Endpoints {
                         format!("\"{hex}\"")
                     };
 
-                    // Return 304 Not Modified if the client already has this version.
                     if req.header("if-none-match").and_then(|v| v.to_str().ok()) == Some(&etag) {
                         return Response::builder()
                             .status(StatusCode::NOT_MODIFIED)
@@ -89,11 +267,8 @@ impl Guest for Endpoints {
                     return set_password_handler(user, body.to_vec()).await;
                 },
             ),
-            // Reset-password email links point to this route.
-            // Instead of serving a standalone page, we redirect to the host app's page
-            // so <trail-auth mode="reset-password"> is rendered in the proper app context.
-            // The redirect URL is stored in KV (key: reset_password_redirect_url) with
-            // {token} as a placeholder. Defaults to /reset-password?token={token}.
+            // Reset-password email links — 303 redirect to the host app page.
+            // The redirect URL is stored in KV with {token} as a placeholder.
             routing::get(
                 "/_/auth/reset_password/update/{password_reset_token}",
                 async |req: Request| -> Result<Response, HttpError> {
@@ -111,47 +286,26 @@ impl Guest for Endpoints {
                         .map_err(internal);
                 },
             ),
-            // Admin config — read current trail-auth settings.
-            routing::get(
-                "/_/admin/trail-auth/config",
-                async |_req: Request| -> Result<Response, HttpError> {
-                    let reset_password_redirect_url = read_reset_password_url()?;
-                    return Ok(Json(TrailAuthConfig { reset_password_redirect_url }).into_response());
-                },
-            ),
-            // Admin config — update trail-auth settings.
-            routing::post(
-                "/_/admin/trail-auth/config",
-                async |mut req: Request| -> Result<Response, HttpError> {
-                    let body = req.body().bytes().await.map_err(internal)?;
-                    let config: TrailAuthConfig =
-                        serde_json::from_slice(&body).map_err(bad_request)?;
-
-                    if config.reset_password_redirect_url.is_empty() {
-                        return Err(bad_request("reset_password_redirect_url must not be empty"));
-                    }
-
-                    let mut store = Store::open().map_err(internal)?;
-                    store
-                        .set(
-                            KV_RESET_PASSWORD_URL,
-                            config.reset_password_redirect_url.as_bytes(),
-                        )
-                        .map_err(internal)?;
-
-                    return Ok(Json(config).into_response());
-                },
-            ),
-            // HTML wrapper for email verification links.
+            // Verify-email links — 303 redirect to the host app page.
+            // The backend has already confirmed the email; we just redirect.
+            // The token query param is forwarded if present, otherwise the
+            // {token} placeholder is replaced with an empty string.
             routing::get(
                 "/_/auth/verify_email",
-                async |_req: Request| -> Result<Response, HttpError> {
-                    return Ok(Html(verify_email_page()).into_response());
+                async |req: Request| -> Result<Response, HttpError> {
+                    let url_template = read_verify_email_url()?;
+                    let token = req.query_param("token").unwrap_or_default();
+                    let location = url_template.replace("{token}", &token);
+
+                    return Response::builder()
+                        .status(StatusCode::SEE_OTHER)
+                        .header(header::LOCATION, location)
+                        .body(b"".into_body())
+                        .map_err(internal);
                 },
             ),
             // i18n — serve the embedded default XLIFF for a given locale.
-            // Cache-Control: no-cache so the bundle picks up the latest embedded
-            // default without forcing the browser to revalidate with an ETag.
+            // Used by the UI bundle to load translations at runtime.
             routing::get(
                 "/_/auth/i18n/{locale}",
                 async |req: Request| -> Result<Response, HttpError> {
@@ -169,46 +323,6 @@ impl Guest for Endpoints {
                         .map_err(internal);
                 },
             ),
-            // i18n — replace the per-locale override stored in KV.
-            // No PUT helper in the routing module, so construct the route directly.
-            HttpRoute::new(
-                Method::PUT,
-                "/_/auth/i18n/{locale}",
-                async |mut req: Request| -> Result<Response, HttpError> {
-                    let body = req.body().bytes().await.map_err(internal)?;
-                    let xml =
-                        std::str::from_utf8(&body).map_err(|_| bad_request("invalid UTF-8"))?;
-                    let entries = parse_xliff(xml).map_err(bad_request)?;
-
-                    let locale = req
-                        .path_param("locale")
-                        .ok_or_else(|| internal("missing locale"))?
-                        .to_string();
-
-                    write_override(&locale, &entries)?;
-
-                    return Response::builder()
-                        .status(StatusCode::OK)
-                        .body(b"".into_body())
-                        .map_err(internal);
-                },
-            ),
-            // i18n — drop the per-locale override from KV.
-            routing::delete(
-                "/_/auth/i18n/{locale}",
-                async |req: Request| -> Result<Response, HttpError> {
-                    let locale = req
-                        .path_param("locale")
-                        .ok_or_else(|| internal("missing locale"))?;
-
-                    delete_override(locale)?;
-
-                    return Response::builder()
-                        .status(StatusCode::OK)
-                        .body(b"".into_body())
-                        .map_err(internal);
-                },
-            ),
             // i18n — serve a JavaScript module for the requested locale.
             // A stored override takes precedence; otherwise the module embedded
             // at build time is served. Returns 404 when neither is available.
@@ -219,8 +333,16 @@ impl Guest for Endpoints {
                         .path_param("locale")
                         .ok_or_else(|| internal("missing locale"))?;
 
-                    if let Some(entries) = read_override(locale)? {
-                        let js = serialize_js_module(&entries);
+                    if let Some(overrides) = read_override(locale)? {
+                        // Merge the override entries with the locale's default
+                        // translations so non-overridden strings keep their
+                        // locale default instead of falling back to English.
+                        let defaults = match load_default_xliff(locale) {
+                            Some(xml) => parse_xliff(&xml).unwrap_or_default(),
+                            None => Vec::new(),
+                        };
+                        let merged = merge_entries(&defaults, &overrides);
+                        let js = serialize_js_module(&merged);
                         return Response::builder()
                             .header(header::CACHE_CONTROL, "no-cache")
                             .header(header::CONTENT_TYPE, "application/javascript; charset=utf-8")

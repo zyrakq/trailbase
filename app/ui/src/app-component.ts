@@ -12,6 +12,7 @@ import '@/pages/admin/index.ts';
 import '@/pages/subscription/index.ts';
 import '@/features/auth/components/oauth-callback';
 import '@/pages/reset-password/index.ts';
+import '@/pages/verify-email/index.ts';
 import '@/features/notifications/components/toast-container';
 
 @customElement('app-component')
@@ -45,7 +46,20 @@ export class AppComponent extends LitElement {
     },
     {
       path: '/subscription/:id',
-      render: (params: Record<string, string | undefined>) => html`<subscription-detail-page .subscriptionId=${params['id'] ?? ''}></subscription-detail-page>`,
+      render: (params: Record<string, string | undefined>) =>
+        html`<subscription-detail-page
+          .subscriptionId=${params['id'] ?? ''}
+        ></subscription-detail-page>`,
+      enter: async () => {
+        await authService.init();
+        return true;
+      },
+    },
+    {
+      // Email verification success page — TrailBase redirects here after
+      // confirming the email. The trail-auth bundle renders the success screen.
+      path: '/verify-email',
+      render: () => html`<verify-email-page></verify-email-page>`,
       enter: async () => {
         await authService.init();
         return true;
@@ -102,7 +116,10 @@ export class AppComponent extends LitElement {
     },
     {
       path: '/admin/subscription/:id/edit',
-      render: (params: Record<string, string | undefined>) => html`<subscription-form-page .subscriptionId=${params['id'] ?? ''}></subscription-form-page>`,
+      render: (params: Record<string, string | undefined>) =>
+        html`<subscription-form-page
+          .subscriptionId=${params['id'] ?? ''}
+        ></subscription-form-page>`,
       enter: async () => {
         await authService.init();
         if (!authService.isAuthenticated()) {

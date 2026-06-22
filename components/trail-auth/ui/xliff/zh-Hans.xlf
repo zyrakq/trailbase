@@ -470,6 +470,150 @@
   <source>Set new password</source>
   <target>设置新密码</target>
 </trans-unit>
+<trans-unit id="s4697cc2dfd70449d">
+  <source>Failed to load settings. Please try again.</source>
+  <target>加载设置失败。请重试。</target>
+</trans-unit>
+<trans-unit id="sdc2508aba9b9ef42">
+  <source>Settings saved successfully.</source>
+  <target>设置保存成功。</target>
+</trans-unit>
+<trans-unit id="s16cc0c31cc93bc6f">
+  <source>Failed to save settings.</source>
+  <target>保存设置失败。</target>
+</trans-unit>
+<trans-unit id="scbb851063af815d9">
+  <source>Failed to load translations.</source>
+  <target>加载翻译失败。</target>
+</trans-unit>
+<trans-unit id="s69daa98384fdb7b7">
+  <source>Translations saved successfully.</source>
+  <target>翻译保存成功。</target>
+</trans-unit>
+<trans-unit id="s9b4a67b333fd0bf8">
+  <source>Failed to save translations.</source>
+  <target>保存翻译失败。</target>
+</trans-unit>
+<trans-unit id="s7e419dd887f998c0">
+  <source>Translations reset to default.</source>
+  <target>翻译已重置为默认值。</target>
+</trans-unit>
+<trans-unit id="s7ac43705f83aea04">
+  <source>Failed to reset translations.</source>
+  <target>重置翻译失败。</target>
+</trans-unit>
+<trans-unit id="s56e2655fe1958c53">
+  <source>Invalid XLIFF file</source>
+  <target>无效的 XLIFF 文件</target>
+</trans-unit>
+<trans-unit id="sa53d47da734122e4">
+  <source>XLIFF loaded. Review and save when ready.</source>
+  <target>XLIFF 已加载。请检查并在准备好后保存。</target>
+</trans-unit>
+<trans-unit id="s4d3d736a36be38e1">
+  <source>Failed to parse XLIFF file.</source>
+  <target>解析 XLIFF 文件失败。</target>
+</trans-unit>
+<trans-unit id="se64886ffc27562a2">
+  <source>Reset password redirect URL</source>
+  <target>重置密码重定向 URL</target>
+</trans-unit>
+<trans-unit id="s7c053e7eb7bbc3fb">
+  <source>Use {token} as a placeholder for the reset token.</source>
+  <target>使用 {token} 作为重置令牌的占位符。</target>
+</trans-unit>
+<trans-unit id="s20c8f42ba4926cb5">
+  <source>Verify email redirect URL</source>
+  <target>验证邮箱重定向 URL</target>
+</trans-unit>
+<trans-unit id="sd1124a79aaa6eea1">
+  <source>Use {token} as a placeholder for the verification token.</source>
+  <target>使用 {token} 作为验证令牌的占位符。</target>
+</trans-unit>
+<trans-unit id="s717d4a2cd3f7d66f">
+  <source>Saving...</source>
+  <target>保存中...</target>
+</trans-unit>
+<trans-unit id="s33f85f24c0f5f008">
+  <source>Save</source>
+  <target>保存</target>
+</trans-unit>
+<trans-unit id="s506b6a19d12f414c">
+  <source>Key</source>
+  <target>键</target>
+</trans-unit>
+<trans-unit id="s41f7dca46d3f1b4a">
+  <source>Value</source>
+  <target>值</target>
+</trans-unit>
+<trans-unit id="s6dba646770efe34c">
+  <source>Download XLIFF Template</source>
+  <target>下载 XLIFF 模板</target>
+</trans-unit>
+<trans-unit id="s11326fd2590f4e5e">
+  <source>Default</source>
+  <target>默认</target>
+</trans-unit>
+<trans-unit id="s749e8ca6ae962ffd">
+  <source>Override</source>
+  <target>覆盖</target>
+</trans-unit>
+<trans-unit id="s4acb8d19c4b38541">
+  <source>Save Overrides</source>
+  <target>保存覆盖</target>
+</trans-unit>
+<trans-unit id="s826f40bb1c0c03db">
+  <source>Upload XLIFF</source>
+  <target>上传 XLIFF</target>
+</trans-unit>
+<trans-unit id="sc9cc72361e6b922e">
+  <source>Download XLIFF</source>
+  <target>下载 XLIFF</target>
+</trans-unit>
+<trans-unit id="sf786171004dde79c">
+  <source>Reset to Default</source>
+  <target>重置为默认</target>
+</trans-unit>
+<trans-unit id="s170319768bda4977">
+  <source>Locale</source>
+  <target>语言</target>
+</trans-unit>
+<trans-unit id="s3979c21646967091">
+  <source>Loading translations...</source>
+  <target>正在加载翻译...</target>
+</trans-unit>
+<trans-unit id="s1c5464d547242a34">
+  <source>Trail Auth Settings</source>
+  <target>Trail Auth 设置</target>
+</trans-unit>
+<trans-unit id="sc3ac225273c8316b">
+  <source>General</source>
+  <target>常规</target>
+</trans-unit>
+<trans-unit id="sebe1e01d3ce62fcd">
+  <source>Translations</source>
+  <target>翻译</target>
+</trans-unit>
+<trans-unit id="s551c5dbba77608db">
+  <source>Reset all overrides to default?</source>
+  <target>将所有覆盖重置为默认值？</target>
+</trans-unit>
+<trans-unit id="s933414dccd5e2e52">
+  <source>Resetting...</source>
+  <target>重置中...</target>
+</trans-unit>
+<trans-unit id="sb85774dc5d18ff0f">
+  <source>Confirm</source>
+  <target>确认</target>
+</trans-unit>
+<trans-unit id="s3810f26bfdec8d85">
+  <source>Email verified</source>
+  <target>邮箱已验证</target>
+</trans-unit>
+<trans-unit id="se7f2d88b36214086">
+  <source>Your email has been verified.</source>
+  <target>您的邮箱已验证。</target>
+</trans-unit>
 </body>
 </file>
 </xliff>

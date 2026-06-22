@@ -4,10 +4,23 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use serde_json;
 use trailbase_wasm::http::HttpError;
-use trailbase_wasm::kv::Store;
 
 use crate::Assets;
+use crate::db_kv::{kv_delete, kv_get, kv_set};
 use crate::error::internal;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(crate) struct I18nEntry {
+    pub(crate) id: String,
+    pub(crate) value: String,
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct I18nEditorResponse {
+    pub(crate) default: Vec<I18nEntry>,
+    #[serde(rename = "override")]
+    pub(crate) override_: Vec<I18nEntry>,
+}
 
 const KV_OVERRIDE_PREFIX: &str = "i18n:";
 
@@ -110,8 +123,7 @@ pub(crate) fn serialize_js_module(entries: &[(String, String)]) -> String {
 }
 
 pub(crate) fn read_override(locale: &str) -> Result<Option<Vec<(String, String)>>, HttpError> {
-    let store = Store::open().map_err(internal)?;
-    let bytes = match store.get(&override_key(locale)).map_err(internal)? {
+    let bytes = match kv_get(&override_key(locale))? {
         Some(b) if !b.is_empty() => b,
         _ => return Ok(None),
     };
@@ -125,15 +137,12 @@ pub(crate) fn read_override(locale: &str) -> Result<Option<Vec<(String, String)>
 pub(crate) fn write_override(locale: &str, entries: &[(String, String)]) -> Result<(), HttpError> {
     let map: HashMap<&str, &str> = entries.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
     let bytes = serde_json::to_vec(&map).map_err(internal)?;
-
-    let mut store = Store::open().map_err(internal)?;
-    store.set(&override_key(locale), &bytes).map_err(internal)?;
+    kv_set(&override_key(locale), &bytes)?;
     return Ok(());
 }
 
 pub(crate) fn delete_override(locale: &str) -> Result<(), HttpError> {
-    let mut store = Store::open().map_err(internal)?;
-    store.delete(&override_key(locale)).map_err(internal)?;
+    kv_delete(&override_key(locale))?;
     return Ok(());
 }
 
@@ -168,6 +177,75 @@ pub(crate) fn merge_entries(
 pub(crate) fn load_default_xliff(locale: &str) -> Option<String> {
     let asset = Assets::get(&format!("xliff/{locale}.xlf"))?;
     return Some(String::from_utf8_lossy(&asset.data).into_owned());
+}
+
+/// Parse `<source>` text from each `<trans-unit>`, ignoring `<target>`.
+/// English is the source language and has no dedicated xliff/{locale}.xlf;
+/// use this to populate the read-only editor view for "en".
+pub(crate) fn parse_xliff_sources(xml: &str) -> Result<Vec<(String, String)>, String> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+
+    let mut entries: Vec<(String, String)> = Vec::new();
+    let mut current_id: Option<String> = None;
+    let mut in_source = false;
+    let mut buf: Vec<u8> = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"trans-unit" => {
+                    current_id = e
+                        .attributes()
+                        .flatten()
+                        .find(|a| a.key.as_ref() == b"id")
+                        .and_then(|a| a.unescape_value().ok().map(|v| v.into_owned()));
+                }
+                b"source" => in_source = true,
+                _ => (),
+            },
+            Ok(Event::Text(e)) => {
+                if in_source
+                    && let Some(id) = current_id.as_deref()
+                {
+                    let text = e.unescape().map_err(|err| err.to_string())?.into_owned();
+                    if !text.is_empty() {
+                        entries.push((id.to_string(), text));
+                    }
+                }
+            }
+            Ok(Event::CData(e)) => {
+                if in_source
+                    && let Some(id) = current_id.as_deref()
+                {
+                    let text = String::from_utf8_lossy(e.as_ref()).into_owned();
+                    if !text.is_empty() {
+                        entries.push((id.to_string(), text));
+                    }
+                }
+            }
+            Ok(Event::End(e)) => match e.name().as_ref() {
+                b"trans-unit" => {
+                    current_id = None;
+                    in_source = false;
+                }
+                b"source" => in_source = false,
+                _ => (),
+            },
+            Ok(Event::Eof) => break,
+            Err(err) => {
+                return Err(format!(
+                    "XLIFF parse error at {}: {err}",
+                    reader.buffer_position()
+                ));
+            }
+            _ => (),
+        }
+
+        buf.clear();
+    }
+
+    return Ok(entries);
 }
 
 fn js_string(value: &str) -> String {

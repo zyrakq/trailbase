@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS _trail_auth_kv (
+  key   TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT NULL
+);
