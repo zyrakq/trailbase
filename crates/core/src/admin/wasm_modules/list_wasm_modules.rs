@@ -13,7 +13,6 @@ pub struct WasmModuleEntry {
   pub icon: Option<String>,
   pub config_path: Option<String>,
   pub description: Option<String>,
-  pub has_config: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, TS)]
@@ -33,7 +32,6 @@ fn build_entry(
     icon: manifest.and_then(|m| m.icon.clone()),
     config_path: manifest.and_then(|m| m.config_path.clone()),
     description: manifest.and_then(|m| m.description.clone()),
-    has_config: manifest.is_some(),
     name,
   };
 }
@@ -41,10 +39,6 @@ fn build_entry(
 pub async fn list_wasm_modules_handler(
   State(state): State<AppState>,
 ) -> Result<Json<ListWasmModulesResponse>, Error> {
-  // Re-probe manifests so the admin UI always sees fresh data without
-  // requiring a server restart after a WASM component is updated.
-  crate::wasm::refresh_manifests(&state).await;
-
   let mut names: Vec<String> = Vec::new();
   for rt in state.wasm_runtimes() {
     let path = rt.read().await.component_path().clone();
@@ -77,7 +71,6 @@ mod tests {
     assert_eq!(entry.display_name, "my_component");
     assert!(entry.icon.is_none());
     assert!(entry.config_path.is_none());
-    assert!(!entry.has_config);
   }
 
   #[test]
@@ -94,7 +87,6 @@ mod tests {
     assert_eq!(entry.icon.as_deref(), Some("<svg/>"));
     assert_eq!(entry.config_path.as_deref(), Some("/_/admin/my/config"));
     assert_eq!(entry.description.as_deref(), Some("A test component"));
-    assert!(entry.has_config);
   }
 
   #[tokio::test]
