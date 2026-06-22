@@ -115,6 +115,85 @@ pub(crate) fn wasm_runtimes_builder(
   }));
 }
 
+/// Probe a WASM component's manifest endpoint by calling it directly
+/// through the runtime's HTTP store. Returns the parsed manifest or None
+/// if the component doesn't expose one or the response is invalid.
+pub(crate) async fn probe_manifest(
+  runtime: &Runtime,
+  manifest_path: &str,
+) -> Option<crate::app_state::WasmManifest> {
+  let manifest_uri = format!("http://localhost{manifest_path}");
+
+  let manifest_store = HttpStore::new(runtime).await.ok()?;
+  let context_header = to_header_value(&HttpContext {
+    kind: HttpContextKind::Http,
+    registered_path: manifest_path.to_string(),
+    path_params: vec![],
+    user: None,
+  })
+  .ok()?;
+
+  let probe_req = hyper::Request::builder()
+    .method(hyper::Method::GET)
+    .uri(manifest_uri)
+    .header("__context", context_header)
+    .body(empty())
+    .ok()?;
+
+  let resp = manifest_store.call_incoming_http_handler(probe_req).await.ok()?;
+
+  if resp.status() != hyper::StatusCode::OK {
+    return None;
+  }
+
+  let (_, body) = resp.into_parts();
+  let collected = body.collect().await.ok()?;
+
+  match serde_json::from_slice::<crate::app_state::WasmManifest>(&collected.to_bytes()) {
+    Ok(manifest) => Some(manifest),
+    Err(err) => {
+      warn!("Manifest at '{manifest_path}' returned invalid JSON: {err}");
+      None
+    }
+  }
+}
+
+/// Re-probe manifests for all WASM runtimes and update the cache.
+/// Called from the admin list_wasm_modules handler so the admin UI
+/// always sees fresh manifest data without requiring a server restart.
+pub(crate) async fn refresh_manifests(state: &AppState) {
+  let mut updates: Vec<(String, crate::app_state::WasmManifest)> = Vec::new();
+
+  let paths = state.wasm_manifest_paths().read().await;
+
+  for rt in state.wasm_runtimes() {
+    let runtime = rt.read().await;
+    let path = runtime.component_path().clone();
+    let name = path
+      .file_stem()
+      .and_then(|s| s.to_str())
+      .unwrap_or("unknown")
+      .to_string();
+
+    let manifest_path = paths.get(&name).cloned();
+    if let Some(ref manifest_path) = manifest_path {
+      if let Some(manifest) = probe_manifest(&runtime, manifest_path).await {
+        info!("Refreshing manifest for WASM component '{name}'");
+        updates.push((name, manifest));
+      }
+    }
+  }
+
+  drop(paths);
+
+  if !updates.is_empty() {
+    let mut manifests = state.wasm_manifests().write().await;
+    for (name, manifest) in updates {
+      manifests.insert(name, manifest);
+    }
+  }
+}
+
 pub(crate) async fn install_routes_and_jobs(
   state: &AppState,
   runtime: Arc<RwLock<Runtime>>,
@@ -138,45 +217,34 @@ pub(crate) async fn install_routes_and_jobs(
     .and_then(|s| s.to_str())
     .unwrap_or("unknown")
     .to_string();
-  let manifest_path = format!("/_/wasm/{component_name}/manifest");
-  let manifest_uri = format!("http://localhost/_/wasm/{component_name}/manifest");
-  if let (Ok(manifest_store), Ok(context_header)) = (
-    HttpStore::new(&*runtime.read().await).await,
-    to_header_value(&HttpContext {
-      kind: HttpContextKind::Http,
-      registered_path: manifest_path,
-      path_params: vec![],
-      user: None,
-    }),
-  ) {
-    if let Ok(probe_req) = hyper::Request::builder()
-      .method(hyper::Method::GET)
-      .uri(manifest_uri)
-      .header("__context", context_header)
-      .body(empty())
-    {
-      if let Ok(resp) = manifest_store.call_incoming_http_handler(probe_req).await {
-        if resp.status() == hyper::StatusCode::OK {
-          let (_, body) = resp.into_parts();
-          if let Ok(collected) = body.collect().await {
-            match serde_json::from_slice::<crate::app_state::WasmManifest>(
-              &collected.to_bytes(),
-            ) {
-              Ok(manifest) => {
-                info!("Registering manifest for WASM component '{component_name}'");
-                state
-                  .wasm_manifests()
-                  .write()
-                  .await
-                  .insert(component_name, manifest);
-              }
-              Err(err) => warn!(
-                "Component '{component_name}': manifest endpoint returned invalid JSON: {err}"
-              ),
-            }
-          }
-        }
-      }
+
+  // Find the manifest route from the component's registered HTTP handlers.
+  // The route prefix is chosen by the WASM component (e.g. "trail-auth"), not
+  // derived from the file stem (e.g. "trail_auth_component"), so we must look
+  // it up from the actual registered routes.
+  let manifest_path = init_result
+    .http_handlers
+    .iter()
+    .find(|(method, path)| {
+      *method == trailbase_wasm_runtime_host::HttpMethodType::Get
+        && path.ends_with("/manifest")
+    })
+    .map(|(_, path)| path.clone());
+
+  if let Some(ref manifest_path) = manifest_path {
+    state
+      .wasm_manifest_paths()
+      .write()
+      .await
+      .insert(component_name.clone(), manifest_path.clone());
+
+    if let Some(manifest) = probe_manifest(&*runtime.read().await, manifest_path).await {
+      info!("Registering manifest for WASM component '{component_name}'");
+      state
+        .wasm_manifests()
+        .write()
+        .await
+        .insert(component_name, manifest);
     }
   }
 
@@ -249,7 +317,10 @@ pub(crate) async fn install_routes_and_jobs(
             .map(|(name, value)| (name.to_string(), value.to_string()))
             .collect(),
           user: user.map(|u| HttpContextUser {
-            id: u.id,
+            // The host encodes user IDs with BASE64_URL_SAFE (with padding), but the
+            // wasm-runtime-guest's is_admin() decodes with URL_SAFE_NO_PAD. Strip the
+            // padding here so the guest receives the format it expects.
+            id: u.id.trim_end_matches('=').to_string(),
             email: u.email,
             csrf_token: u.csrf_token,
           }),

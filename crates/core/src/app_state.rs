@@ -27,6 +27,7 @@ pub struct WasmManifest {
   pub display_name: String,
   pub icon: Option<String>,
   pub config_path: Option<String>,
+  pub description: Option<String>,
 }
 
 /// The app's internal state. AppState needs to be clonable which puts unnecessary constraints on
@@ -65,6 +66,11 @@ struct InternalState {
   /// WASM runtime builders needed to rebuild above runtimes, e.g. when hot-reloading.
   wasm_runtimes_builder: crate::wasm::WasmRuntimeBuilder,
   wasm_manifests: Arc<RwLock<HashMap<String, WasmManifest>>>,
+  /// Maps component file stem to actual manifest route path (e.g.
+  /// "trail_auth_component" -> "/_/wasm/trail-auth/manifest"). Needed
+  /// because the route prefix is chosen by the WASM component, not derived
+  /// from the file name.
+  wasm_manifest_paths: Arc<RwLock<HashMap<String, String>>>,
 
   #[cfg(test)]
   #[allow(unused)]
@@ -211,9 +217,10 @@ impl AppState {
           .map(|rt| Arc::new(RwLock::new(rt)))
           .collect(),
         wasm_runtimes_builder,
-        wasm_manifests: Arc::new(RwLock::new(HashMap::new())),
-        #[cfg(test)]
-        pg_uri: None,
+wasm_manifests: Arc::new(RwLock::new(HashMap::new())),
+      wasm_manifest_paths: Arc::new(RwLock::new(HashMap::new())),
+      #[cfg(test)]
+      pg_uri: None,
         #[cfg(test)]
         test_cleanup: vec![],
       }),
@@ -412,6 +419,10 @@ impl AppState {
 
   pub(crate) fn wasm_manifests(&self) -> &Arc<RwLock<HashMap<String, WasmManifest>>> {
     return &self.state.wasm_manifests;
+  }
+
+  pub(crate) fn wasm_manifest_paths(&self) -> &Arc<RwLock<HashMap<String, String>>> {
+    return &self.state.wasm_manifest_paths;
   }
 
   pub(crate) async fn reload_wasm_runtimes(&self) -> Result<(), crate::wasm::AnyError> {
@@ -863,8 +874,9 @@ mod test_utils {
         object_store,
         wasm_runtimes: vec![],
         wasm_runtimes_builder: Box::new(|| Ok(vec![])),
-        wasm_manifests: Arc::new(RwLock::new(HashMap::new())),
-        pg_uri,
+wasm_manifests: Arc::new(RwLock::new(HashMap::new())),
+      wasm_manifest_paths: Arc::new(RwLock::new(HashMap::new())),
+      pg_uri,
         test_cleanup: vec![Box::new(pg_aborter), Box::new(temp_dir)],
       }),
     });
@@ -882,6 +894,7 @@ mod test_utils {
         display_name: "Demo".to_string(),
         icon: Some("<svg/>".to_string()),
         config_path: Some("/_/admin/demo".to_string()),
+        description: Some("A demo component".to_string()),
       },
     );
     assert_eq!(1, registry.read().await.len());
