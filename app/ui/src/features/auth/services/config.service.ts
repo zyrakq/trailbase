@@ -1,3 +1,5 @@
+// Public config service — fetches specific feature flags for the frontend.
+// No caching: each call fetches fresh data from the server.
 export interface PublicConfig {
   /** Whether password-based login, registration, and OTP UI should be shown. */
   passwordAuthEnabled: boolean;

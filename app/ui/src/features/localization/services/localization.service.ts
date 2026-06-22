@@ -62,7 +62,7 @@ class LocalizationService {
     this._saveLocale(locale);
 
     window.dispatchEvent(
-      new CustomEvent('velora-locale-change', {
+      new CustomEvent('locale-change', {
         detail: {
           oldLocale: this._getLocale(),
           newLocale: locale,

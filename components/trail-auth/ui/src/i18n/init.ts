@@ -3,8 +3,8 @@ import {
   str,
   LOCALE_STATUS_EVENT,
   type LocaleStatusEventDetail,
-} from '@lit/localize';
-import { sourceLocale, targetLocales } from '../generated/locale-codes.js';
+} from "@lit/localize";
+import { sourceLocale, targetLocales } from "../generated/locale-codes.js";
 
 // trail-auth's own @lit/localize instance — bundled into the IIFE,
 // independent of any host app's instance.
@@ -36,11 +36,10 @@ class LocalizationService {
 
 export const localizationService = new LocalizationService();
 
-// The host app persists the active locale under this localStorage key
-// (see app/ui/src/features/localization/data/locale-metadata.ts).
-// Reading it on bundle load lets trail-auth render in the user's
-// chosen language without the host having to call init() explicitly.
-const VELORA_LOCALE_STORAGE_KEY = 'velora-locale';
+// Admin panel's own locale storage key, decoupled from the main app's
+// locale key. Reading it on bundle load lets trail-auth render in the
+// admin's chosen language without the host having to call init() explicitly.
+const ADMIN_LOCALE_STORAGE_KEY = "admin-locale";
 
 // Listen for locale changes dispatched by the host app's own
 // @lit/localize instance. When the host switches locale, this listener
@@ -51,14 +50,14 @@ window.addEventListener(LOCALE_STATUS_EVENT, (event) => {
   const detail = (event as CustomEvent<LocaleStatusEventDetail>).detail;
   if (!detail) return;
   const locale =
-    detail.status === 'loading' ? detail.loadingLocale : detail.readyLocale;
+    detail.status === "loading" ? detail.loadingLocale : detail.readyLocale;
   if (locale && locale !== localizationService.getLocale()) {
     void localizationService.setLocale(locale);
   }
 });
 
 try {
-  const stored = localStorage.getItem(VELORA_LOCALE_STORAGE_KEY);
+  const stored = localStorage.getItem(ADMIN_LOCALE_STORAGE_KEY);
   if (stored && stored !== sourceLocale) {
     void localizationService.setLocale(stored);
   }

@@ -10,7 +10,7 @@ import {
 export interface PreventFARTOptions {
   /**
    * localStorage key to read theme from
-   * @default 'app-theme'
+   * @default 'theme'
    */
   storageKey?: string;
 
@@ -45,7 +45,7 @@ export interface PreventFARTOptions {
  * <head>
  *   <script>
  *     (function() {
- *       var stored = localStorage.getItem('app-theme');
+   *       var stored = localStorage.getItem('theme');
  *       var theme;
  *       if (stored === 'light' || stored === 'dark') {
  *         theme = stored;

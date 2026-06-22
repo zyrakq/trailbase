@@ -225,7 +225,7 @@ export class ThemeService {
  */
 export const themeService = ThemeService.getInstance({
   storage: {
-    key: 'velora-theme',
+    key: 'theme',
     enabled: true,
   },
 });

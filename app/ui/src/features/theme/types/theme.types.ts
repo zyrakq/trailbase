@@ -20,7 +20,7 @@ export type Theme = ThemeMode;
 export interface ThemeStorage {
   /**
    * localStorage key for storing user preference
-   * @default 'app-theme'
+   * @default 'theme'
    */
   key: string;
 
@@ -66,7 +66,7 @@ export const DEFAULT_CONFIG: ThemeConfig = {
   defaultTheme: 'light',
   useSystemPreference: true,
   storage: {
-    key: 'app-theme',
+    key: 'theme',
     enabled: true,
   },
   attribute: 'theme',
@@ -80,7 +80,7 @@ export const THEME_ATTRIBUTE = 'theme';
 /**
  * Default localStorage key (exported as constant)
  */
-export const THEME_STORAGE_KEY = 'app-theme';
+export const THEME_STORAGE_KEY = 'theme';
 
 // PreventFART options type (re-exported from utils for convenience)
 export type { PreventFARTOptions } from '../utils/prevent-fart';

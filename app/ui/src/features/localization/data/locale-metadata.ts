@@ -32,4 +32,4 @@ export const LOCALE_METADATA: Record<LocaleCode, LocaleMetadata> = {
 };
 
 export const DEFAULT_LOCALE: LocaleCode = 'en';
-export const STORAGE_KEY = 'velora-locale';
+export const STORAGE_KEY = 'locale';

@@ -31,7 +31,7 @@ Add this inline script to your HTML `<head>` before any other scripts:
 ```html
 <head>
   <script>
-    (function(){var e=localStorage.getItem("velora-theme"),t;if(e==="light"||e==="dark"){t=e}else if(window.matchMedia("(prefers-color-scheme: dark)").matches){t="dark"}else{t="light"}document.documentElement.setAttribute("theme",t)})();
+    (function(){var e=localStorage.getItem("theme"),t;if(e==="light"||e==="dark"){t=e}else if(window.matchMedia("(prefers-color-scheme: dark)").matches){t="dark"}else{t="light"}document.documentElement.setAttribute("theme",t)})();
   </script>
 </head>
 ```
