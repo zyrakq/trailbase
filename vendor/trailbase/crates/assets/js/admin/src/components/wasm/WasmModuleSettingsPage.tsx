@@ -99,7 +99,7 @@ export function WasmModuleSettingsPage() {
             </div>
           </Match>
 
-          <Match when={!module()?.has_config}>
+          <Match when={!module()?.config_path}>
             <Header
               title={module()?.display_name ?? params.name}
               leading={backLink()}
@@ -109,7 +109,7 @@ export function WasmModuleSettingsPage() {
             </div>
           </Match>
 
-          <Match when={module()?.has_config}>
+          <Match when={module()?.config_path}>
             <Header title={module()!.display_name} leading={backLink()} />
 
             <div class="p-4">

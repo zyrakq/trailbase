@@ -68,7 +68,7 @@ function ModuleCard(props: { module: WasmModuleEntry }) {
         </Show>
       </div>
 
-      <Show when={props.module.has_config}>
+      <Show when={props.module.config_path !== null}>
         <A
           href={`/wasm-modules/${props.module.name}`}
           class="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"

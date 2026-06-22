@@ -158,42 +158,6 @@ pub(crate) async fn probe_manifest(
   }
 }
 
-/// Re-probe manifests for all WASM runtimes and update the cache.
-/// Called from the admin list_wasm_modules handler so the admin UI
-/// always sees fresh manifest data without requiring a server restart.
-pub(crate) async fn refresh_manifests(state: &AppState) {
-  let mut updates: Vec<(String, crate::app_state::WasmManifest)> = Vec::new();
-
-  let paths = state.wasm_manifest_paths().read().await;
-
-  for rt in state.wasm_runtimes() {
-    let runtime = rt.read().await;
-    let path = runtime.component_path().clone();
-    let name = path
-      .file_stem()
-      .and_then(|s| s.to_str())
-      .unwrap_or("unknown")
-      .to_string();
-
-    let manifest_path = paths.get(&name).cloned();
-    if let Some(ref manifest_path) = manifest_path {
-      if let Some(manifest) = probe_manifest(&runtime, manifest_path).await {
-        info!("Refreshing manifest for WASM component '{name}'");
-        updates.push((name, manifest));
-      }
-    }
-  }
-
-  drop(paths);
-
-  if !updates.is_empty() {
-    let mut manifests = state.wasm_manifests().write().await;
-    for (name, manifest) in updates {
-      manifests.insert(name, manifest);
-    }
-  }
-}
-
 pub(crate) async fn install_routes_and_jobs(
   state: &AppState,
   runtime: Arc<RwLock<Runtime>>,

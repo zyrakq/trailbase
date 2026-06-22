@@ -6,5 +6,4 @@ display_name: string,
 icon: string | null,
 config_path: string | null,
 description: string | null,
-has_config: boolean,
 };
