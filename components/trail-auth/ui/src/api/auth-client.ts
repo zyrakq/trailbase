@@ -345,14 +345,23 @@ export async function loginWithMfa(mfaToken: string, totpCode: string): Promise<
 // Registration
 // ---------------------------------------------------------------------------
 
-export async function registerWithPassword(email: string, password: string): Promise<void> {
+export async function registerWithPassword(
+  email: string,
+  password: string,
+  redirectUri?: string
+): Promise<void> {
   let response: Response;
   try {
     response = await fetch('/api/auth/v1/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, password, password_repeat: password }),
+      body: JSON.stringify({
+        email,
+        password,
+        password_repeat: password,
+        ...(redirectUri ? { redirect_uri: redirectUri } : {}),
+      }),
     });
   } catch {
     throw new AuthClientError(AuthErrorCode.NETWORK_ERROR, 'Network error during registration');
@@ -387,13 +396,17 @@ export async function registerWithPassword(email: string, password: string): Pro
 // Verification email
 // ---------------------------------------------------------------------------
 
-export async function resendVerificationEmail(email: string): Promise<void> {
+export async function resendVerificationEmail(
+  email: string,
+  redirectUri?: string
+): Promise<void> {
   let response: Response;
+  const params = new URLSearchParams({ email });
+  if (redirectUri) params.set('redirect_uri', redirectUri);
   try {
-    response = await fetch(
-      `/api/auth/v1/verify_email/trigger?email=${encodeURIComponent(email)}`,
-      { credentials: 'include' }
-    );
+    response = await fetch(`/api/auth/v1/verify_email/trigger?${params.toString()}`, {
+      credentials: 'include',
+    });
   } catch {
     throw new AuthClientError(AuthErrorCode.NETWORK_ERROR, 'Network error resending email');
   }
@@ -750,7 +763,6 @@ function adminHeaders(extra?: Record<string, string>): Record<string, string> {
 
 export interface TrailAuthConfig {
   reset_password_redirect_url: string;
-  verify_email_redirect_url: string;
 }
 
 export async function fetchTrailAuthConfig(): Promise<TrailAuthConfig> {

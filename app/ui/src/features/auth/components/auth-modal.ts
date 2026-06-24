@@ -156,6 +156,7 @@ export class AuthModal extends LitElement {
       return html`<trail-auth
         ?no-password-auth=${!this.passwordAuthEnabled}
         ?no-registration=${!this.registrationEnabled}
+        verify-email-redirect-url="/verify-email"
       ></trail-auth>`;
     }
     if (this.bundleStatus === 'error' || this.retryInFlight) {

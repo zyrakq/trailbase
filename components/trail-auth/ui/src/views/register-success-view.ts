@@ -19,6 +19,7 @@ type ResendState = 'idle' | 'loading' | 'sent' | 'rate-limited' | 'smtp-error';
 export class TrailAuthRegisterSuccessView extends LitElement {
   @property({ type: String }) email = '';
   @property({ type: Boolean }) emailSent = false;
+  @property({ type: String }) verifyEmailRedirectUrl?: string;
 
   @state() private resendState: ResendState = 'idle';
 
@@ -42,7 +43,7 @@ export class TrailAuthRegisterSuccessView extends LitElement {
     if (this.resendState === 'loading' || this.resendState === 'sent') return;
     this.resendState = 'loading';
     try {
-      await resendVerificationEmail(this.email.trim());
+      await resendVerificationEmail(this.email.trim(), this.verifyEmailRedirectUrl);
       this.resendState = 'sent';
     } catch (error) {
       if (error instanceof AuthClientError) {

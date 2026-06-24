@@ -44,9 +44,11 @@ type ViewState =
  * - `token`           — password-reset JWT; used only when `mode="reset-password"`
  * - `no-password-auth` — boolean; disables password login/registration UI
  * - `no-registration`  — boolean; hides the "Create account" path
- * - `oauth-providers`  — JSON string: `[{"name":"oidc0","displayName":"SSO"}, ...]`
- *                        Can also be set as a JS property: `el.oauthProviders = [...]`
- */
+   * - `oauth-providers`  — JSON string: `[{"name":"oidc0","displayName":"SSO"}, ...]`
+   *                        Can also be set as a JS property: `el.oauthProviders = [...]`
+   * - `verify-email-redirect-url` — host-app path users land on after verifying their email
+   *                                (forwarded to TrailBase as `redirect_uri` on register/resend)
+   */
 @customElement('trail-auth')
 @localized()
 export class TrailAuth extends LitElement {
@@ -55,6 +57,8 @@ export class TrailAuth extends LitElement {
 
   @property({ type: Boolean, attribute: 'no-password-auth' }) noPasswordAuth = false;
   @property({ type: Boolean, attribute: 'no-registration' }) noRegistration = false;
+
+  @property({ attribute: 'verify-email-redirect-url' }) verifyEmailRedirectUrl?: string;
 
   @state() private view: ViewState = 'choice';
   @state() private oauthProviders: OAuthProvider[] = [];
@@ -150,12 +154,15 @@ export class TrailAuth extends LitElement {
         ></trail-auth-password>`;
 
       case 'register':
-        return html`<trail-auth-register></trail-auth-register>`;
+        return html`<trail-auth-register
+          .verifyEmailRedirectUrl=${this.verifyEmailRedirectUrl}
+        ></trail-auth-register>`;
 
       case 'register-success':
         return html`<trail-auth-register-success
           .email=${this.sharedEmail}
           .emailSent=${this.registerSuccessEmailSent}
+          .verifyEmailRedirectUrl=${this.verifyEmailRedirectUrl}
         ></trail-auth-register-success>`;
 
       case 'mfa':

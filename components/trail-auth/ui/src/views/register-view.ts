@@ -1,5 +1,5 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '../i18n/localized';
 import { authSharedStyles } from '../styles.ts';
@@ -22,6 +22,8 @@ import {
 @customElement('trail-auth-register')
 @localized()
 export class TrailAuthRegisterView extends LitElement {
+  @property({ type: String }) verifyEmailRedirectUrl?: string;
+
   @state() private email = '';
   @state() private password = '';
   @state() private confirmPassword = '';
@@ -90,7 +92,7 @@ export class TrailAuthRegisterView extends LitElement {
     let emailSent = true;
 
     try {
-      await registerWithPassword(trimmedEmail, trimmedPassword);
+      await registerWithPassword(trimmedEmail, trimmedPassword, this.verifyEmailRedirectUrl);
     } catch (err) {
       if (err instanceof AuthClientError && err.code === AuthErrorCode.EMAIL_NOT_SENT) {
         requiresVerification = true;

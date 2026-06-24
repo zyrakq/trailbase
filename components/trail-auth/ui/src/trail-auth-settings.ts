@@ -21,7 +21,7 @@ type Tab = 'general' | 'translations';
  * `<trail-auth-settings>` — admin settings UI for the trail-auth module.
  *
  * Two tabs:
- * - General: edit reset-password and verify-email redirect URLs
+ * - General: edit reset-password redirect URL
  * - Translations: per-locale translation override editor
  *
  * All API calls target `/_/wasm/trail-auth/*` admin endpoints which require
@@ -37,7 +37,6 @@ export class TrailAuthSettings extends LitElement {
 
   // General tab state
   @state() private resetPasswordUrl = '';
-  @state() private verifyEmailUrl = '';
   @state() private savingGeneral = false;
 
   // Translations tab state
@@ -72,7 +71,6 @@ export class TrailAuthSettings extends LitElement {
   private async loadConfig() {
     const config = await fetchTrailAuthConfig();
     this.resetPasswordUrl = config.reset_password_redirect_url;
-    this.verifyEmailUrl = config.verify_email_redirect_url;
   }
 
   private async handleSaveGeneral() {
@@ -82,7 +80,6 @@ export class TrailAuthSettings extends LitElement {
     try {
       const config: TrailAuthConfig = {
         reset_password_redirect_url: this.resetPasswordUrl,
-        verify_email_redirect_url: this.verifyEmailUrl,
       };
       await updateTrailAuthConfig(config);
       this.successMessage = msg('Settings saved successfully.');
@@ -281,26 +278,10 @@ export class TrailAuthSettings extends LitElement {
           >
         </div>
 
-        <div class="form-field">
-          <label for="verify-email-url">${msg('Verify email redirect URL')}</label>
-          <input
-            id="verify-email-url"
-            type="text"
-            .value=${this.verifyEmailUrl}
-            @input=${(e: Event) => {
-              this.verifyEmailUrl = (e.target as HTMLInputElement).value;
-            }}
-            placeholder="/verify-email?token={token}"
-          />
-          <span class="hint"
-            >${msg('Use {token} as a placeholder for the verification token.')}</span
-          >
-        </div>
-
         <button
           class="btn btn-primary"
           @click=${() => this.handleSaveGeneral()}
-          ?disabled=${this.savingGeneral || !this.resetPasswordUrl || !this.verifyEmailUrl}
+          ?disabled=${this.savingGeneral || !this.resetPasswordUrl}
         >
           ${this.savingGeneral ? msg('Saving...') : msg('Save')}
         </button>
@@ -440,7 +421,7 @@ export class TrailAuthSettings extends LitElement {
       return html`<div class="loading-skeleton"></div>`;
     }
 
-    if (this.error && !this.resetPasswordUrl && !this.verifyEmailUrl) {
+    if (this.error && !this.resetPasswordUrl) {
       return html`<div class="error-banner" role="alert">${this.error}</div>`;
     }
 

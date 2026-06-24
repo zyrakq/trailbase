@@ -17,10 +17,7 @@ mod profile;
 mod set_password;
 mod settings;
 
-use config::{
-    read_reset_password_url, read_verify_email_url, TrailAuthConfig, KV_RESET_PASSWORD_URL,
-    KV_VERIFY_EMAIL_URL,
-};
+use config::{read_reset_password_url, TrailAuthConfig, KV_RESET_PASSWORD_URL};
 use error::{bad_request, internal};
 use i18n::{
     delete_override, load_default_xliff, merge_entries, parse_xliff, parse_xliff_sources,
@@ -89,12 +86,12 @@ impl Guest for Endpoints {
                 "/_/wasm/trail-auth/config",
                 async |_req: Request| -> Result<Response, HttpError> {
                     let reset_password_redirect_url = read_reset_password_url()?;
-                    let verify_email_redirect_url = read_verify_email_url()?;
-                    return Ok(Json(TrailAuthConfig {
-                        reset_password_redirect_url,
-                        verify_email_redirect_url,
-                    })
-                    .into_response());
+                    return Ok(
+                        Json(TrailAuthConfig {
+                            reset_password_redirect_url,
+                        })
+                        .into_response(),
+                    );
                 },
             )
             .require_admin(),
@@ -109,17 +106,10 @@ impl Guest for Endpoints {
                     if config.reset_password_redirect_url.is_empty() {
                         return Err(bad_request("reset_password_redirect_url must not be empty"));
                     }
-                    if config.verify_email_redirect_url.is_empty() {
-                        return Err(bad_request("verify_email_redirect_url must not be empty"));
-                    }
 
                     db_kv::kv_set(
                         KV_RESET_PASSWORD_URL,
                         config.reset_password_redirect_url.as_bytes(),
-                    )?;
-                    db_kv::kv_set(
-                        KV_VERIFY_EMAIL_URL,
-                        config.verify_email_redirect_url.as_bytes(),
                     )?;
 
                     return Ok(Json(config).into_response());
@@ -278,24 +268,6 @@ impl Guest for Endpoints {
 
                     let url_template = read_reset_password_url()?;
                     let location = url_template.replace("{token}", token);
-
-                    return Response::builder()
-                        .status(StatusCode::SEE_OTHER)
-                        .header(header::LOCATION, location)
-                        .body(b"".into_body())
-                        .map_err(internal);
-                },
-            ),
-            // Verify-email links — 303 redirect to the host app page.
-            // The backend has already confirmed the email; we just redirect.
-            // The token query param is forwarded if present, otherwise the
-            // {token} placeholder is replaced with an empty string.
-            routing::get(
-                "/_/auth/verify_email",
-                async |req: Request| -> Result<Response, HttpError> {
-                    let url_template = read_verify_email_url()?;
-                    let token = req.query_param("token").unwrap_or_default();
-                    let location = url_template.replace("{token}", &token);
 
                     return Response::builder()
                         .status(StatusCode::SEE_OTHER)
