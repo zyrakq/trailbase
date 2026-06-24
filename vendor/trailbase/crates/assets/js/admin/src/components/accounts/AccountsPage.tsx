@@ -397,7 +397,7 @@ export function AccountsPage() {
   });
 
   return (
-    <div class="h-full">
+    <div>
       <Header
         title="Accounts"
         left={
