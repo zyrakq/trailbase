@@ -429,9 +429,9 @@ fn component_global_rebuild_refetch_parse() {
 fn per_item_rebuild_override_parses() {
     let overlay = indoc! {r#"
         [[components.items]]
-        name = "trail_auth"
-        wasm = "trail-auth.wasm"
-        source = { build = "trail-auth-component" }
+        name = "wcauth"
+        wasm = "wcauth.wasm"
+        source = { build = "wcauth-tb-component" }
         rebuild = true
     "#};
     let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
@@ -448,14 +448,14 @@ fn multiple_items_parse_in_order() {
         source = { fetch = "trailbase/auth_ui" }
 
         [[components.items]]
-        name = "trail_auth"
-        wasm = "trail-auth.wasm"
-        source = { build = "trail-auth-component" }
+        name = "wcauth"
+        wasm = "wcauth.wasm"
+        source = { build = "wcauth-tb-component" }
     "#};
     let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
     assert_eq!(s.components.items.len(), 2);
     assert_eq!(s.components.items[0].name, "auth_ui");
-    assert_eq!(s.components.items[1].name, "trail_auth");
+    assert_eq!(s.components.items[1].name, "wcauth");
 }
 
 #[test]
@@ -492,15 +492,15 @@ fn overlay_replaces_items_array_wholesale() {
         source = { fetch = "trailbase/auth_ui" }
 
         [[components.items]]
-        name = "trail_auth"
-        wasm = "trail-auth.wasm"
-        source = { build = "trail-auth-component" }
+        name = "wcauth"
+        wasm = "wcauth.wasm"
+        source = { build = "wcauth-tb-component" }
     "#};
     let overlay = indoc! {r#"
         [[components.items]]
-        name = "trail_auth"
-        wasm = "trail-auth.wasm"
-        source = { build = "trail-auth-component" }
+        name = "wcauth"
+        wasm = "wcauth.wasm"
+        source = { build = "wcauth-tb-component" }
     "#};
     let s = settings_from_toml(base, overlay).expect("should deserialize");
     assert_eq!(
@@ -508,7 +508,7 @@ fn overlay_replaces_items_array_wholesale() {
         1,
         "overlay must replace the items array wholesale, not merge"
     );
-    assert_eq!(s.components.items[0].name, "trail_auth");
+    assert_eq!(s.components.items[0].name, "wcauth");
 }
 
 #[test]

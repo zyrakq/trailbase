@@ -40,14 +40,14 @@ export class AuthModal extends LitElement {
       });
     }
 
-    void bundleLoader.loadTrailAuth();
+    void bundleLoader.loadWcAuth();
     if (bundleLoader.getStatus() === 'ready') {
-      this.resetTrailAuth();
+      this.resetWcAuth();
     }
   }
 
-  private resetTrailAuth() {
-    const el = this.shadowRoot?.querySelector('trail-auth') as
+  private resetWcAuth() {
+    const el = this.shadowRoot?.querySelector('wcauth-section') as
       | (HTMLElement & { reset?: () => void })
       | null;
     el?.reset?.();
@@ -130,8 +130,8 @@ export class AuthModal extends LitElement {
       <div
         class="modal-overlay"
         @click=${this.handleOverlayClick}
-        @trail-auth-success=${this.handleAuthSuccess}
-        @trail-auth-close=${this.handleClose}
+        @wcauth-section-success=${this.handleAuthSuccess}
+        @wcauth-section-close=${this.handleClose}
       >
         <div class="modal-card">
           <div class="modal-header">
@@ -143,9 +143,7 @@ export class AuthModal extends LitElement {
               ✕
             </button>
           </div>
-          <div class="modal-content">
-            ${this.renderAuthContent()}
-          </div>
+          <div class="modal-content">${this.renderAuthContent()}</div>
         </div>
       </div>
     `;
@@ -153,11 +151,11 @@ export class AuthModal extends LitElement {
 
   private renderAuthContent(): TemplateResult {
     if (this.bundleStatus === 'ready') {
-      return html`<trail-auth
+      return html`<wcauth-section
         ?no-password-auth=${!this.passwordAuthEnabled}
         ?no-registration=${!this.registrationEnabled}
         verify-email-redirect-url="/verify-email"
-      ></trail-auth>`;
+      ></wcauth-section>`;
     }
     if (this.bundleStatus === 'error' || this.retryInFlight) {
       return html`<bundle-error

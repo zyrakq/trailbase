@@ -1,0 +1,619 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+<file target-language="ru" source-language="en" original="lit-localize-inputs" datatype="plaintext">
+<body>
+<trans-unit id="s8a3c78af5a3a1be1">
+  <source>Two-factor authentication</source>
+  <target>Двухфакторная аутентификация</target>
+</trans-unit>
+<trans-unit id="s3e538c7535f6f129">
+  <source>Reset password</source>
+  <target>Сброс пароля</target>
+</trans-unit>
+<trans-unit id="s11f3987890b096c8">
+  <source>Failed to delete account. Please try again.</source>
+  <target>Не удалось удалить аккаунт. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="sdaf3d13c3b1ec474">
+  <source>Danger Zone</source>
+  <target>Опасная зона</target>
+</trans-unit>
+<trans-unit id="s954da8826feec8ca">
+  <source>Permanently delete your account and all associated data. This action cannot be undone.</source>
+  <target>Навсегда удалите ваш аккаунт и все связанные данные. Это действие нельзя отменить.</target>
+</trans-unit>
+<trans-unit id="s7d00063d92ed2821">
+  <source>Delete Account</source>
+  <target>Удалить аккаунт</target>
+</trans-unit>
+<trans-unit id="s948ad98a7dba6dc4">
+  <source>This action is destructive and cannot be reverted. All your data will be permanently deleted.</source>
+  <target>Это действие разрушительно и не может быть отменено. Все ваши данные будут навсегда удалены.</target>
+</trans-unit>
+<trans-unit id="s64e8cdefe1dc8061">
+  <source>Deleting...</source>
+  <target>Удаление...</target>
+</trans-unit>
+<trans-unit id="sdc673e73b5c13aea">
+  <source>Delete</source>
+  <target>Удалить</target>
+</trans-unit>
+<trans-unit id="s22106eb0affe368b">
+  <source>Avatar upload failed. Please try again.</source>
+  <target>Не удалось загрузить аватар. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="sebba7336e98a95ed">
+  <source>Failed to remove avatar. Please try again.</source>
+  <target>Не удалось удалить аватар. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="se7692167f1edeef2">
+  <source>Uploading...</source>
+  <target>Загрузка...</target>
+</trans-unit>
+<trans-unit id="s2f64461723d3df5d">
+  <source>Change</source>
+  <target>Изменить</target>
+</trans-unit>
+<trans-unit id="s6210b400a0196334">
+  <source>Removing...</source>
+  <target>Удаление...</target>
+</trans-unit>
+<trans-unit id="sea4f08110bb8f15d">
+  <source>Remove</source>
+  <target>Удалить</target>
+</trans-unit>
+<trans-unit id="s6adba329b433a53e">
+  <source>Please enter a valid email address.</source>
+  <target>Пожалуйста, введите корректный адрес электронной почты.</target>
+</trans-unit>
+<trans-unit id="sd44c1babed6d5b6d">
+  <source>Email already in use</source>
+  <target>Email уже используется</target>
+</trans-unit>
+<trans-unit id="sc9fa9a572e13993e">
+  <source>Please wait before trying again</source>
+  <target>Пожалуйста, подождите перед повторной попыткой</target>
+</trans-unit>
+<trans-unit id="s7f41db41f313b7f1">
+  <source>Invalid request</source>
+  <target>Неверный запрос</target>
+</trans-unit>
+<trans-unit id="s75c1bd0b06b8ba25">
+  <source>Failed to request email change. Please try again.</source>
+  <target>Не удалось запросить смену email. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="sd1f44f1a8bc20e67">
+  <source>Email</source>
+  <target>Email</target>
+</trans-unit>
+<trans-unit id="sf7d93e17ec4b1219">
+  <source>...</source>
+  <target>...</target>
+</trans-unit>
+<trans-unit id="sf9bf8133c2196bd9">
+  <source>Verification email sent to</source>
+  <target>Письмо подтверждения отправлено на</target>
+</trans-unit>
+<trans-unit id="sa20e55c96617cba0">
+  <source>Check your inbox.</source>
+  <target>Проверьте ваш почтовый ящик.</target>
+</trans-unit>
+<trans-unit id="sc16e00a7a8b2fde2">
+  <source>Back</source>
+  <target>Назад</target>
+</trans-unit>
+<trans-unit id="s9935205555f03661">
+  <source>At least <x id="0" equiv-text="${minLength}"/> characters</source>
+  <target>Минимум <x id="0" equiv-text="${minLength}"/> символов</target>
+</trans-unit>
+<trans-unit id="s85efe82068b2ba1b">
+  <source>Both upper and lower case letters</source>
+  <target>Заглавные и строчные буквы</target>
+</trans-unit>
+<trans-unit id="sfa7323daaccd9ff4">
+  <source>At least one digit</source>
+  <target>Минимум одна цифра</target>
+</trans-unit>
+<trans-unit id="sa9ea759946c2c691">
+  <source>At least one special character</source>
+  <target>Минимум один специальный символ</target>
+</trans-unit>
+<trans-unit id="sbe6366bacf476146">
+  <source>Current password is incorrect</source>
+  <target>Текущий пароль неверен</target>
+</trans-unit>
+<trans-unit id="s4ebb89dbb477b629">
+  <source>Password does not meet requirements</source>
+  <target>Пароль не соответствует требованиям</target>
+</trans-unit>
+<trans-unit id="s6d84c67f663fb24d">
+  <source>Too many attempts. Please try again later.</source>
+  <target>Слишком много попыток. Пожалуйста, попробуйте позже.</target>
+</trans-unit>
+<trans-unit id="seda6e7a56c9a25b9">
+  <source>Failed to change password. Please try again.</source>
+  <target>Не удалось изменить пароль. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="sfee74640068abc13">
+  <source>Current password</source>
+  <target>Текущий пароль</target>
+</trans-unit>
+<trans-unit id="sdfe2fbe3700c436b">
+  <source>Changing password...</source>
+  <target>Изменение пароля...</target>
+</trans-unit>
+<trans-unit id="s94f83322f089fbae">
+  <source>Create password</source>
+  <target>Создать пароль</target>
+</trans-unit>
+<trans-unit id="sff50532a2d85e32e">
+  <source>Change password</source>
+  <target>Изменить пароль</target>
+</trans-unit>
+<trans-unit id="s07f07b015a0ee529">
+  <source>Password changed successfully</source>
+  <target>Пароль успешно изменен</target>
+</trans-unit>
+<trans-unit id="s0379fc73608ab971">
+  <source>Done</source>
+  <target>Готово</target>
+</trans-unit>
+<trans-unit id="s922a5d4948c360b0">
+  <source>Failed to disable two-factor authentication. Please try again.</source>
+  <target>Не удалось отключить двухфакторную аутентификацию. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="s9b06fbe4c999e2ea">
+  <source>Add an extra layer of security to your account by requiring a code from your authenticator app when signing in.</source>
+  <target>Добавьте дополнительный уровень безопасности вашему аккаунту, требуя код из вашего приложения аутентификатора при входе.</target>
+</trans-unit>
+<trans-unit id="s49730f3d5751a433">
+  <source>Loading...</source>
+  <target>Загрузка...</target>
+</trans-unit>
+<trans-unit id="s3d66aaab91b1e364">
+  <source>Enable two-factor authentication</source>
+  <target>Включить двухфакторную аутентификацию</target>
+</trans-unit>
+<trans-unit id="sfdf28b982ab5bfb3">
+  <source>Scan the QR code with your authenticator app, then enter the 6-digit code to verify.</source>
+  <target>Отсканируйте QR-код вашим приложением аутентификатора, затем введите 6-значный код для проверки.</target>
+</trans-unit>
+<trans-unit id="sb24b8e7c6df71830">
+  <source>TOTP QR code</source>
+  <target>QR-код TOTP</target>
+</trans-unit>
+<trans-unit id="sf1410dfa4033c312">
+  <source>Manual entry key:</source>
+  <target>Ключ ручного ввода:</target>
+</trans-unit>
+<trans-unit id="s30d6ff9e15e0a40a">
+  <source>Verifying...</source>
+  <target>Проверка...</target>
+</trans-unit>
+<trans-unit id="s9e4fdbe8cd2f6c80">
+  <source>Verify and enable</source>
+  <target>Проверить и включить</target>
+</trans-unit>
+<trans-unit id="s1cfffeb326f3e4be">
+  <source>Two-factor authentication is enabled</source>
+  <target>Двухфакторная аутентификация включена</target>
+</trans-unit>
+<trans-unit id="s87cf58d0578b4fa5">
+  <source>Disable two-factor authentication</source>
+  <target>Отключить двухфакторную аутентификацию</target>
+</trans-unit>
+<trans-unit id="s2756c24166f19e64">
+  <source>Enter your current authenticator code to disable two-factor authentication.</source>
+  <target>Введите ваш текущий код аутентификатора для отключения двухфакторной аутентификации.</target>
+</trans-unit>
+<trans-unit id="se1b1f6c54bc50c33">
+  <source>Current code</source>
+  <target>Текущий код</target>
+</trans-unit>
+<trans-unit id="s8e57f7bed3b96e8b">
+  <source>Confirm disable</source>
+  <target>Подтвердить отключение</target>
+</trans-unit>
+<trans-unit id="s2ceb11be2290bb1b">
+  <source>Cancel</source>
+  <target>Отмена</target>
+</trans-unit>
+<trans-unit id="s01a8d45397ec133b">
+  <source>Security</source>
+  <target>Безопасность</target>
+</trans-unit>
+<trans-unit id="sb061ff5a347a296e">
+  <source>Profile</source>
+  <target>Профиль</target>
+</trans-unit>
+<trans-unit id="sea6ff86442041be6">
+  <source>Signing out...</source>
+  <target>Выход...</target>
+</trans-unit>
+<trans-unit id="s8fa032cdafb3c9b0">
+  <source>Sign Out</source>
+  <target>Выйти</target>
+</trans-unit>
+<trans-unit id="sd6250add7a3ea7d1">
+  <source>Sign in with email and password</source>
+  <target>Войти с email и паролем</target>
+</trans-unit>
+<trans-unit id="sc84410561a2a8073">
+  <source>Create an account</source>
+  <target>Создать аккаунт</target>
+</trans-unit>
+<trans-unit id="sbf6a0dbc8a792e9d">
+  <source>If this email address is registered, you'll receive a reset link shortly. Check your inbox.</source>
+  <target>Если этот адрес электронной почты зарегистрирован, вы получите ссылку для сброса в ближайшее время. Проверьте почтовый ящик.</target>
+</trans-unit>
+<trans-unit id="scedf77e8b75cad5a">
+  <source>Please enter your email address.</source>
+  <target>Пожалуйста, введите ваш адрес электронной почты.</target>
+</trans-unit>
+<trans-unit id="s451d166d45726604">
+  <source>A reset link was already sent. Check your inbox or wait 1 hour before trying again.</source>
+  <target>Ссылка для сброса уже отправлена. Проверьте почтовый ящик или подождите 1 час перед повторной попыткой.</target>
+</trans-unit>
+<trans-unit id="se9b201958e0bc004">
+  <source>Network error. Please check your connection.</source>
+  <target>Ошибка сети. Пожалуйста, проверьте подключение.</target>
+</trans-unit>
+<trans-unit id="s539cc7126a88f5a8">
+  <source>An error occurred. Please try again.</source>
+  <target>Произошла ошибка. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="s11742bb831d6ea93">
+  <source>Enter your email address and we'll send you a reset link.</source>
+  <target>Введите ваш адрес электронной почты, и мы отправим вам ссылку для сброса.</target>
+</trans-unit>
+<trans-unit id="s2bc085f4279e8528">
+  <source>Send reset link</source>
+  <target>Отправить ссылку для сброса</target>
+</trans-unit>
+<trans-unit id="s4e4512611eeac0f0">
+  <source>Please enter the 6-digit code from your authenticator app.</source>
+  <target>Пожалуйста, введите 6-значный код из вашего приложения аутентификатора.</target>
+</trans-unit>
+<trans-unit id="s05b0cd636ec6a22e">
+  <source>Invalid code. Please try again.</source>
+  <target>Неверный код. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="sb47b0b39e28f35a8">
+  <source>Verification failed. Please try again.</source>
+  <target>Проверка не удалась. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="seca9f9bcc44c906c">
+  <source>Enter the 6-digit code from your authenticator app.</source>
+  <target>Введите 6-значный код из вашего приложения аутентификатора.</target>
+</trans-unit>
+<trans-unit id="s1d3e412955e528f7">
+  <source>Verification code</source>
+  <target>Код подтверждения</target>
+</trans-unit>
+<trans-unit id="s067e961bb67cf3f6">
+  <source>Verifying…</source>
+  <target>Проверка...</target>
+</trans-unit>
+<trans-unit id="sc2b6c18334a4a2c4">
+  <source>Verify</source>
+  <target>Проверить</target>
+</trans-unit>
+<trans-unit id="s8116180a3ff4936f">
+  <source>Back to sign in</source>
+  <target>Назад ко входу</target>
+</trans-unit>
+<trans-unit id="s815c4f0a6876070c">
+  <source>Please enter your email and password.</source>
+  <target>Пожалуйста, введите ваш email и пароль.</target>
+</trans-unit>
+<trans-unit id="sca53e5ee345b14c7">
+  <source>Invalid email or password. Please try again.</source>
+  <target>Неверный email или пароль. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="s440973a5ab778843">
+  <source>Unable to connect. Please check your internet connection and try again.</source>
+  <target>Не удается подключиться. Проверьте подключение к интернету и попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="sf249dcf6c6b6f8ed">
+  <source>Sign in failed. Please try again.</source>
+  <target>Вход не удался. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="s38887b94b3320533">
+  <source>Email address</source>
+  <target>Email</target>
+</trans-unit>
+<trans-unit id="sf6e1665c7022a1f8">
+  <source>Password</source>
+  <target>Пароль</target>
+</trans-unit>
+<trans-unit id="s452f791e0ff6a13e">
+  <source>Hide password</source>
+  <target>Скрыть пароль</target>
+</trans-unit>
+<trans-unit id="s2f7f35f6a5b733f5">
+  <source>Show password</source>
+  <target>Показать пароль</target>
+</trans-unit>
+<trans-unit id="s85366fac18679f28">
+  <source>Forgot password?</source>
+  <target>Забыли пароль?</target>
+</trans-unit>
+<trans-unit id="s59169c4e8fbcdccf">
+  <source>Signing in…</source>
+  <target>Вход…</target>
+</trans-unit>
+<trans-unit id="s5e27738a2e8eb763">
+  <source>Sign in</source>
+  <target>Войти</target>
+</trans-unit>
+<trans-unit id="s535205a9a936dacd">
+  <source>Back to sign in options</source>
+  <target>Назад к вариантам входа</target>
+</trans-unit>
+<trans-unit id="s829c029ff2b2f5ce">
+  <source>Check your inbox</source>
+  <target>Проверьте почтовый ящик</target>
+</trans-unit>
+<trans-unit id="s8d85cfe2f59f0366">
+  <source>If this email isn't registered yet, a verification link has been sent. Please check your inbox and click the link to complete sign in.</source>
+  <target>Если этот email еще не зарегистрирован, ссылка для подтверждения была отправлена. Пожалуйста, проверьте почтовый ящик и перейдите по ссылке для завершения входа.</target>
+</trans-unit>
+<trans-unit id="s86c6967126989c25">
+  <source>Verification email resent.</source>
+  <target>Письмо подтверждения отправлено повторно.</target>
+</trans-unit>
+<trans-unit id="s18db9d04bed5f64b">
+  <source>You can request a new link in a few hours.</source>
+  <target>Вы можете запросить новую ссылку через несколько часов.</target>
+</trans-unit>
+<trans-unit id="s3e59d1d45febe1b3">
+  <source>Could not send the email. Please contact support.</source>
+  <target>Не удалось отправить письмо. Пожалуйста, обратитесь в поддержку.</target>
+</trans-unit>
+<trans-unit id="s6ead281adf0d371d">
+  <source>Sending…</source>
+  <target>Отправка…</target>
+</trans-unit>
+<trans-unit id="s97ee1bd2cffede65">
+  <source>Resend verification email</source>
+  <target>Отправить письмо подтверждения повторно</target>
+</trans-unit>
+<trans-unit id="sb6a33664b18e690d">
+  <source>Sign in instead</source>
+  <target>Войти вместо этого</target>
+</trans-unit>
+<trans-unit id="s873adbcb887edaec">
+  <source>Account created</source>
+  <target>Аккаунт создан</target>
+</trans-unit>
+<trans-unit id="sb129b4b64f55ab36">
+  <source>Your account has been created, but we could not send a verification email.</source>
+  <target>Ваш аккаунт создан, но мы не смогли отправить письмо подтверждения.</target>
+</trans-unit>
+<trans-unit id="s0543f88e7d397d64">
+  <source>Please contact support to verify your account and complete sign in.</source>
+  <target>Пожалуйста, обратитесь в поддержку для подтверждения вашего аккаунта и завершения входа.</target>
+</trans-unit>
+<trans-unit id="s5e8250fb85d64c23">
+  <source>Close</source>
+  <target>Закрыть</target>
+</trans-unit>
+<trans-unit id="s82f8493b0823a619">
+  <source>Please fill in all fields.</source>
+  <target>Пожалуйста, заполните все поля.</target>
+</trans-unit>
+<trans-unit id="scfa81f565f29df08">
+  <source>Passwords do not match.</source>
+  <target>Пароли не совпадают.</target>
+</trans-unit>
+<trans-unit id="s29a999ba183cddb3">
+  <source>This email is already registered. Please sign in instead.</source>
+  <target>Этот email уже зарегистрирован. Пожалуйста, войдите.</target>
+</trans-unit>
+<trans-unit id="s55e14946061017ae">
+  <source>Password does not meet requirements. Please choose a stronger password.</source>
+  <target>Пароль не соответствует требованиям. Пожалуйста, выберите более надежный пароль.</target>
+</trans-unit>
+<trans-unit id="s8038a46c043af486">
+  <source>Registration is currently disabled. Please contact an administrator.</source>
+  <target>Регистрация в данный момент отключена. Пожалуйста, свяжитесь с администратором.</target>
+</trans-unit>
+<trans-unit id="s6590be55b885eab6">
+  <source>Registration failed. Please try again.</source>
+  <target>Регистрация не удалась. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="s5515a136187c74c0">
+  <source>Confirm password</source>
+  <target>Подтвердите пароль</target>
+</trans-unit>
+<trans-unit id="s7e736d1dc11355d1">
+  <source>Creating account…</source>
+  <target>Создание аккаунта…</target>
+</trans-unit>
+<trans-unit id="s0c97387dc725a9e2">
+  <source>Create account</source>
+  <target>Создать аккаунт</target>
+</trans-unit>
+<trans-unit id="s643b46be37d2cf15">
+  <source>Your password has been updated successfully.</source>
+  <target>Ваш пароль успешно обновлен.</target>
+</trans-unit>
+<trans-unit id="s53aeb14de19dd0f6">
+  <source>Passwords do not match</source>
+  <target>Пароли не совпадают</target>
+</trans-unit>
+<trans-unit id="s736157452e7fc7af">
+  <source>Something went wrong. Please try again.</source>
+  <target>Что-то пошло не так. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="s0f788e783a2383a8">
+  <source>This password reset link is invalid or has expired.</source>
+  <target>Эта ссылка для сброса пароля недействительна или истекла.</target>
+</trans-unit>
+<trans-unit id="s87ae843b8b424681">
+  <source>Request a new link</source>
+  <target>Запросить новую ссылку</target>
+</trans-unit>
+<trans-unit id="s3490e2c8b9ec6ad2">
+  <source>New password</source>
+  <target>Новый пароль</target>
+</trans-unit>
+<trans-unit id="s418f15154f4671aa">
+  <source>Confirm new password</source>
+  <target>Подтвердите новый пароль</target>
+</trans-unit>
+<trans-unit id="s5e02110f25c02642">
+  <source>Setting password...</source>
+  <target>Установка пароля...</target>
+</trans-unit>
+<trans-unit id="s3c7cdf8041ebca56">
+  <source>Set new password</source>
+  <target>Установить новый пароль</target>
+</trans-unit>
+<trans-unit id="s4697cc2dfd70449d">
+  <source>Failed to load settings. Please try again.</source>
+  <target>Не удалось загрузить настройки. Пожалуйста, попробуйте снова.</target>
+</trans-unit>
+<trans-unit id="sdc2508aba9b9ef42">
+  <source>Settings saved successfully.</source>
+  <target>Настройки сохранены успешно.</target>
+</trans-unit>
+<trans-unit id="s16cc0c31cc93bc6f">
+  <source>Failed to save settings.</source>
+  <target>Не удалось сохранить настройки.</target>
+</trans-unit>
+<trans-unit id="scbb851063af815d9">
+  <source>Failed to load translations.</source>
+  <target>Не удалось загрузить переводы.</target>
+</trans-unit>
+<trans-unit id="s69daa98384fdb7b7">
+  <source>Translations saved successfully.</source>
+  <target>Переводы сохранены успешно.</target>
+</trans-unit>
+<trans-unit id="s9b4a67b333fd0bf8">
+  <source>Failed to save translations.</source>
+  <target>Не удалось сохранить переводы.</target>
+</trans-unit>
+<trans-unit id="s7e419dd887f998c0">
+  <source>Translations reset to default.</source>
+  <target>Переводы сброшены к значениям по умолчанию.</target>
+</trans-unit>
+<trans-unit id="s7ac43705f83aea04">
+  <source>Failed to reset translations.</source>
+  <target>Не удалось сбросить переводы.</target>
+</trans-unit>
+<trans-unit id="s56e2655fe1958c53">
+  <source>Invalid XLIFF file</source>
+  <target>Неверный файл XLIFF</target>
+</trans-unit>
+<trans-unit id="sa53d47da734122e4">
+  <source>XLIFF loaded. Review and save when ready.</source>
+  <target>XLIFF загружен. Проверьте и сохраните, когда будете готовы.</target>
+</trans-unit>
+<trans-unit id="s4d3d736a36be38e1">
+  <source>Failed to parse XLIFF file.</source>
+  <target>Не удалось разобрать файл XLIFF.</target>
+</trans-unit>
+<trans-unit id="se64886ffc27562a2">
+  <source>Reset password redirect URL</source>
+  <target>URL перенаправления сброса пароля</target>
+</trans-unit>
+<trans-unit id="s7c053e7eb7bbc3fb">
+  <source>Use {token} as a placeholder for the reset token.</source>
+  <target>Используйте {token} как плейсхолдер для токена сброса.</target>
+</trans-unit>
+<trans-unit id="s20c8f42ba4926cb5">
+  <source>Verify email redirect URL</source>
+  <target>URL перенаправления подтверждения email</target>
+</trans-unit>
+<trans-unit id="sd1124a79aaa6eea1">
+  <source>Use {token} as a placeholder for the verification token.</source>
+  <target>Используйте {token} как плейсхолдер для токена подтверждения.</target>
+</trans-unit>
+<trans-unit id="s717d4a2cd3f7d66f">
+  <source>Saving...</source>
+  <target>Сохранение...</target>
+</trans-unit>
+<trans-unit id="s33f85f24c0f5f008">
+  <source>Save</source>
+  <target>Сохранить</target>
+</trans-unit>
+<trans-unit id="s506b6a19d12f414c">
+  <source>Key</source>
+  <target>Ключ</target>
+</trans-unit>
+<trans-unit id="s41f7dca46d3f1b4a">
+  <source>Value</source>
+  <target>Значение</target>
+</trans-unit>
+<trans-unit id="s6dba646770efe34c">
+  <source>Download XLIFF Template</source>
+  <target>Скачать шаблон XLIFF</target>
+</trans-unit>
+<trans-unit id="s11326fd2590f4e5e">
+  <source>Default</source>
+  <target>По умолчанию</target>
+</trans-unit>
+<trans-unit id="s749e8ca6ae962ffd">
+  <source>Override</source>
+  <target>Переопределение</target>
+</trans-unit>
+<trans-unit id="s4acb8d19c4b38541">
+  <source>Save Overrides</source>
+  <target>Сохранить переопределения</target>
+</trans-unit>
+<trans-unit id="s826f40bb1c0c03db">
+  <source>Upload XLIFF</source>
+  <target>Загрузить XLIFF</target>
+</trans-unit>
+<trans-unit id="sc9cc72361e6b922e">
+  <source>Download XLIFF</source>
+  <target>Скачать XLIFF</target>
+</trans-unit>
+<trans-unit id="sf786171004dde79c">
+  <source>Reset to Default</source>
+  <target>Сбросить к умолчанию</target>
+</trans-unit>
+<trans-unit id="s170319768bda4977">
+  <source>Locale</source>
+  <target>Локаль</target>
+</trans-unit>
+<trans-unit id="s3979c21646967091">
+  <source>Loading translations...</source>
+  <target>Загрузка переводов...</target>
+</trans-unit>
+<trans-unit id="s1c5464d547242a34">
+  <source>WcAuth Settings</source>
+  <target>Настройки WcAuth</target>
+</trans-unit>
+<trans-unit id="sc3ac225273c8316b">
+  <source>General</source>
+  <target>Общие</target>
+</trans-unit>
+<trans-unit id="sebe1e01d3ce62fcd">
+  <source>Translations</source>
+  <target>Переводы</target>
+</trans-unit>
+<trans-unit id="s551c5dbba77608db">
+  <source>Reset all overrides to default?</source>
+  <target>Сбросить все переопределения к значениям по умолчанию?</target>
+</trans-unit>
+<trans-unit id="s933414dccd5e2e52">
+  <source>Resetting...</source>
+  <target>Сброс...</target>
+</trans-unit>
+<trans-unit id="sb85774dc5d18ff0f">
+  <source>Confirm</source>
+  <target>Подтвердить</target>
+</trans-unit>
+<trans-unit id="s3810f26bfdec8d85">
+  <source>Email verified</source>
+  <target>Email подтверждён</target>
+</trans-unit>
+<trans-unit id="se7f2d88b36214086">
+  <source>Your email has been verified.</source>
+  <target>Ваш email подтверждён.</target>
+</trans-unit>
+</body>
+</file>
+</xliff>

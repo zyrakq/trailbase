@@ -27,17 +27,13 @@ fn main() {
         return;
     };
 
-    let workspace_dir = manifest_dir
-        .parent()
-        .expect("app/ has no parent directory");
+    let workspace_dir = manifest_dir.parent().expect("app/ has no parent directory");
 
     build_wasm_components(&workspace_dir, &packages);
 }
 
 fn manifest_dir() -> PathBuf {
-    PathBuf::from(
-        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"),
-    )
+    PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"))
 }
 
 fn ensure_ui_dist_exists(ui_dir: &Path) {
@@ -87,10 +83,7 @@ fn build_frontend(ui_dir: &Path) {
         .args(["run", "build"])
         .current_dir(ui_dir)
         .status()
-        .unwrap_or_else(|_| panic!(
-            "failed to run `bun run build` in {}",
-            ui_dir.display()
-        ));
+        .unwrap_or_else(|_| panic!("failed to run `bun run build` in {}", ui_dir.display()));
     if !status.success() {
         panic!("bun run build failed in {}", ui_dir.display());
     }
@@ -115,9 +108,7 @@ fn needs_install(ui_dir: &Path) -> bool {
         .and_then(|m| m.modified())
         .ok();
     match nm_mtime {
-        Some(nm) => {
-            pkg_mtime.is_some_and(|p| p > nm) || lock_mtime.is_some_and(|l| l > nm)
-        }
+        Some(nm) => pkg_mtime.is_some_and(|p| p > nm) || lock_mtime.is_some_and(|l| l > nm),
         None => true,
     }
 }
@@ -172,8 +163,8 @@ fn load_build_packages(manifest_dir: &Path) -> Option<Vec<String>> {
 fn build_wasm_components(workspace_dir: &Path, packages: &[String]) {
     println!("cargo::rerun-if-changed=../vendor/trailbase/crates/auth-ui/src");
     println!("cargo::rerun-if-changed=../vendor/trailbase/crates/auth-ui/ui/src");
-    println!("cargo::rerun-if-changed=../components/trail-auth/src");
-    println!("cargo::rerun-if-changed=../components/trail-auth/ui/src");
+    println!("cargo::rerun-if-changed=../components/wcauth/src");
+    println!("cargo::rerun-if-changed=../components/wcauth/ui/src");
 
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
 
@@ -188,7 +179,10 @@ fn build_wasm_components(workspace_dir: &Path, packages: &[String]) {
         args.push(pkg.clone());
     }
 
-    println!("cargo::warning=Building {} for wasm32-wasip2...", packages.join(", "));
+    println!(
+        "cargo::warning=Building {} for wasm32-wasip2...",
+        packages.join(", ")
+    );
     let status = Command::new(&cargo)
         .args(&args)
         .current_dir(workspace_dir)

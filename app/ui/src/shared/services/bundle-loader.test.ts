@@ -17,14 +17,12 @@ describe('BundleLoaderService', () => {
         originalCreateElement(tagName, options)
     );
 
-    vi.spyOn(document.head, 'appendChild').mockImplementation(
-      (node: Node) => {
-        if (node instanceof HTMLScriptElement) {
-          appendedScripts.push(node);
-        }
-        return node;
+    vi.spyOn(document.head, 'appendChild').mockImplementation((node: Node) => {
+      if (node instanceof HTMLScriptElement) {
+        appendedScripts.push(node);
       }
-    );
+      return node;
+    });
   });
 
   afterEach(() => {
@@ -43,7 +41,9 @@ describe('BundleLoaderService', () => {
   function mockWhenDefinedResolved() {
     return vi
       .spyOn(customElements, 'whenDefined')
-      .mockImplementation(() => Promise.resolve(class {} as CustomElementConstructor));
+      .mockImplementation(() =>
+        Promise.resolve(class {} as CustomElementConstructor)
+      );
   }
 
   function captureBundleEvents(): {
@@ -68,7 +68,7 @@ describe('BundleLoaderService', () => {
     const { bundleLoader } = await loadService();
     mockWhenDefinedResolved();
 
-    const promise = bundleLoader.loadTrailAuth();
+    const promise = bundleLoader.loadWcAuth();
 
     expect(bundleLoader.getStatus()).toBe('loading');
     expect(bundleLoader.getLastError()).toBeNull();
@@ -91,7 +91,7 @@ describe('BundleLoaderService', () => {
     const { bundleLoader } = await loadService();
     mockWhenDefinedResolved();
 
-    const promise = bundleLoader.loadTrailAuth();
+    const promise = bundleLoader.loadWcAuth();
 
     const script = latestBundleScript();
     script?.dispatchEvent(new Event('error'));
@@ -106,7 +106,7 @@ describe('BundleLoaderService', () => {
     const { bundleLoader } = await loadService();
     mockWhenDefinedResolved();
 
-    const first = bundleLoader.loadTrailAuth();
+    const first = bundleLoader.loadWcAuth();
     const script1 = latestBundleScript();
     script1?.dispatchEvent(new Event('load'));
     await first;
@@ -114,7 +114,7 @@ describe('BundleLoaderService', () => {
 
     const { events, restore } = captureBundleEvents();
 
-    await bundleLoader.loadTrailAuth();
+    await bundleLoader.loadWcAuth();
 
     expect(bundleLoader.getStatus()).toBe('ready');
     expect(appendedScripts).toHaveLength(1);
@@ -127,9 +127,9 @@ describe('BundleLoaderService', () => {
     const { bundleLoader } = await loadService();
     mockWhenDefinedResolved();
 
-    const p1 = bundleLoader.loadTrailAuth();
-    const p2 = bundleLoader.loadTrailAuth();
-    const p3 = bundleLoader.loadTrailAuth();
+    const p1 = bundleLoader.loadWcAuth();
+    const p2 = bundleLoader.loadWcAuth();
+    const p3 = bundleLoader.loadWcAuth();
 
     expect(p1).toBe(p2);
     expect(p2).toBe(p3);
@@ -146,7 +146,7 @@ describe('BundleLoaderService', () => {
     const { bundleLoader } = await loadService();
     mockWhenDefinedResolved();
 
-    const first = bundleLoader.loadTrailAuth();
+    const first = bundleLoader.loadWcAuth();
     const script1 = latestBundleScript();
     script1?.dispatchEvent(new Event('error'));
     await expect(first).rejects.toBeInstanceOf(Error);
@@ -155,8 +155,7 @@ describe('BundleLoaderService', () => {
     const removeSpy = vi.spyOn(script1!, 'remove');
     vi.spyOn(document, 'querySelectorAll').mockImplementation(
       (selector: string) =>
-        selector ===
-        'script[src="/_/auth/bundle.js"][data-bundle-failed]'
+        selector === 'script[src="/_/auth/bundle.js"][data-bundle-failed]'
           ? ([script1] as unknown as NodeListOf<HTMLScriptElement>)
           : ([] as unknown as NodeListOf<HTMLScriptElement>)
     );
@@ -181,7 +180,7 @@ describe('BundleLoaderService', () => {
     const { events, restore } = captureBundleEvents();
 
     // First load: idle -> loading -> ready
-    const first = bundleLoader.loadTrailAuth();
+    const first = bundleLoader.loadWcAuth();
     const script1 = latestBundleScript();
     script1?.dispatchEvent(new Event('load'));
     await first;
@@ -215,7 +214,7 @@ describe('BundleLoaderService', () => {
       () => new Promise(() => {})
     );
 
-    const promise = bundleLoader.loadTrailAuth();
+    const promise = bundleLoader.loadWcAuth();
     promise.catch(() => undefined);
 
     const script = latestBundleScript();

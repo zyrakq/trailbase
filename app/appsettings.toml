@@ -37,9 +37,6 @@ rebuild = false
 refetch = false
 
 [[components.items]]
-name = "trail_auth"
-wasm = "trail-auth.wasm"
-source = { build = "trail-auth-component" }
-
-[branding]
-branding_dir = ""
+name = "wcauth"
+wasm = "wcauth.wasm"
+source = { build = "wcauth-tb-component" }

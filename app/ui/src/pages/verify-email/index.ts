@@ -11,8 +11,8 @@ import '@/shared/components/bundle-error';
 /**
  * Host app page for email verification success.
  *
- * Loads the trail-auth bundle via the singleton bundle loader, then mounts
- * `<trail-auth mode="verify-email">` which renders the success screen.
+ * Loads the wcauth bundle via the singleton bundle loader, then mounts
+ * `<wcauth mode="verify-email">` which renders the success screen.
  * No token extraction — the backend already confirmed the email before
  * redirecting here.
  */
@@ -36,18 +36,24 @@ export class VerifyEmailPage extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.bundleStatus = bundleLoader.getStatus();
-    window.addEventListener('bundle-status-changed', this.handleBundleStatusChanged);
-    bundleLoader.loadTrailAuth();
+    window.addEventListener(
+      'bundle-status-changed',
+      this.handleBundleStatusChanged
+    );
+    bundleLoader.loadWcAuth();
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    window.removeEventListener('bundle-status-changed', this.handleBundleStatusChanged);
+    window.removeEventListener(
+      'bundle-status-changed',
+      this.handleBundleStatusChanged
+    );
   }
 
   private renderContent(): TemplateResult {
     if (this.bundleStatus === 'ready') {
-      return html`<trail-auth mode="verify-email"></trail-auth>`;
+      return html`<wcauth-section mode="verify-email"></wcauth-section>`;
     }
 
     if (this.bundleStatus === 'error' || this.retryInFlight) {
@@ -68,9 +74,7 @@ export class VerifyEmailPage extends LitElement {
       <div class="page">
         <app-header></app-header>
         <main class="main-content">
-          <div class="container">
-            ${this.renderContent()}
-          </div>
+          <div class="container">${this.renderContent()}</div>
         </main>
         <footer-info></footer-info>
       </div>
@@ -107,13 +111,22 @@ export class VerifyEmailPage extends LitElement {
     .skeleton {
       height: 200px;
       border-radius: 8px;
-      background: color-mix(in srgb, var(--theme-color-text-primary) 8%, transparent);
+      background: color-mix(
+        in srgb,
+        var(--theme-color-text-primary) 8%,
+        transparent
+      );
       animation: pulse 1.5s ease-in-out infinite;
     }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      0%,
+      100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
     }
 
     @media (max-width: 640px) {

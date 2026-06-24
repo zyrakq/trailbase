@@ -1,4 +1,8 @@
-use std::{env, io::Cursor, path::{Component, Path}};
+use std::{
+    env,
+    io::Cursor,
+    path::{Component, Path},
+};
 use tracing::info;
 use zip::ZipArchive;
 
@@ -32,7 +36,7 @@ pub async fn ensure_component(
 
             // Derive the build artifact name from the cargo package name:
             // hyphens → underscores, append .wasm. This matches Cargo's output
-            // convention (`trail-auth-component` → `trail_auth_component.wasm`).
+            // convention (`wcauth-tb-component` → `wcauth_component.wasm`).
             let artifact = format!("{}.wasm", package.replace('-', "_"));
             let source = manifest_dir
                 .parent()
@@ -63,7 +67,10 @@ pub async fn ensure_component(
             );
             Ok(())
         }
-        ComponentSource::Fetch { fetch: url, zip_name } => {
+        ComponentSource::Fetch {
+            fetch: url,
+            zip_name,
+        } => {
             let refetch = entry.refetch.unwrap_or(settings.refetch);
             if target_wasm.exists() && !refetch {
                 info!(

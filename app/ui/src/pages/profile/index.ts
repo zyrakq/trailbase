@@ -39,19 +39,27 @@ export class ProfilePage extends LitElement {
     const authState = authService.getAuthState();
     this.user = authState.user;
     this.bundleStatus = bundleLoader.getStatus();
-    window.addEventListener('bundle-status-changed', this.handleBundleStatusChanged);
-    bundleLoader.loadTrailAuth();
+    window.addEventListener(
+      'bundle-status-changed',
+      this.handleBundleStatusChanged
+    );
+    bundleLoader.loadWcAuth();
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    window.removeEventListener('bundle-status-changed', this.handleBundleStatusChanged);
+    window.removeEventListener(
+      'bundle-status-changed',
+      this.handleBundleStatusChanged
+    );
   }
 
   private async handleSignOut() {
     try {
       await authService.signOut();
-      setTimeout(() => { window.location.href = '/'; }, 1000);
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
     } catch {
       notificationService.error(msg('Failed to sign out. Please try again.'));
     }
@@ -66,12 +74,12 @@ export class ProfilePage extends LitElement {
   private renderProfileContent(): TemplateResult {
     if (this.bundleStatus === 'ready') {
       return html`
-        <trail-profile
+        <wcauth-profile
           .email=${this.user?.email ?? ''}
           ?has-mfa=${authService.getAuthState().hasMfa}
-          @trail-profile-sign-out=${this.handleSignOut}
-          @trail-profile-account-deleted=${this.handleAccountDeleted}
-        ></trail-profile>
+          @wcauth-profile-sign-out=${this.handleSignOut}
+          @wcauth-profile-account-deleted=${this.handleAccountDeleted}
+        ></wcauth-profile>
       `;
     }
 
@@ -93,9 +101,7 @@ export class ProfilePage extends LitElement {
       <div class="page">
         <app-header></app-header>
         <main class="main-content">
-          <div class="profile-container">
-            ${this.renderProfileContent()}
-          </div>
+          <div class="profile-container">${this.renderProfileContent()}</div>
         </main>
         <footer-info></footer-info>
       </div>
@@ -131,17 +137,28 @@ export class ProfilePage extends LitElement {
     .skeleton {
       height: 200px;
       border-radius: 8px;
-      background: color-mix(in srgb, var(--theme-color-text-primary) 8%, transparent);
+      background: color-mix(
+        in srgb,
+        var(--theme-color-text-primary) 8%,
+        transparent
+      );
       animation: pulse 1.5s ease-in-out infinite;
     }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      0%,
+      100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
     }
 
     @media (max-width: 640px) {
-      .main-content { padding: 1.5rem 1rem; }
+      .main-content {
+        padding: 1.5rem 1rem;
+      }
     }
   `;
 }

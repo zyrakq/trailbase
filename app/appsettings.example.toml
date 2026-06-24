@@ -134,7 +134,7 @@ refetch = false
 
 # Live example — fetch the pre-built auth_ui component from the registry.
 # This block is active by default. Comment it out (and uncomment the
-# trail_auth block below) to switch to the locally-built variant.
+# wcauth block below) to switch to the locally-built variant.
 [[components.items]]
 name = "auth_ui"
 # File name the component must install into traildepot/wasm/. Plain
@@ -146,18 +146,18 @@ source = { fetch = "https://github.com/trailbaseio/trailbase/releases/download/v
 # comment out the auth_ui block above to switch to the build variant.
 # The package is built with `cargo build -p <value> --target wasm32-wasip2`.
 # [[components.items]]
-# name = "trail_auth"
-# wasm = "trail-auth.wasm"
-# source = { build = "trail-auth-component" }
+# name = "wcauth"
+# wasm = "wcauth.wasm"
+# source = { build = "wcauth-tb-component" }
 
 # Per-item overrides (optional): any entry may set `rebuild` (build-kind
 # only) or `refetch` (fetch-kind only) to override the global default
 # above. Absent or null → use the global default.
 #
 # [[components.items]]
-# name = "trail_auth"
-# wasm = "trail-auth.wasm"
-# source = { build = "trail-auth-component" }
+# name = "wcauth"
+# wasm = "wcauth.wasm"
+# source = { build = "wcauth-tb-component" }
 # rebuild = true
 #
 # [[components.items]]

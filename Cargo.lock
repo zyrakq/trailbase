@@ -6181,21 +6181,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "trail-auth-component"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "password-hash",
- "quick-xml 0.36.2",
- "rand 0.8.6",
- "rust-embed",
- "serde",
- "serde_json",
- "trailbase-build",
- "trailbase-wasm",
-]
-
-[[package]]
 name = "trailbase"
 version = "0.2.0"
 dependencies = [
@@ -7413,6 +7398,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81b1086c9e85b95bd6a229a928bc6c6d0662e42af0250c88d067b418831ea4d4"
 dependencies = [
  "wast",
+]
+
+[[package]]
+name = "wcauth-tb-component"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "password-hash",
+ "quick-xml 0.36.2",
+ "rand 0.8.6",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "trailbase-build",
+ "trailbase-wasm",
 ]
 
 [[package]]

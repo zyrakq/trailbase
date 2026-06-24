@@ -57,7 +57,7 @@ export class AppComponent extends LitElement {
     },
     {
       // Email verification success page — TrailBase redirects here after
-      // confirming the email. The trail-auth bundle renders the success screen.
+      // confirming the email. The wcauth bundle renders the success screen.
       path: '/verify-email',
       render: () => html`<verify-email-page></verify-email-page>`,
       enter: async () => {

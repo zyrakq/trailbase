@@ -1,4 +1,4 @@
-// Singleton service that lazily injects the trail-auth bundle script and waits
+// Singleton service that lazily injects the wcauth bundle script and waits
 // for the related custom elements to register. Exposes a status event so that
 // UI components can react to loading, ready, and error transitions.
 
@@ -11,9 +11,9 @@ export interface BundleStatusDetail {
 
 export const BUNDLE_STATUS_CHANGED = 'bundle-status-changed';
 
-export const TRAIL_AUTH_BUNDLE_URL = '/_/auth/bundle.js';
-export const TRAIL_AUTH_ELEMENT = 'trail-auth';
-export const TRAIL_PROFILE_ELEMENT = 'trail-profile';
+export const WCAUTH_BUNDLE_URL = '/_/auth/bundle.js';
+export const WCAUTH_ELEMENT = 'wcauth-section';
+export const WCAUTH_PROFILE_ELEMENT = 'wcauth-profile';
 export const REGISTRATION_TIMEOUT_MS = 10_000;
 
 class BundleLoaderService {
@@ -40,7 +40,7 @@ class BundleLoaderService {
     return this.lastError;
   }
 
-  loadTrailAuth(): Promise<void> {
+  loadWcAuth(): Promise<void> {
     if (this.status === 'ready') return Promise.resolve();
     if (this.inFlight) return this.inFlight;
     return (this.inFlight = this._load());
@@ -52,10 +52,10 @@ class BundleLoaderService {
     this.inFlight = null;
     document
       .querySelectorAll<HTMLScriptElement>(
-        `script[src="${TRAIL_AUTH_BUNDLE_URL}"][data-bundle-failed]`
+        `script[src="${WCAUTH_BUNDLE_URL}"][data-bundle-failed]`
       )
       .forEach((s) => s.remove());
-    return this.loadTrailAuth();
+    return this.loadWcAuth();
   }
 
   private async _load(): Promise<void> {
@@ -75,7 +75,7 @@ class BundleLoaderService {
   private _injectScript(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const existing = document.querySelector<HTMLScriptElement>(
-        `script[src="${TRAIL_AUTH_BUNDLE_URL}"]:not([data-bundle-failed])`
+        `script[src="${WCAUTH_BUNDLE_URL}"]:not([data-bundle-failed])`
       );
       if (existing) {
         if (existing.dataset.bundleLoaded === 'true') {
@@ -103,7 +103,7 @@ class BundleLoaderService {
 
       const script = document.createElement('script');
       script.type = 'module';
-      script.src = TRAIL_AUTH_BUNDLE_URL;
+      script.src = WCAUTH_BUNDLE_URL;
       script.addEventListener(
         'load',
         () => {
@@ -126,8 +126,8 @@ class BundleLoaderService {
 
   private async _waitForElements(): Promise<void> {
     const elementsReady = Promise.all([
-      customElements.whenDefined(TRAIL_AUTH_ELEMENT),
-      customElements.whenDefined(TRAIL_PROFILE_ELEMENT),
+      customElements.whenDefined(WCAUTH_ELEMENT),
+      customElements.whenDefined(WCAUTH_PROFILE_ELEMENT),
     ]);
     await this._withTimeout(
       elementsReady,
