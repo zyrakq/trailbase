@@ -13,4 +13,4 @@ refetch = false
 # [[components.items]]
 # name = "auth_ui"
 # wasm = "auth_ui_component.wasm"
-# source = { fetch = "trailbase/auth_ui" }
+# source = { fetch = "https://github.com/trailbaseio/trailbase/releases/download/v0.28.6/trailbase_v0.28.6_wasm_auth_ui.zip" }

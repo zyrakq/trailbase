@@ -1,5 +1,6 @@
-use std::{env, path::{Component, Path}};
+use std::{env, io::Cursor, path::{Component, Path}};
 use tracing::info;
+use zip::ZipArchive;
 
 use crate::settings::components::{ComponentEntry, ComponentSettings, ComponentSource};
 
@@ -90,7 +91,12 @@ pub async fn ensure_component(
                 .parent()
                 .ok_or("cannot determine wasm output directory")?;
             std::fs::create_dir_all(target_wasm_dir)?;
-            std::fs::write(&target_wasm, &bytes)?;
+
+            if url.to_lowercase().ends_with(".zip") {
+                extract_wasm_from_zip(&bytes, &entry.wasm, url, &target_wasm)?;
+            } else {
+                std::fs::write(&target_wasm, &bytes)?;
+            }
 
             info!(
                 name = %entry.name,
@@ -101,6 +107,35 @@ pub async fn ensure_component(
             Ok(())
         }
     }
+}
+
+fn extract_wasm_from_zip(
+    bytes: &[u8],
+    wasm_filename: &str,
+    url: &str,
+    target: &Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut cursor = Cursor::new(bytes);
+    let mut archive = ZipArchive::new(&mut cursor)
+        .map_err(|e| format!("failed to open zip archive from {url}: {e}"))?;
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        if let Some(path) = file.enclosed_name() {
+            // Match on the bare filename so nested entries
+            // (e.g. `components/auth_ui_component.wasm`) are still found.
+            let Some(filename) = path.file_name().and_then(|e| e.to_str()) else {
+                continue;
+            };
+            if filename == wasm_filename {
+                let mut out = std::fs::File::create(target)?;
+                std::io::copy(&mut file, &mut out)?;
+                return Ok(());
+            }
+        }
+    }
+
+    Err(format!("file '{wasm_filename}' not found in zip archive from {url}").into())
 }
 
 fn validate_wasm_filename(wasm: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -318,5 +353,100 @@ mod tests {
         ensure_component(&entry, &settings, &manifest)
             .await
             .expect("per-item refetch=false should override global refetch=true -> skip");
+    }
+
+    /// Build an in-memory zip (deflate, stored) from `(name, bytes)` entries.
+    fn build_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        use std::io::Write;
+        let mut buf = std::io::Cursor::new(Vec::<u8>::new());
+        {
+            let mut zw = zip::ZipWriter::new(&mut buf);
+            for (name, data) in entries {
+                zw.start_file(name, zip::write::SimpleFileOptions::default())
+                    .expect("start_file");
+                zw.write_all(data).expect("write_all");
+            }
+            zw.finish().expect("finish");
+        }
+        buf.into_inner()
+    }
+
+    #[test]
+    fn extract_wasm_from_zip_extracts_matching_entry() {
+        let payload = b"wasm-payload-bytes";
+        let zip_bytes = build_zip(&[("auth_ui_component.wasm", payload)]);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("auth_ui_component.wasm");
+
+        extract_wasm_from_zip(
+            &zip_bytes,
+            "auth_ui_component.wasm",
+            "https://example.com/x.zip",
+            &target,
+        )
+        .expect("should extract");
+
+        assert_eq!(std::fs::read(&target).unwrap(), payload);
+    }
+
+    #[test]
+    fn extract_wasm_from_zip_finds_nested_entry_by_bare_filename() {
+        // Entry stored under a subdirectory, as common in GitHub release zips.
+        // Lookup must succeed via file_name(), not a full-path comparison.
+        let payload = b"nested-wasm-bytes";
+        let zip_bytes = build_zip(&[("components/auth_ui_component.wasm", payload)]);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("auth_ui_component.wasm");
+
+        extract_wasm_from_zip(
+            &zip_bytes,
+            "auth_ui_component.wasm",
+            "https://example.com/x.zip",
+            &target,
+        )
+        .expect("should find nested entry by bare filename");
+
+        assert_eq!(std::fs::read(&target).unwrap(), payload);
+    }
+
+    #[test]
+    fn extract_wasm_from_zip_errors_when_entry_missing() {
+        let zip_bytes = build_zip(&[("other.wasm", b"x")]);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("wanted.wasm");
+
+        let err = extract_wasm_from_zip(
+            &zip_bytes,
+            "wanted.wasm",
+            "https://example.com/x.zip",
+            &target,
+        )
+        .expect_err("missing entry must error");
+
+        let msg = err.to_string();
+        assert!(msg.contains("not found in zip archive"), "got: {msg}");
+        assert!(msg.contains("wanted.wasm"), "got: {msg}");
+        assert!(msg.contains("https://example.com/x.zip"), "got: {msg}");
+    }
+
+    #[test]
+    fn extract_wasm_from_zip_errors_on_garbage_input() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("x.wasm");
+
+        let err = extract_wasm_from_zip(
+            b"this is not a zip archive",
+            "x.wasm",
+            "https://example.com/x.zip",
+            &target,
+        )
+        .expect_err("garbage input must error");
+
+        let msg = err.to_string();
+        assert!(msg.contains("failed to open zip archive"), "got: {msg}");
+        assert!(msg.contains("https://example.com/x.zip"), "got: {msg}");
     }
 }
