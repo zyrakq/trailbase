@@ -182,34 +182,16 @@ pub(crate) async fn install_routes_and_jobs(
     .unwrap_or("unknown")
     .to_string();
 
-  // Find the manifest route from the component's registered HTTP handlers.
-  // The route prefix is chosen by the WASM component (e.g. "trail-auth"), not
-  // derived from the file stem (e.g. "trail_auth_component"), so we must look
-  // it up from the actual registered routes.
-  let manifest_path = init_result
-    .http_handlers
-    .iter()
-    .find(|(method, path)| {
-      *method == trailbase_wasm_runtime_host::HttpMethodType::Get
-        && path.ends_with("/manifest")
-    })
-    .map(|(_, path)| path.clone());
-
-  if let Some(ref manifest_path) = manifest_path {
+  // Convention: manifest is always at /_/wasm/<file-stem>/manifest.
+  // Components must register their routes under the same prefix as their file name.
+  let manifest_path = format!("/_/wasm/{component_name}/manifest");
+  if let Some(manifest) = probe_manifest(&*runtime.read().await, &manifest_path).await {
+    info!("Registering manifest for WASM component '{component_name}'");
     state
-      .wasm_manifest_paths()
+      .wasm_manifests()
       .write()
       .await
-      .insert(component_name.clone(), manifest_path.clone());
-
-    if let Some(manifest) = probe_manifest(&*runtime.read().await, manifest_path).await {
-      info!("Registering manifest for WASM component '{component_name}'");
-      state
-        .wasm_manifests()
-        .write()
-        .await
-        .insert(component_name, manifest);
-    }
+      .insert(component_name, manifest);
   }
 
   for (name, spec) in init_result.job_handlers {
