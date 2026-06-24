@@ -15,6 +15,6 @@ refetch = false
 
 [[components.items]]
 name = "trail_auth"
-wasm = "trail_auth_component.wasm"
-[components.items.source]
-fetch = "https://github.com/zyrakq/trail-auth/releases/latest/download/trail_auth_component.wasm"
+wasm = "trail-auth.wasm"
+source = { fetch = "https://github.com/zyrakq/trail-auth/releases/latest/download/trail_auth_component.wasm" }
+

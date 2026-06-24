@@ -30,13 +30,17 @@ pub async fn ensure_component(
 
             let target_dir = env::var("CARGO_TARGET_DIR").unwrap_or("target".to_string());
 
+            // Derive the build artifact name from the cargo package name:
+            // hyphens → underscores, append .wasm. This matches Cargo's output
+            // convention (`trail-auth-component` → `trail_auth_component.wasm`).
+            let artifact = format!("{}.wasm", package.replace('-', "_"));
             let source = manifest_dir
                 .parent()
                 .ok_or("cannot determine parent directory of manifest_dir")?
                 .join(&target_dir)
                 .join("wasm32-wasip2")
                 .join("release")
-                .join(&entry.wasm);
+                .join(&artifact);
 
             if !source.exists() {
                 return Err(format!(
@@ -59,7 +63,7 @@ pub async fn ensure_component(
             );
             Ok(())
         }
-        ComponentSource::Fetch(url) => {
+        ComponentSource::Fetch { fetch: url, zip_name } => {
             let refetch = entry.refetch.unwrap_or(settings.refetch);
             if target_wasm.exists() && !refetch {
                 info!(
@@ -93,7 +97,9 @@ pub async fn ensure_component(
             std::fs::create_dir_all(target_wasm_dir)?;
 
             if url.to_lowercase().ends_with(".zip") {
-                extract_wasm_from_zip(&bytes, &entry.wasm, url, &target_wasm)?;
+                // Search by zip_name if provided, otherwise by entry.wasm.
+                let search_name = zip_name.as_deref().unwrap_or(&entry.wasm);
+                extract_wasm_from_zip(&bytes, search_name, url, &target_wasm)?;
             } else {
                 std::fs::write(&target_wasm, &bytes)?;
             }
@@ -166,8 +172,9 @@ mod tests {
     }
 
     fn make_source(workspace: &Path, wasm: &str) -> PathBuf {
+        let target_dir = env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target".to_string());
         let src = workspace
-            .join("target")
+            .join(&target_dir)
             .join("wasm32-wasip2")
             .join("release")
             .join(wasm);
@@ -197,7 +204,10 @@ mod tests {
         ComponentEntry {
             name: "test".into(),
             wasm: wasm.into(),
-            source: ComponentSource::Fetch("https://example.com/test.wasm".into()),
+            source: ComponentSource::Fetch {
+                fetch: "https://example.com/test.wasm".into(),
+                zip_name: None,
+            },
             rebuild: None,
             refetch,
         }
@@ -224,7 +234,8 @@ mod tests {
     #[tokio::test]
     async fn build_copies_when_rebuild_true() {
         let (workspace, manifest) = make_layout();
-        make_source(workspace.path(), WASM);
+        // Package "test-pkg" → artifact "test_pkg.wasm"; entry.wasm is the target name.
+        make_source(workspace.path(), "test_pkg.wasm");
         let target = write_target(&manifest, WASM, b"stale");
 
         let entry = build_entry(WASM, Some(true));
@@ -302,6 +313,8 @@ mod tests {
         let (workspace, manifest) = make_layout();
         make_source(workspace.path(), WASM);
 
+        // Package "test-pkg" → artifact "test_pkg.wasm"; entry.wasm is the target name.
+        make_source(workspace.path(), "test_pkg.wasm");
         let target = write_target(&manifest, WASM, b"stale");
         let entry = build_entry(WASM, Some(true));
         let settings = ComponentSettings {

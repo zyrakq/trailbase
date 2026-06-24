@@ -8,12 +8,17 @@ use serde::Deserialize;
 // TOML shape (exactly one key per source):
 //   source = { build = "auth-ui-component" }
 //   source = { fetch = "trailbase/auth_ui" }
+//   source = { fetch = "https://example.com/bundle.zip", zip_name = "auth_ui.wasm" }
 #[derive(Debug, Clone, PartialEq)]
 pub enum ComponentSource {
     // Package name to compile via `cargo build -p <package> --target wasm32-wasip2`.
     Build(String),
-    // Name or URL to fetch via `trail components add <name-or-url>`.
-    Fetch(String),
+    // Name or URL to fetch. `zip_name` overrides the filename searched for
+    // inside a zip archive (defaults to `entry.wasm` when absent).
+    Fetch {
+        fetch: String,
+        zip_name: Option<String>,
+    },
 }
 
 impl<'de> Deserialize<'de> for ComponentSource {
@@ -27,12 +32,16 @@ impl<'de> Deserialize<'de> for ComponentSource {
         #[serde(untagged)]
         enum Helper {
             Build { build: String },
-            Fetch { fetch: String },
+            Fetch {
+                fetch: String,
+                #[serde(default)]
+                zip_name: Option<String>,
+            },
         }
 
         match Helper::deserialize(deserializer)? {
             Helper::Build { build } => Ok(Self::Build(build)),
-            Helper::Fetch { fetch } => Ok(Self::Fetch(fetch)),
+            Helper::Fetch { fetch, zip_name } => Ok(Self::Fetch { fetch, zip_name }),
         }
     }
 }

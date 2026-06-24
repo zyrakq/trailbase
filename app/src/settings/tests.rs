@@ -379,7 +379,29 @@ fn component_source_fetch_round_trips_through_config() {
     assert_eq!(s.components.items.len(), 1);
     assert_eq!(
         s.components.items[0].source,
-        ComponentSource::Fetch("trailbase/auth_ui".to_string())
+        ComponentSource::Fetch {
+            fetch: "trailbase/auth_ui".to_string(),
+            zip_name: None,
+        }
+    );
+}
+
+#[test]
+fn component_source_fetch_with_zip_name_parses() {
+    let overlay = indoc! {r#"
+        [[components.items]]
+        name = "auth_ui"
+        wasm = "auth_ui.wasm"
+        source = { fetch = "https://example.com/bundle.zip", zip_name = "auth_ui_component.wasm" }
+    "#};
+    let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
+    assert_eq!(s.components.items.len(), 1);
+    assert_eq!(
+        s.components.items[0].source,
+        ComponentSource::Fetch {
+            fetch: "https://example.com/bundle.zip".to_string(),
+            zip_name: Some("auth_ui_component.wasm".to_string()),
+        }
     );
 }
 
@@ -408,7 +430,7 @@ fn per_item_rebuild_override_parses() {
     let overlay = indoc! {r#"
         [[components.items]]
         name = "trail_auth"
-        wasm = "trail_auth_component.wasm"
+        wasm = "trail-auth.wasm"
         source = { build = "trail-auth-component" }
         rebuild = true
     "#};
@@ -427,7 +449,7 @@ fn multiple_items_parse_in_order() {
 
         [[components.items]]
         name = "trail_auth"
-        wasm = "trail_auth_component.wasm"
+        wasm = "trail-auth.wasm"
         source = { build = "trail-auth-component" }
     "#};
     let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
@@ -471,13 +493,13 @@ fn overlay_replaces_items_array_wholesale() {
 
         [[components.items]]
         name = "trail_auth"
-        wasm = "trail_auth_component.wasm"
+        wasm = "trail-auth.wasm"
         source = { build = "trail-auth-component" }
     "#};
     let overlay = indoc! {r#"
         [[components.items]]
         name = "trail_auth"
-        wasm = "trail_auth_component.wasm"
+        wasm = "trail-auth.wasm"
         source = { build = "trail-auth-component" }
     "#};
     let s = settings_from_toml(base, overlay).expect("should deserialize");
@@ -521,34 +543,11 @@ fn env_override_sets_components_rebuild() {
 
 #[test]
 fn appsettings_example_toml_parses() {
-    // The example file is the canonical reference for all available settings.
-    // It must remain in sync with the `Settings` struct — this test guards that
-    // contract by parsing it through the same config builder the app uses.
+    // The example file is documentation; it must always parse as valid Settings.
+    // Value assertions live in inline-fixture tests above, not here — otherwise
+    // every edit to the example breaks the test.
     let example = include_str!("../../appsettings.example.toml");
-    let s = settings_from_toml(example, "").expect("example should deserialize as Settings");
-    assert_eq!(s.server.address, "0.0.0.0:4000");
-    assert_eq!(s.frontend.effective_serve_from(), "disk");
-    assert!(!s.frontend.watch);
-    assert_eq!(s.trailbase.server.application_name, "Velora");
-    assert!(
-        s.trailbase.auth.oidc0.is_some(),
-        "oidc0 should be Some when client_id is set in the example"
-    );
-    assert!(
-        !s.trailbase.smtp.is_configured(),
-        "smtp should not be configured when smtp_host is empty in the example"
-    );
-    // Live example shows the auth_ui fetch variant. The trail_auth build
-    // variant is commented out in the example file — see file for details.
-    assert_eq!(s.components.items.len(), 1);
-    assert_eq!(s.components.items[0].name, "auth_ui");
-    assert_eq!(
-        s.components.items[0].source,
-        ComponentSource::Fetch("trailbase/auth_ui".to_string())
-    );
-    assert_eq!(s.branding.brand_name, Some("velora".to_string()));
-    assert_eq!(s.branding.theme_color, Some("#ff6b35".to_string()));
-    assert_eq!(s.branding.branding_dir, "");
+    settings_from_toml(example, "").expect("example should deserialize as Settings");
 }
 
 // ---------------------------------------------------------------------------

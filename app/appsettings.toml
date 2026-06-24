@@ -38,7 +38,7 @@ refetch = false
 
 [[components.items]]
 name = "trail_auth"
-wasm = "trail_auth_component.wasm"
+wasm = "trail-auth.wasm"
 source = { build = "trail-auth-component" }
 
 [branding]
