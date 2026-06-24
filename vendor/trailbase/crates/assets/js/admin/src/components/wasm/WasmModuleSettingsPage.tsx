@@ -30,6 +30,10 @@ export function WasmModuleSettingsPage() {
   const wasmModules = useQuery(() => ({
     queryKey: ["wasm-modules"],
     queryFn: fetchWasmModules,
+    // The module list doesn't change on its own during an admin session;
+    // refetching on window focus would re-inject the settings fragment and
+    // reset any unsaved state the user may have entered.
+    refetchOnWindowFocus: false,
   }));
 
   const module = () =>
@@ -43,15 +47,21 @@ export function WasmModuleSettingsPage() {
   >({ status: "idle" });
 
   let containerRef: HTMLDivElement | undefined;
+  // Tracks the config_path that was last successfully injected so that
+  // spurious re-runs of the effect (e.g. from an unrelated query refetch that
+  // produces a new object reference) don't wipe and re-inject the fragment.
+  let loadedConfigPath: string | undefined;
 
   createEffect(() => {
     const mod = module();
     if (!mod) return;
-    if (!mod.config_path) return;
+    const configPath = mod.config_path;
+    if (!configPath) return;
+    if (configPath === loadedConfigPath) return;
 
     setFragmentState({ status: "loading" });
 
-    fetch(mod.config_path, { credentials: "include" })
+    fetch(configPath, { credentials: "include" })
       .then((res) => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
@@ -61,6 +71,7 @@ export function WasmModuleSettingsPage() {
       .then((html) => {
         if (containerRef) {
           injectFragment(containerRef, html);
+          loadedConfigPath = configPath;
           setFragmentState({ status: "ready" });
         }
       })
@@ -82,7 +93,7 @@ export function WasmModuleSettingsPage() {
   );
 
   return (
-    <div class="h-full">
+    <div>
       <Show
         when={!wasmModules.isLoading}
         fallback={

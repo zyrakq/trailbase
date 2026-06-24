@@ -89,7 +89,7 @@ export function WasmModulesPage() {
   const modules = createMemo(() => wasmModules.data?.modules ?? []);
 
   return (
-    <div class="h-full">
+    <div>
       <Header title="WASM Modules" />
 
       <div class="flex flex-col gap-3 p-4">
