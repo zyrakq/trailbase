@@ -5,11 +5,7 @@ Authentication UI WASM component for TrailBase.
 ## Setup
 
 Copy the migrations from the `migrations/` directory into the project's
-`traildepot/migrations/main/` directory before running the server:
-
-```sh
-cp components/trail-auth/migrations/* app/traildepot/migrations/main/
-```
+`traildepot/migrations/main/`
 
 These migrations create the tables required for persistent configuration
 and i18n override storage.
