@@ -20,8 +20,6 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
-    /* Path mapping */
-    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./src/*"
@@ -40,6 +38,12 @@
       ],
       "@/assets/*": [
         "./src/assets/*"
+      ],
+      "@lit/reactive-element": [
+        "./node_modules/@lit/reactive-element/reactive-element.d.ts"
+      ],
+      "@lit/reactive-element/*": [
+        "./node_modules/@lit/reactive-element/*"
       ]
     },
     /* Linting */
