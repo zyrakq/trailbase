@@ -4,6 +4,7 @@
 export { AppHeader } from './components/app-header';
 export { FooterInfo } from './components/footer-info';
 export { BundleError } from './components/bundle-error';
+export { AccountMenu } from './components/account-menu';
 
 // Services
 export { bundleLoader, BundleLoaderService } from './services/bundle-loader';

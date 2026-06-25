@@ -48,8 +48,20 @@ vi.mock('@/features/auth/services/config.service', () => ({
   },
 }));
 
+// Mock the auth feature surface used by app-header. Only isAuthenticated,
+// showLogin, and init are exercised by the component; each test reshapes
+// return values via `vi.mocked(authService.<method>).mockReturnValue(...)`.
+vi.mock('@/features/auth', () => ({
+  authService: {
+    init: vi.fn().mockResolvedValue(undefined),
+    isAuthenticated: vi.fn().mockReturnValue(false),
+    showLogin: vi.fn(),
+  },
+}));
+
 import './app-header';
 import type { AppHeader } from './app-header';
+import { authService } from '@/features/auth';
 import { themeService } from '@/features/theme';
 import { localizationService } from '@/features/localization';
 
@@ -63,6 +75,11 @@ describe('app-header', () => {
     // during render. The service is a no-op until init() runs; init() is
     // idempotent so calling it in every test is safe.
     localizationService.init();
+    // Reset the auth mock to the unauthenticated default so each test
+    // starts from a known state and shapes isAuthenticated explicitly.
+    vi.mocked(authService.isAuthenticated).mockReturnValue(false);
+    vi.mocked(authService.init).mockResolvedValue(undefined);
+    vi.mocked(authService.showLogin).mockReset();
   });
 
   afterEach(() => {
@@ -97,5 +114,59 @@ describe('app-header', () => {
 
     const appName = element.shadowRoot?.querySelector('.app-name');
     expect(appName?.textContent?.trim()).toBe('Custom Brand');
+  });
+
+  it('renders the Sign In button when unauthenticated', async () => {
+    element = document.createElement('app-header') as AppHeader;
+    document.body.appendChild(element);
+    await element.updateComplete;
+
+    const signInBtn = element.shadowRoot?.querySelector('button.login-btn');
+    expect(signInBtn).not.toBeNull();
+    expect(signInBtn?.textContent?.trim()).toBe('Sign In');
+    // The account-menu should not be present in the unauthenticated state.
+    expect(element.shadowRoot?.querySelector('account-menu')).toBeNull();
+  });
+
+  it('renders <account-menu> when authenticated', async () => {
+    vi.mocked(authService.isAuthenticated).mockReturnValue(true);
+
+    element = document.createElement('app-header') as AppHeader;
+    document.body.appendChild(element);
+    await element.updateComplete;
+
+    expect(element.shadowRoot?.querySelector('account-menu')).not.toBeNull();
+    // The Sign In button must not be rendered in the authenticated state.
+    expect(element.shadowRoot?.querySelector('button.login-btn')).toBeNull();
+  });
+
+  it('reacts to auth-state-updated by re-reading isAuthenticated', async () => {
+    element = document.createElement('app-header') as AppHeader;
+    document.body.appendChild(element);
+    await element.updateComplete;
+
+    // Start unauthenticated — Sign In button visible.
+    expect(element.shadowRoot?.querySelector('button.login-btn')).not.toBeNull();
+
+    // Flip the underlying auth state and notify subscribers.
+    vi.mocked(authService.isAuthenticated).mockReturnValue(true);
+    window.dispatchEvent(new CustomEvent('auth-state-updated'));
+    await element.updateComplete;
+
+    expect(element.shadowRoot?.querySelector('account-menu')).not.toBeNull();
+    expect(element.shadowRoot?.querySelector('button.login-btn')).toBeNull();
+  });
+
+  it('calls authService.showLogin when the Sign In button is clicked', async () => {
+    element = document.createElement('app-header') as AppHeader;
+    document.body.appendChild(element);
+    await element.updateComplete;
+
+    const signInBtn = element.shadowRoot?.querySelector(
+      'button.login-btn'
+    ) as HTMLButtonElement;
+    signInBtn.click();
+
+    expect(authService.showLogin).toHaveBeenCalledTimes(1);
   });
 });

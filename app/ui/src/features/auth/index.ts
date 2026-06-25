@@ -1,4 +1,3 @@
-// Public API for auth feature
 export { AuthStatus } from './components/auth-status.ts';
 export { OAuthCallback } from './components/oauth-callback.ts';
 export { AuthModal } from './components/auth-modal.ts';

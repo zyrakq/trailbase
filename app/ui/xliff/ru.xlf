@@ -306,9 +306,6 @@
   <source>Retrying...</source>
   <target>Повтор...</target>
 </trans-unit>
-<trans-unit id="sec617ad1a555a9ac">
-  <source>velora</source>
-</trans-unit>
 <trans-unit id="s5b8b13ceea6996fb">
   <source>Velora GitHub</source>
 </trans-unit>
@@ -321,6 +318,75 @@
 <trans-unit id="s1fa96bca92224298">
   <source>Welcome to</source>
   <target>Добро пожаловать в</target>
+</trans-unit>
+<trans-unit id="s6ebc9bd6feae62a3">
+  <source>Loading…</source>
+</trans-unit>
+<trans-unit id="sa5d2fd8bcebf87ee">
+  <source>Manage all your subscriptions in one place</source>
+</trans-unit>
+<trans-unit id="s58d4b589fca4bf0d">
+  <source>Subscribe to, track, and manage access to the services you use.</source>
+</trans-unit>
+<trans-unit id="sa92157e2dfe3fcd3">
+  <source>All your services in one place</source>
+</trans-unit>
+<trans-unit id="s33bb65113b1acb7d">
+  <source>See every active subscription from a single dashboard.</source>
+</trans-unit>
+<trans-unit id="s2b783faafd1bc172">
+  <source>Subscribe in one click</source>
+</trans-unit>
+<trans-unit id="sf5306236b7225d3a">
+  <source>Activate new services instantly without leaving the app.</source>
+</trans-unit>
+<trans-unit id="s7c6c149b737b84e9">
+  <source>Always know what is active</source>
+</trans-unit>
+<trans-unit id="seac654818b33eb25">
+  <source>A full event history keeps you in control of your account.</source>
+</trans-unit>
+<trans-unit id="scb922946a73a9141">
+  <source>Sign In to Get Started</source>
+</trans-unit>
+<trans-unit id="s846b3790b6e25c1c">
+  <source>Account</source>
+</trans-unit>
+<trans-unit id="sb061ff5a347a296e">
+  <source>Profile</source>
+</trans-unit>
+<trans-unit id="s7cfe12cd14df9950">
+  <source>Sign out</source>
+</trans-unit>
+<trans-unit id="sd4c7544ac5326790">
+  <source>Subscribed to <ph id="0">${sub.name}</ph></source>
+</trans-unit>
+<trans-unit id="s0ed547eb7ef65cb0">
+  <source>Could not subscribe. Please try again.</source>
+</trans-unit>
+<trans-unit id="s4b5985c35de3877b">
+  <source>Subscription cancelled.</source>
+</trans-unit>
+<trans-unit id="s02d31b1fde5ff098">
+  <source>Could not cancel. Please try again.</source>
+</trans-unit>
+<trans-unit id="s2ceb11be2290bb1b">
+  <source>Cancel</source>
+</trans-unit>
+<trans-unit id="s58aac558ddaa15a3">
+  <source>Subscribe</source>
+</trans-unit>
+<trans-unit id="s5e8250fb85d64c23">
+  <source>Close</source>
+</trans-unit>
+<trans-unit id="sdd104d7efb3527ee">
+  <source>Open Service</source>
+</trans-unit>
+<trans-unit id="saf439b4c85cb1e19">
+  <source>…</source>
+</trans-unit>
+<trans-unit id="s36eea7ee613def92">
+  <source>Failed to load the dashboard.</source>
 </trans-unit>
 </body>
 </file>

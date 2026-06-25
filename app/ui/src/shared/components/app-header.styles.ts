@@ -46,6 +46,21 @@ export const appHeaderStyles = css`
     gap: 1rem;
   }
 
+  .login-btn {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    background: var(--theme-color-primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background-color 0.2s ease;
+  }
+  .login-btn:hover { background: var(--theme-color-primary-hover); }
+  .login-btn:active { background: var(--theme-color-primary-active); }
+
   @media (max-width: 640px) {
     .header-content {
       padding: 0.75rem 1rem;

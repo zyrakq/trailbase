@@ -5,10 +5,11 @@ import { authService, configService } from '@/features/auth';
 import { localizationService } from '@/features/localization';
 import '@/features/theme/services/favicon.service';
 
-// Import components (they will be registered as custom elements)
-import '@/pages/welcome/index.ts';
+import '@/pages/home';
 import '@/pages/dashboard/index.ts';
 import '@/pages/profile/index.ts';
+import '@/pages/admin/index.ts';
+import '@/pages/subscription/index.ts';
 import '@/features/auth/components/oauth-callback';
 import '@/pages/reset-password/index.ts';
 import '@/features/notifications/components/toast-container';
@@ -24,16 +25,13 @@ export class AppComponent extends LitElement {
   private _router = new Router(this, [
     {
       path: '/',
-      render: () => html`<welcome-page></welcome-page>`,
+      render: () => html`<home-page></home-page>`,
       enter: async () => {
         await authService.init();
         return true;
       },
     },
     {
-      // Landing page after TrailBase completes OAuth and redirects the browser.
-      // TrailBase sets the session cookie before this redirect — oauth-callback
-      // calls authService.refresh() to load auth state from the cookie.
       path: '/auth/callback',
       render: () => html`<oauth-callback></oauth-callback>`,
     },
@@ -41,16 +39,19 @@ export class AppComponent extends LitElement {
       path: '/reset-password',
       render: () => html`<reset-password-page></reset-password-page>`,
       enter: async () => {
-        // Initialize auth so the header renders correctly (e.g. shows user avatar
-        // if somehow an authenticated user follows a reset link). Does NOT redirect
-        // authenticated users — they are allowed to reset their password too.
         await authService.init();
         return true;
       },
     },
     {
-      // Legacy route — kept for backwards compatibility.
-      // Redirects authenticated users to /profile; unauthenticated to /.
+      path: '/subscription/:id',
+      render: (params: Record<string, string | undefined>) => html`<subscription-detail-page .subscriptionId=${params['id'] ?? ''}></subscription-detail-page>`,
+      enter: async () => {
+        await authService.init();
+        return true;
+      },
+    },
+    {
       path: '/dashboard',
       render: () => html``,
       enter: async () => {
@@ -66,6 +67,42 @@ export class AppComponent extends LitElement {
     {
       path: '/profile',
       render: () => html`<profile-page></profile-page>`,
+      enter: async () => {
+        await authService.init();
+        if (!authService.isAuthenticated()) {
+          window.location.href = '/';
+          return false;
+        }
+        return true;
+      },
+    },
+    {
+      path: '/admin',
+      render: () => html`<admin-page></admin-page>`,
+      enter: async () => {
+        await authService.init();
+        if (!authService.isAuthenticated()) {
+          window.location.href = '/';
+          return false;
+        }
+        return true;
+      },
+    },
+    {
+      path: '/admin/subscription/new',
+      render: () => html`<subscription-form-page></subscription-form-page>`,
+      enter: async () => {
+        await authService.init();
+        if (!authService.isAuthenticated()) {
+          window.location.href = '/';
+          return false;
+        }
+        return true;
+      },
+    },
+    {
+      path: '/admin/subscription/:id/edit',
+      render: (params: Record<string, string | undefined>) => html`<subscription-form-page .subscriptionId=${params['id'] ?? ''}></subscription-form-page>`,
       enter: async () => {
         await authService.init();
         if (!authService.isAuthenticated()) {

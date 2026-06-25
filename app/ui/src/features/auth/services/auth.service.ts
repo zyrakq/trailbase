@@ -71,16 +71,21 @@ class AuthService {
     }
   }
 
-  /**
-   * Map a TrailBase user object to the application User type.
-   */
   private mapTrailBaseUser(tbUser: TrailBaseUser): User {
+    const tbAny = tbUser as unknown as Record<string, unknown>;
+    const admin = typeof tbAny['admin'] === 'boolean' ? tbAny['admin'] : undefined;
     return {
       id: tbUser.id,
       username: tbUser.email || tbUser.id,
       email: tbUser.email,
       displayName: tbUser.email,
+      avatarUrl: `/api/auth/v1/avatar/${tbUser.id}`,
+      admin,
     };
+  }
+
+  isAdmin(): boolean {
+    return Boolean(this.authState.user?.admin);
   }
 
   /**
