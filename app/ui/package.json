@@ -10,13 +10,15 @@
     "i18n:extract": "lit-localize extract",
     "i18n:build": "lit-localize build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "postinstall": "node -e \"const fs=require('fs'),path=require('path'),src=path.join('node_modules','@lit','reactive-element','src');fs.mkdirSync(src,{recursive:true});['css-tag','reactive-controller'].forEach(f=>{const dev=path.join('node_modules','@lit','reactive-element','development',f+'.d.ts'),dst=path.join(src,f+'.d.ts');if(fs.existsSync(dev)&&!fs.existsSync(dst))fs.copyFileSync(dev,dst);})\""
   },
   "dependencies": {
     "@lit-labs/router": "^0.1.4",
     "@lit/localize": "^0.12.2",
     "@lit/localize-tools": "^0.8.1",
-    "lit": "^3.3.1",
+    "@lit/reactive-element": "^2.1.2",
+    "lit": "^3.3.3",
     "trailbase": "^0.12.1",
     "urlpattern-polyfill": "^10.1.0"
   },

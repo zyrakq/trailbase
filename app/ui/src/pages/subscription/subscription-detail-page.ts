@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
@@ -127,6 +127,7 @@ export class SubscriptionDetailPage extends LitElement {
   private _renderDetail() {
     const sub = this._subscription!;
     const hasActive = this._userSubscription?.status === 'active';
+    const hasCancelled = this._userSubscription?.status === 'cancelled';
     const activePricing = sub.pricing.filter(p => !p.is_archived);
     const isAuthenticated = authService.isAuthenticated();
 
@@ -156,6 +157,7 @@ export class SubscriptionDetailPage extends LitElement {
               <h1 class="title">${sub.name}</h1>
               ${sub.status === 'archived' ? html`<span class="badge-archived">${msg('Archived')}</span>` : null}
               ${hasActive ? html`<span class="badge-active">${msg('Active')}</span>` : null}
+              ${hasCancelled ? html`<span class="badge-cancelled">${msg('Cancelled')}</span>` : nothing}
             </div>
 
             <p class="description">${sub.description}</p>
@@ -191,6 +193,14 @@ export class SubscriptionDetailPage extends LitElement {
               </div>
             ` : null}
 
+            ${hasActive && sub.resource_url ? html`
+              <div class="access-section">
+                <a href=${sub.resource_url} target="_blank" rel="noopener" class="btn-access">
+                  ${msg('Open')} ${sub.name} ↗
+                </a>
+              </div>
+            ` : nothing}
+
             ${isAuthenticated && sub.status === 'active' ? html`
               <div class="cta-row">
                 ${hasActive
@@ -208,9 +218,8 @@ export class SubscriptionDetailPage extends LitElement {
               <confirm-subscribe-modal @subscription-subscribed=${this._handleSubscribed}></confirm-subscribe-modal>
             ` : null}
 
-            ${!isAuthenticated ? html`
-              <p class="login-cta">${msg('Sign in to subscribe.')}</p>
-            ` : null}
+            ${!isAuthenticated ? html`<p class="sign-in-hint">${msg('Sign in to subscribe.')}</p>` : nothing}
+            ${sub.status === 'archived' ? html`<p class="archived-notice">${msg('This subscription is no longer available.')}</p>` : nothing}
           </div>
         </div>
       </div>

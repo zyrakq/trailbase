@@ -133,6 +133,15 @@ export const subscriptionDetailPageStyles = css`
     color: var(--theme-color-text-secondary);
   }
 
+  .badge-cancelled {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--theme-color-error-subtle, rgba(239, 68, 68, 0.15));
+    color: var(--theme-color-error, #ef4444);
+  }
+
   .description {
     color: var(--theme-color-text-secondary);
     line-height: 1.6;
@@ -197,6 +206,24 @@ export const subscriptionDetailPageStyles = css`
     color: var(--theme-color-text-primary);
   }
 
+  .access-section {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+
+  .btn-access {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.625rem 1.5rem;
+    border-radius: 8px;
+    background: var(--theme-color-primary, #6366f1);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
   .cta-row {
     margin-top: 1.5rem;
     display: flex;
@@ -243,6 +270,19 @@ export const subscriptionDetailPageStyles = css`
     margin-top: 1.5rem;
     color: var(--theme-color-text-secondary);
     font-style: italic;
+  }
+
+  .sign-in-hint {
+    margin-top: 1.5rem;
+    color: var(--theme-color-text-secondary);
+    font-style: italic;
+  }
+
+  .archived-notice {
+    text-align: center;
+    color: var(--theme-color-text-secondary);
+    font-style: italic;
+    margin-top: 0.5rem;
   }
 
   @media (max-width: 640px) {

@@ -184,7 +184,9 @@
 's2915ba682ae8df35': `Subscription not found.`,
 's575e795c45e2d97e': `Go back`,
 'sc16e00a7a8b2fde2': `Back`,
+'s1f7698c061c208c9': `Open`,
 's84b80ed4e3c0ce57': `Cancelling…`,
 's556e13c6c16c4c0a': `Sign in to subscribe.`,
+'seb3d073a728e4da5': `This subscription is no longer available.`,
     };
   
