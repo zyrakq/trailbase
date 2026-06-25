@@ -20,18 +20,24 @@ config = { version = "0.15", features = ["toml"] }
 # Dependencies required by vendor/trailbase/crates/auth-ui (built as workspace member).
 askama = { version = "0.16.0", default-features = false, features = ["derive", "std", "config"] }
 rust-embed = { version = "8.4.0", default-features = false, features = ["mime-guess"] }
-trailbase-wasm = { path = "./vendor/trailbase/crates/wasm-runtime-guest" }
-trailbase-build = { path = "./vendor/trailbase/crates/build" }
+trailbase-wasm = { git = "https://github.com/zyrakq/trailbase" }
+trailbase-build = { git = "https://github.com/zyrakq/trailbase" }
 
 trailbase = { git = "https://github.com/zyrakq/trailbase", default-features = false, features = ["wasm", "pg"] }
-mailcrab = { path = "vendor/mailcrab/mailcrab" }
-mailcrab-server = { path = "vendor/mailcrab/backend" }
+mailcrab = { git = "https://github.com/zyrakq/mailcrab" }
+mailcrab-server = { git = "https://github.com/zyrakq/mailcrab" }
 
 # Use local vendor/trailbase subtree instead of fetching from git.
 # [patch] is ignored by downstream consumers of trailbase, so this only
 # affects top-level builds of this workspace.
 [patch."https://github.com/zyrakq/trailbase"]
-trailbase = { path = "./vendor/trailbase/crates/core"}
+trailbase = { path = "./vendor/trailbase/crates/core" }
+trailbase-wasm = { path = "./vendor/trailbase/crates/wasm-runtime-guest" }
+trailbase-build = { path = "./vendor/trailbase/crates/build" }
+
+[patch."https://github.com/zyrakq/mailcrab"]
+mailcrab = { path = "./vendor/mailcrab/mailcrab" }
+mailcrab-server = { path = "./vendor/mailcrab/backend" }
 
 [profile.dev]
 debug = 1
