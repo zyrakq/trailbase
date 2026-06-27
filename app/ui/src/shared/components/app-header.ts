@@ -46,18 +46,14 @@ export class AppHeader extends LitElement {
   private _handleSignIn(): void {
     authService.showLogin();
   }
-
   render() {
-    const logo = `/branding/logo-${this.theme.theme}.svg`;
+    const mark = `/branding/mark-${this.theme.theme}.svg`;
 
     return html`
       <header>
         <div class="header-content">
           <a class="logo-link" href="/" aria-label=${msg('Go to home')}>
-            <div class="logo-section">
-              <img src=${logo} alt=${this.brandName} class="logo" />
-              <span class="app-name">${this.brandName}</span>
-            </div>
+            <img src=${mark} alt=${this.brandName} class="logo-mark" />
           </a>
           <div class="actions">
             ${this._isAuthenticated

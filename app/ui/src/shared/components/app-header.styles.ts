@@ -29,22 +29,9 @@ export const appHeaderStyles = css`
     text-decoration: none;
   }
 
-  .logo-section {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .logo {
-    width: 48px;
-    height: 48px;
-  }
-
-  .app-name {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--theme-color-text-primary);
-    transition: color 0.2s ease;
+  .logo-mark {
+    height: 40px;
+    width: auto;
   }
 
   .actions {
@@ -70,21 +57,6 @@ export const appHeaderStyles = css`
   @media (max-width: 640px) {
     .header-content {
       padding: 0.75rem 1rem;
-    }
-
-    .app-name {
-      font-size: 1.125rem;
-    }
-
-    .logo {
-      width: 40px;
-      height: 40px;
-    }
-  }
-
-  @media (max-width: 540px) {
-    .app-name {
-      display: none;
     }
   }
 `;
