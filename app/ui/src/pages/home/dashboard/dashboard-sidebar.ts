@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
@@ -6,6 +6,15 @@ import type { SubscriptionPeriod } from '@/features/subscriptions';
 import { dashboardSidebarStyles } from './dashboard-sidebar.styles';
 
 type DashboardSection = 'my-subscriptions' | 'all-services' | 'history';
+type FilterPeriod = SubscriptionPeriod | 'all';
+
+const PERIOD_LABELS: Record<FilterPeriod, string> = {
+  all: 'All',
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  yearly: 'Yearly',
+  onetime: 'One-time',
+};
 
 @customElement('dashboard-sidebar')
 @localized()
@@ -14,7 +23,11 @@ export class DashboardSidebar extends LitElement {
   activeSection: DashboardSection = 'my-subscriptions';
 
   @property()
-  selectedPeriod: SubscriptionPeriod | 'all' = 'all';
+  selectedPeriod: FilterPeriod = 'all';
+
+  // null hides the filter entirely (history section, loading, single period).
+  @property({ attribute: false })
+  availablePeriods: SubscriptionPeriod[] | null = null;
 
   private _handleSectionClick(section: DashboardSection): void {
     this.dispatchEvent(
@@ -26,9 +39,9 @@ export class DashboardSidebar extends LitElement {
     );
   }
 
-  private _handlePeriodClick(period: SubscriptionPeriod | 'all'): void {
+  private _handlePeriodClick(period: FilterPeriod): void {
     this.dispatchEvent(
-      new CustomEvent<SubscriptionPeriod | 'all'>('period-change', {
+      new CustomEvent<FilterPeriod>('period-change', {
         detail: period,
         bubbles: true,
         composed: true,
@@ -77,6 +90,26 @@ export class DashboardSidebar extends LitElement {
     `;
   }
 
+  private _renderPeriodFilter(): TemplateResult {
+    if (!this.availablePeriods || this.availablePeriods.length < 2) {
+      return html``;
+    }
+    const periods: FilterPeriod[] = ['all', ...this.availablePeriods];
+    return html`
+      <div class="period-filter">
+        <span class="filter-label">${msg('Period')}</span>
+        ${periods.map(p => html`
+          <button
+            class="period-btn ${this.selectedPeriod === p ? 'active' : ''}"
+            @click=${() => this._handlePeriodClick(p)}
+          >
+            ${msg(PERIOD_LABELS[p])}
+          </button>
+        `)}
+      </div>
+    `;
+  }
+
   render() {
     return html`
       <nav class="nav">
@@ -84,17 +117,7 @@ export class DashboardSidebar extends LitElement {
         ${this._renderItem('all-services', msg('All Services'))}
         ${this._renderItem('history', msg('History'))}
       </nav>
-      <div class="period-filter">
-        <span class="filter-label">${msg('Period')}</span>
-        ${(['all', 'monthly', 'quarterly', 'yearly', 'onetime'] as const).map(p => html`
-          <button
-            class="period-btn ${this.selectedPeriod === p ? 'active' : ''}"
-            @click=${() => this._handlePeriodClick(p)}
-          >
-            ${p === 'all' ? msg('All') : p === 'monthly' ? msg('Monthly') : p === 'quarterly' ? msg('Quarterly') : p === 'yearly' ? msg('Yearly') : msg('One-time')}
-          </button>
-        `)}
-      </div>
+      ${this._renderPeriodFilter()}
     `;
   }
 
