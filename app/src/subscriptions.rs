@@ -257,7 +257,7 @@ pub struct SubscriptionIdResponse {
     pub id: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PricingInput {
     pub period: String,
     pub price: i64,
@@ -306,10 +306,11 @@ fn blob_to_b64(bytes: &[u8]) -> Result<String, ApiError> {
 // Mirrors trailbase's own is_admin (vendor/.../auth/util.rs:381) — User has no
 // is_admin() method and auth::util::is_admin is pub(crate).
 async fn require_admin(state: &AppState, user: &User) -> Result<(), ApiError> {
+    let sql = format!(r#"SELECT admin FROM "{}" WHERE id = $1"#, USER_TABLE);
     let admin: Option<i64> = state
         .user_conn()
         .read_query_row_get(
-            &format!(r#"SELECT admin FROM "{}" WHERE id = $1"#, USER_TABLE),
+            sql,
             trailbase_sqlite::params![user.uuid.as_bytes().to_vec()],
             0,
         )
@@ -338,7 +339,7 @@ pub async fn catalog_handler(
                FROM subscriptions
                WHERE status = 'active'
                ORDER BY created_at"#,
-            trailbase_sqlite::params![],
+            (),
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -360,7 +361,7 @@ pub async fn catalog_handler(
             r#"SELECT id, subscription_id, period, price, currency, is_archived
                FROM subscription_pricing
                WHERE is_archived = 0"#,
-            trailbase_sqlite::params![],
+            (),
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -470,7 +471,7 @@ pub async fn mine_handler(
                       what_included, terms, status, created_at, updated_at
                FROM subscriptions
                WHERE status = 'active'"#,
-            trailbase_sqlite::params![],
+            (),
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -480,7 +481,7 @@ pub async fn mine_handler(
             r#"SELECT id, subscription_id, period, price, currency, is_archived
                FROM subscription_pricing
                WHERE is_archived = 0"#,
-            trailbase_sqlite::params![],
+            (),
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -712,6 +713,7 @@ async fn set_subscription_status(
     let sub_uuid = trailbase::util::b64_to_uuid(id_b64)
         .map_err(|_| ApiError::BadRequest("invalid id".into()))?;
     let sub_bytes = sub_uuid.as_bytes().to_vec();
+    let status = status.to_string();
 
     let affected = state
         .user_conn()

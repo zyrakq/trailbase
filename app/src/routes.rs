@@ -35,6 +35,34 @@ pub fn build(state: AppState) -> Router {
             "/api/subscriptions/cancel/{id}",
             axum::routing::post(crate::subscriptions::cancel_handler),
         )
+        .route(
+            "/api/subscriptions/catalog",
+            axum::routing::get(crate::subscriptions::catalog_handler),
+        )
+        .route(
+            "/api/subscriptions/mine",
+            axum::routing::get(crate::subscriptions::mine_handler),
+        )
+        .route(
+            "/api/admin/subscriptions",
+            axum::routing::post(crate::subscriptions::create_subscription_handler),
+        )
+        .route(
+            "/api/admin/subscriptions/{id}",
+            axum::routing::put(crate::subscriptions::update_subscription_handler),
+        )
+        .route(
+            "/api/admin/subscriptions/{id}/archive",
+            axum::routing::put(crate::subscriptions::archive_subscription_handler),
+        )
+        .route(
+            "/api/admin/subscriptions/{id}/restore",
+            axum::routing::put(crate::subscriptions::restore_subscription_handler),
+        )
+        .route(
+            "/api/admin/subscriptions/{id}",
+            axum::routing::delete(crate::subscriptions::delete_subscription_handler),
+        )
         .with_state(state)
 }
 
