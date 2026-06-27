@@ -5344,6 +5344,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-rustls",
+ "tower-cookies",
  "tower-http 0.7.0",
  "tracing",
  "trailbase",

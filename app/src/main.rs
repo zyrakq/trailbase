@@ -66,7 +66,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let base_router = axum::Router::new()
         .merge(routes::build(state))
-        .merge(main_router.1);
+        .merge(main_router.1)
+        // CookieManagerLayer is applied inside TrailBase's wrap_with_default_layers() only to
+        // its own routes. Our custom routes are merged outside that boundary, so we add the
+        // layer here to cover the whole base router uniformly.
+        .layer(tower_cookies::CookieManagerLayer::new());
 
     let base_router = match settings.frontend.effective_serve_from() {
         "embedded" => {

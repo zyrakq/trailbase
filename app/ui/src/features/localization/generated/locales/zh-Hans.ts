@@ -88,6 +88,7 @@
 'sffef1a8596bc58bb': `正在验证身份...`,
 's846b3790b6e25c1c': `Account`,
 'sb061ff5a347a296e': `Profile`,
+'se4f7eba403105eec': `Manage subscriptions`,
 's7cfe12cd14df9950': `Sign out`,
 's5b8b13ceea6996fb': `Velora GitHub`,
 'sa1eda5e887fbd9eb': `Velora Docs`,
