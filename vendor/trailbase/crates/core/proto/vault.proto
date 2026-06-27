@@ -1,7 +1,0 @@
-syntax = "proto2";
-
-package config;
-
-message Vault {
-  map<string, string> secrets = 1;
-}
