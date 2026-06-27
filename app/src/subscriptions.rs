@@ -30,6 +30,7 @@ pub enum ApiError {
     BadRequest(String),
     NotFound(String),
     Conflict(String),
+    Forbidden(String),
     Internal(String),
 }
 
@@ -39,6 +40,7 @@ impl IntoResponse for ApiError {
             ApiError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
             ApiError::NotFound(m) => (StatusCode::NOT_FOUND, m),
             ApiError::Conflict(m) => (StatusCode::CONFLICT, m),
+            ApiError::Forbidden(m) => (StatusCode::FORBIDDEN, m),
             ApiError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m),
         };
         (code, msg).into_response()
@@ -214,4 +216,567 @@ pub async fn cancel_handler(
         status: "cancelled".to_string(),
         expires_at: None,
     }))
+}
+
+#[derive(Debug, Serialize)]
+pub struct PricingDto {
+    pub id: String,
+    pub subscription_id: String,
+    pub period: String,
+    pub price: i64,
+    pub currency: String,
+    pub is_archived: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SubscriptionDto {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub logo_url: String,
+    pub resource_url: String,
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub what_included: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub terms: Option<String>,
+    pub pricing: Vec<PricingDto>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CatalogResponse {
+    pub subscriptions: Vec<SubscriptionDto>,
+    #[serde(rename = "available_periods")]
+    pub available_periods: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SubscriptionIdResponse {
+    pub id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PricingInput {
+    pub period: String,
+    pub price: i64,
+    pub currency: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SubscriptionInput {
+    pub name: String,
+    pub description: Option<String>,
+    pub logo_url: Option<String>,
+    pub resource_url: Option<String>,
+    pub what_included: Option<String>,
+    pub terms: Option<String>,
+    pub pricing: Vec<PricingInput>,
+}
+
+const USER_TABLE: &str = "_user";
+
+fn period_rank(p: &str) -> u8 {
+    match p {
+        "monthly" => 0,
+        "quarterly" => 1,
+        "yearly" => 2,
+        "onetime" => 3,
+        _ => 4,
+    }
+}
+
+fn sort_periods(mut periods: Vec<String>) -> Vec<String> {
+    periods.sort_by(|a, b| {
+        period_rank(a)
+            .cmp(&period_rank(b))
+            .then_with(|| a.cmp(b))
+    });
+    periods.dedup();
+    periods
+}
+
+fn blob_to_b64(bytes: &[u8]) -> Result<String, ApiError> {
+    let uuid = uuid::Uuid::from_slice(bytes)
+        .map_err(|_| ApiError::Internal("invalid id blob".into()))?;
+    Ok(trailbase::util::uuid_to_b64(&uuid))
+}
+
+// Mirrors trailbase's own is_admin (vendor/.../auth/util.rs:381) — User has no
+// is_admin() method and auth::util::is_admin is pub(crate).
+async fn require_admin(state: &AppState, user: &User) -> Result<(), ApiError> {
+    let admin: Option<i64> = state
+        .user_conn()
+        .read_query_row_get(
+            &format!(r#"SELECT admin FROM "{}" WHERE id = $1"#, USER_TABLE),
+            trailbase_sqlite::params![user.uuid.as_bytes().to_vec()],
+            0,
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    if admin.map(|v| v > 0).unwrap_or(false) {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden("admin privileges required".into()))
+    }
+}
+
+#[allow(dead_code)]
+const PERIOD_ORDER: [&str; 4] = ["monthly", "quarterly", "yearly", "onetime"];
+
+pub async fn catalog_handler(
+    State(state): State<AppState>,
+    user: User,
+) -> Result<Json<CatalogResponse>, ApiError> {
+    let conn = state.user_conn();
+
+    let sub_rows = conn
+        .read_query_rows(
+            r#"SELECT id, name, description, logo_url, resource_url,
+                      what_included, terms, status, created_at, updated_at
+               FROM subscriptions
+               WHERE status = 'active'
+               ORDER BY created_at"#,
+            trailbase_sqlite::params![],
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let active_ids: Vec<Vec<u8>> = sub_rows
+        .iter()
+        .filter_map(|r| r.get::<Vec<u8>>(0).ok())
+        .collect();
+
+    if active_ids.is_empty() {
+        return Ok(Json(CatalogResponse {
+            subscriptions: vec![],
+            available_periods: vec![],
+        }));
+    }
+
+    let pricing_rows = conn
+        .read_query_rows(
+            r#"SELECT id, subscription_id, period, price, currency, is_archived
+               FROM subscription_pricing
+               WHERE is_archived = 0"#,
+            trailbase_sqlite::params![],
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let active_id_set: std::collections::HashSet<Vec<u8>> = active_ids.into_iter().collect();
+
+    let mut periods: Vec<String> = Vec::new();
+    let mut pricing_by_sub: std::collections::HashMap<Vec<u8>, Vec<PricingDto>> =
+        std::collections::HashMap::new();
+
+    for r in pricing_rows.iter() {
+        let sub_id: Vec<u8> = match r.get::<Vec<u8>>(1) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if !active_id_set.contains(&sub_id) {
+            continue;
+        }
+        let period: String = r.get::<String>(2).unwrap_or_default();
+        if !periods.contains(&period) {
+            periods.push(period.clone());
+        }
+        let dto = PricingDto {
+            id: blob_to_b64(&r.get::<Vec<u8>>(0).unwrap_or_default())?,
+            subscription_id: blob_to_b64(&sub_id)?,
+            period,
+            price: r.get::<i64>(3).unwrap_or(0),
+            currency: r.get::<String>(4).unwrap_or_else(|_| "USD".into()),
+            is_archived: r.get::<i64>(5).unwrap_or(0) != 0,
+        };
+        pricing_by_sub.entry(sub_id).or_default().push(dto);
+    }
+
+    let mut subs: Vec<SubscriptionDto> = Vec::with_capacity(sub_rows.len());
+    for r in sub_rows.iter() {
+        let id_bytes: Vec<u8> = r.get::<Vec<u8>>(0).unwrap_or_default();
+        let period_list = pricing_by_sub.remove(&id_bytes).unwrap_or_default();
+        subs.push(SubscriptionDto {
+            id: blob_to_b64(&id_bytes)?,
+            name: r.get::<String>(1).unwrap_or_default(),
+            description: r.get::<String>(2).unwrap_or_default(),
+            logo_url: r.get::<String>(3).unwrap_or_default(),
+            resource_url: r.get::<String>(4).unwrap_or_default(),
+            what_included: r.get::<Option<String>>(5).ok().flatten(),
+            terms: r.get::<Option<String>>(6).ok().flatten(),
+            status: r.get::<String>(7).unwrap_or_else(|_| "active".into()),
+            created_at: r.get::<i64>(8).unwrap_or(0),
+            updated_at: r.get::<i64>(9).unwrap_or(0),
+            pricing: period_list,
+        });
+    }
+
+    log::info!(
+        "catalog served to user {} ({} subs, {} periods)",
+        user.id,
+        subs.len(),
+        periods.len()
+    );
+
+    Ok(Json(CatalogResponse {
+        subscriptions: subs,
+        available_periods: sort_periods(periods),
+    }))
+}
+
+pub async fn mine_handler(
+    State(state): State<AppState>,
+    user: User,
+) -> Result<Json<CatalogResponse>, ApiError> {
+    let conn = state.user_conn();
+    let user_bytes = user.uuid.as_bytes().to_vec();
+
+    let user_sub_rows = conn
+        .read_query_rows(
+            r#"SELECT DISTINCT subscription_id, period
+               FROM user_subscriptions
+               WHERE user_id = $1
+                 AND status = 'active'
+                 AND (expires_at IS NULL OR expires_at > unixepoch())"#,
+            trailbase_sqlite::params![user_bytes.clone()],
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let mut periods: Vec<String> = Vec::new();
+    let mut sub_id_set: std::collections::HashSet<Vec<u8>> = std::collections::HashSet::new();
+    for r in user_sub_rows.iter() {
+        if let Ok(sub_id) = r.get::<Vec<u8>>(0) {
+            sub_id_set.insert(sub_id);
+        }
+        let period: String = r.get::<String>(1).unwrap_or_default();
+        if !period.is_empty() && !periods.contains(&period) {
+            periods.push(period);
+        }
+    }
+
+    if sub_id_set.is_empty() {
+        return Ok(Json(CatalogResponse {
+            subscriptions: vec![],
+            available_periods: vec![],
+        }));
+    }
+
+    let sub_rows = conn
+        .read_query_rows(
+            r#"SELECT id, name, description, logo_url, resource_url,
+                      what_included, terms, status, created_at, updated_at
+               FROM subscriptions
+               WHERE status = 'active'"#,
+            trailbase_sqlite::params![],
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let pricing_rows = conn
+        .read_query_rows(
+            r#"SELECT id, subscription_id, period, price, currency, is_archived
+               FROM subscription_pricing
+               WHERE is_archived = 0"#,
+            trailbase_sqlite::params![],
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let mut pricing_by_sub: std::collections::HashMap<Vec<u8>, Vec<PricingDto>> =
+        std::collections::HashMap::new();
+    for r in pricing_rows.iter() {
+        let sub_id: Vec<u8> = match r.get::<Vec<u8>>(1) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if !sub_id_set.contains(&sub_id) {
+            continue;
+        }
+        let dto = PricingDto {
+            id: blob_to_b64(&r.get::<Vec<u8>>(0).unwrap_or_default())?,
+            subscription_id: blob_to_b64(&sub_id)?,
+            period: r.get::<String>(2).unwrap_or_default(),
+            price: r.get::<i64>(3).unwrap_or(0),
+            currency: r.get::<String>(4).unwrap_or_else(|_| "USD".into()),
+            is_archived: r.get::<i64>(5).unwrap_or(0) != 0,
+        };
+        pricing_by_sub.entry(sub_id).or_default().push(dto);
+    }
+
+    let mut subs: Vec<SubscriptionDto> = Vec::new();
+    for r in sub_rows.iter() {
+        let id_bytes: Vec<u8> = r.get::<Vec<u8>>(0).unwrap_or_default();
+        if !sub_id_set.contains(&id_bytes) {
+            continue;
+        }
+        let pricing = pricing_by_sub.remove(&id_bytes).unwrap_or_default();
+        subs.push(SubscriptionDto {
+            id: blob_to_b64(&id_bytes)?,
+            name: r.get::<String>(1).unwrap_or_default(),
+            description: r.get::<String>(2).unwrap_or_default(),
+            logo_url: r.get::<String>(3).unwrap_or_default(),
+            resource_url: r.get::<String>(4).unwrap_or_default(),
+            what_included: r.get::<Option<String>>(5).ok().flatten(),
+            terms: r.get::<Option<String>>(6).ok().flatten(),
+            status: r.get::<String>(7).unwrap_or_else(|_| "active".into()),
+            created_at: r.get::<i64>(8).unwrap_or(0),
+            updated_at: r.get::<i64>(9).unwrap_or(0),
+            pricing,
+        });
+    }
+
+    log::info!(
+        "mine served to user {} ({} subs, {} periods)",
+        user.id,
+        subs.len(),
+        periods.len()
+    );
+
+    Ok(Json(CatalogResponse {
+        subscriptions: subs,
+        available_periods: sort_periods(periods),
+    }))
+}
+
+pub async fn create_subscription_handler(
+    State(state): State<AppState>,
+    user: User,
+    Json(body): Json<SubscriptionInput>,
+) -> Result<(StatusCode, Json<SubscriptionIdResponse>), ApiError> {
+    require_admin(&state, &user).await?;
+
+    let sub_id = uuid::Uuid::new_v4();
+    let sub_bytes = sub_id.as_bytes().to_vec();
+    let pricing_inputs = body.pricing.clone();
+
+    state
+        .user_conn()
+        .transaction(move |mut tx| -> Result<(), trailbase_sqlite::Error> {
+            tx.execute(
+                r#"INSERT INTO subscriptions
+                   (id, name, description, logo_url, resource_url,
+                    what_included, terms, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 'active')"#,
+                trailbase_sqlite::params![
+                    sub_bytes.clone(),
+                    body.name.clone(),
+                    body.description.clone().unwrap_or_default(),
+                    body.logo_url.clone().unwrap_or_default(),
+                    body.resource_url.clone().unwrap_or_default(),
+                    body.what_included.clone().unwrap_or_default(),
+                    body.terms.clone().unwrap_or_default(),
+                ],
+            )?;
+
+            for tier in &pricing_inputs {
+                let tier_id = uuid::Uuid::new_v4();
+                tx.execute(
+                    r#"INSERT INTO subscription_pricing
+                       (id, subscription_id, period, price, currency, is_archived)
+                       VALUES (?, ?, ?, ?, ?, 0)"#,
+                    trailbase_sqlite::params![
+                        tier_id.as_bytes().to_vec(),
+                        sub_bytes.clone(),
+                        tier.period.clone(),
+                        tier.price,
+                        tier.currency.clone(),
+                    ],
+                )?;
+            }
+
+            tx.commit()?;
+            Ok(())
+        })
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    log::info!("admin {} created subscription {}", user.id, sub_id);
+    Ok((
+        StatusCode::CREATED,
+        Json(SubscriptionIdResponse {
+            id: trailbase::util::uuid_to_b64(&sub_id),
+        }),
+    ))
+}
+
+pub async fn update_subscription_handler(
+    State(state): State<AppState>,
+    user: User,
+    Path(id): Path<String>,
+    Json(body): Json<SubscriptionInput>,
+) -> Result<StatusCode, ApiError> {
+    require_admin(&state, &user).await?;
+
+    let sub_uuid = trailbase::util::b64_to_uuid(&id)
+        .map_err(|_| ApiError::BadRequest("invalid id".into()))?;
+    let sub_bytes = sub_uuid.as_bytes().to_vec();
+    let pricing_inputs = body.pricing.clone();
+
+    state
+        .user_conn()
+        .transaction(move |mut tx| -> Result<(), trailbase_sqlite::Error> {
+            let exists = tx
+                .query_row(
+                    "SELECT 1 FROM subscriptions WHERE id = ?",
+                    trailbase_sqlite::params![sub_bytes.clone()],
+                )?
+                .is_some();
+            if !exists {
+                return Err(trailbase_sqlite::Error::Other("subscription not found".into()));
+            }
+
+            tx.execute(
+                r#"UPDATE subscriptions SET
+                     name = ?, description = ?, logo_url = ?, resource_url = ?,
+                     what_included = ?, terms = ?, updated_at = unixepoch()
+                   WHERE id = ?"#,
+                trailbase_sqlite::params![
+                    body.name.clone(),
+                    body.description.clone().unwrap_or_default(),
+                    body.logo_url.clone().unwrap_or_default(),
+                    body.resource_url.clone().unwrap_or_default(),
+                    body.what_included.clone().unwrap_or_default(),
+                    body.terms.clone().unwrap_or_default(),
+                    sub_bytes.clone(),
+                ],
+            )?;
+
+            tx.execute(
+                "UPDATE subscription_pricing SET is_archived = 1 WHERE subscription_id = ? AND is_archived = 0",
+                trailbase_sqlite::params![sub_bytes.clone()],
+            )?;
+
+            for tier in &pricing_inputs {
+                let tier_id = uuid::Uuid::new_v4();
+                tx.execute(
+                    r#"INSERT INTO subscription_pricing
+                       (id, subscription_id, period, price, currency, is_archived)
+                       VALUES (?, ?, ?, ?, ?, 0)"#,
+                    trailbase_sqlite::params![
+                        tier_id.as_bytes().to_vec(),
+                        sub_bytes.clone(),
+                        tier.period.clone(),
+                        tier.price,
+                        tier.currency.clone(),
+                    ],
+                )?;
+            }
+
+            tx.commit()?;
+            Ok(())
+        })
+        .await
+        .map_err(|err| {
+            let msg = err.to_string();
+            if msg.contains("not found") {
+                ApiError::NotFound(msg)
+            } else {
+                ApiError::Internal(msg)
+            }
+        })?;
+
+    log::info!("admin {} updated subscription {}", user.id, id);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn archive_subscription_handler(
+    State(state): State<AppState>,
+    user: User,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    require_admin(&state, &user).await?;
+    set_subscription_status(&state, &id, "archived").await?;
+    log::info!("admin {} archived subscription {}", user.id, id);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn restore_subscription_handler(
+    State(state): State<AppState>,
+    user: User,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    require_admin(&state, &user).await?;
+    set_subscription_status(&state, &id, "active").await?;
+    log::info!("admin {} restored subscription {}", user.id, id);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn set_subscription_status(
+    state: &AppState,
+    id_b64: &str,
+    status: &str,
+) -> Result<(), ApiError> {
+    let sub_uuid = trailbase::util::b64_to_uuid(id_b64)
+        .map_err(|_| ApiError::BadRequest("invalid id".into()))?;
+    let sub_bytes = sub_uuid.as_bytes().to_vec();
+
+    let affected = state
+        .user_conn()
+        .execute(
+            "UPDATE subscriptions SET status = ?, updated_at = unixepoch() WHERE id = ?",
+            trailbase_sqlite::params![status, sub_bytes],
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    if affected == 0 {
+        return Err(ApiError::NotFound("subscription not found".into()));
+    }
+    Ok(())
+}
+
+pub async fn delete_subscription_handler(
+    State(state): State<AppState>,
+    user: User,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    require_admin(&state, &user).await?;
+
+    let sub_uuid = trailbase::util::b64_to_uuid(&id)
+        .map_err(|_| ApiError::BadRequest("invalid id".into()))?;
+    let sub_bytes = sub_uuid.as_bytes().to_vec();
+
+    state
+        .user_conn()
+        .transaction(move |mut tx| -> Result<(), trailbase_sqlite::Error> {
+            let has_active = tx
+                .query_row(
+                    "SELECT 1 FROM user_subscriptions WHERE subscription_id = ? AND status = 'active'",
+                    trailbase_sqlite::params![sub_bytes.clone()],
+                )?
+                .is_some();
+            if has_active {
+                return Err(trailbase_sqlite::Error::Other(
+                    "subscription has active subscribers".into(),
+                ));
+            }
+
+            let affected = tx.execute(
+                "DELETE FROM subscriptions WHERE id = ?",
+                trailbase_sqlite::params![sub_bytes.clone()],
+            )?;
+            if affected == 0 {
+                return Err(trailbase_sqlite::Error::Other("subscription not found".into()));
+            }
+
+            tx.commit()?;
+            Ok(())
+        })
+        .await
+        .map_err(|err| {
+            let msg = err.to_string();
+            if msg.contains("active subscribers") {
+                ApiError::Conflict(msg)
+            } else if msg.contains("not found") {
+                ApiError::NotFound(msg)
+            } else {
+                ApiError::Internal(msg)
+            }
+        })?;
+
+    log::info!("admin {} deleted subscription {}", user.id, id);
+    Ok(StatusCode::NO_CONTENT)
 }
