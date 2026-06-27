@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS subscription_pricing (
   price           INTEGER NOT NULL DEFAULT 0,
   currency        TEXT NOT NULL DEFAULT 'RUB',
   is_archived     INTEGER NOT NULL DEFAULT 0
-);
+) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_subscription_pricing_sub_id
   ON subscription_pricing(subscription_id);

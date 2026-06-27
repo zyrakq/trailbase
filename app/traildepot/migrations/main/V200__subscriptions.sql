@@ -9,6 +9,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   status        TEXT NOT NULL DEFAULT 'active',
   created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at    INTEGER NOT NULL DEFAULT (unixepoch())
-);
+) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);

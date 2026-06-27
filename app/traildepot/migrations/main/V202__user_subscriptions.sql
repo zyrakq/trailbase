@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
   subscribed_at   INTEGER NOT NULL DEFAULT (unixepoch()),
   expires_at      INTEGER,
   cancelled_at    INTEGER
-);
+) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id
   ON user_subscriptions(user_id);

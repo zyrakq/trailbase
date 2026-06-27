@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS subscription_events (
   event_type           TEXT NOT NULL,
   created_at           INTEGER NOT NULL DEFAULT (unixepoch()),
   metadata             TEXT
-);
+) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_subscription_events_user_sub
   ON subscription_events(user_subscription_id);
