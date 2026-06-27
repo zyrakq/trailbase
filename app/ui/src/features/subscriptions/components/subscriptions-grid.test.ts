@@ -234,18 +234,19 @@ describe('subscriptions-grid', () => {
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
     document.body.appendChild(element);
 
-    let observed: CustomEvent | null = null;
-    document.addEventListener('periods-loaded', (e: Event) => {
-      observed = e as CustomEvent;
-    });
+    let observed: CustomEvent<unknown> | null = null;
+    const handler = (e: Event): void => {
+      observed = e as CustomEvent<unknown>;
+    };
+    document.addEventListener('periods-loaded', handler);
 
     await settle(element);
 
     expect(observed).not.toBeNull();
-    expect(observed?.bubbles).toBe(true);
-    expect(observed?.composed).toBe(true);
+    expect(observed!.bubbles).toBe(true);
+    expect(observed!.composed).toBe(true);
 
-    document.removeEventListener('periods-loaded', () => {});
+    document.removeEventListener('periods-loaded', handler);
   });
 
   it('shows empty state when mode="user" and the user has no subscriptions', async () => {
