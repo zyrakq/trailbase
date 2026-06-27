@@ -146,7 +146,22 @@ class SubscriptionsService {
         filters: [{ column: 'status', op: 'equal', value: 'active' }],
         pagination: { limit: 256 },
       });
-    return result.records.map(mapUserSubscription);
+    const now = Date.now();
+    return result.records
+      .map(mapUserSubscription)
+      .filter(u => u.expires_at === undefined || u.expires_at > now);
+  }
+
+  async getSubscribedSubscriptions(userSubs: UserSubscription[]): Promise<Subscription[]> {
+    const ids = [...new Set(userSubs.map(u => u.subscription_id))];
+    if (ids.length === 0) return [];
+    const client = await trailbaseService.initClient();
+    const result = await client
+      .records<Record<string, unknown>>('subscriptions')
+      .list({ pagination: { limit: 1024 } });
+    const idSet = new Set(ids);
+    const subscribed = result.records.filter(s => idSet.has(s['id'] as string));
+    return joinPricingToSubscriptions(subscribed);
   }
 
   async getEventHistory(): Promise<SubscriptionEventWithSub[]> {

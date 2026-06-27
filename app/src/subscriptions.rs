@@ -22,6 +22,8 @@ pub struct UserSubscriptionRecord {
     pub subscription_id: String,
     pub period: String,
     pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<i64>,
 }
 
 pub enum ApiError {
@@ -64,6 +66,16 @@ pub async fn subscribe_handler(
     let new_id_b64 = trailbase::util::uuid_to_b64(&new_id);
 
     let period_tx = period.clone();
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let expires_at: Option<i64> = match period.as_str() {
+        "monthly" => Some(now_secs + 2_592_000),
+        "quarterly" => Some(now_secs + 7_776_000),
+        "yearly" => Some(now_secs + 31_536_000),
+        _ => None,
+    };
 
     state
         .user_conn()
@@ -101,8 +113,8 @@ pub async fn subscribe_handler(
             }
 
             tx.execute(
-                "INSERT INTO user_subscriptions (id, user_id, subscription_id, period, status) VALUES (?, ?, ?, ?, 'active')",
-                trailbase_sqlite::params![new_id_bytes.clone(), user_bytes.clone(), sub_bytes.clone(), period_tx.clone()],
+                "INSERT INTO user_subscriptions (id, user_id, subscription_id, period, status, expires_at) VALUES (?, ?, ?, ?, 'active', ?)",
+                trailbase_sqlite::params![new_id_bytes.clone(), user_bytes.clone(), sub_bytes.clone(), period_tx.clone(), expires_at],
             )?;
 
             tx.execute(
@@ -136,6 +148,7 @@ pub async fn subscribe_handler(
         subscription_id: subscription_id_b64,
         period,
         status: "active".to_string(),
+        expires_at,
     }))
 }
 
@@ -199,5 +212,6 @@ pub async fn cancel_handler(
         subscription_id: String::new(),
         period: String::new(),
         status: "cancelled".to_string(),
+        expires_at: None,
     }))
 }

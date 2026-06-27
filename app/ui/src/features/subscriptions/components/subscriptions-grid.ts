@@ -53,14 +53,19 @@ export class SubscriptionsGrid extends LitElement {
     this._loading = true;
     this._error = false;
     try {
-      const all = await subscriptionsService.getAll();
       const userSubs = await subscriptionsService.getUserSubscriptions();
       if (this.mode === 'user') {
-        this._items = all
-          .filter(s => userSubs.some(u => u.subscription_id === s.id))
-          .map(s => ({ ...s, userSubscription: userSubs.find(u => u.subscription_id === s.id) }));
+        const subscribed = await subscriptionsService.getSubscribedSubscriptions(userSubs);
+        this._items = subscribed.map(s => ({
+          ...s,
+          userSubscription: userSubs.find(u => u.subscription_id === s.id),
+        }));
       } else {
-        this._items = all.map(s => ({ ...s, userSubscription: userSubs.find(u => u.subscription_id === s.id) }));
+        const all = await subscriptionsService.getAll();
+        this._items = all.map(s => ({
+          ...s,
+          userSubscription: userSubs.find(u => u.subscription_id === s.id),
+        }));
       }
     } catch {
       this._error = true;
