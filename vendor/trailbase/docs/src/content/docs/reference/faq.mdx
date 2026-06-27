@@ -1,0 +1,170 @@
+---
+title: FAQ
+description: Frequently Asked Questions
+---
+
+## Who is TrailBase for?
+
+TrailBase is very flexible and can be a lot to a lot of people. The most
+prominent use-cases is developers or teams, who want to focus on a client-side
+experience (mobile app, progressive web app, desktop, ...) and need a backend
+to solve common challenges for them like persistent relational storage, APIs,
+authentication, file uploads, realtime data updates, logs, background jobs,
+SQL data analysis... .
+
+Besides its features, TrailBase provides other tangible benefits:
+
+* As a small portable single-executable it's easy to deploy *consistently*
+  across environments such as testing, development, and prod.
+  In contrast, spinning up a bunch of services and waiting for them to be
+  healthy may be prohibitive for unit tests leading to inconsistencies lowering
+  the coverage and quality of your tests while slowing you down your overall
+  development.
+* TrailBase is quick, much quicker than many full-stack frameworks.
+  Sub-millisecond response times and high concurrency eliminate the need for
+  dedicated caches.
+  This can simplify your stack and completely eliminating cache invalidation
+  challenges.
+  It may also improve the quality and consistency of your user-facing product.
+* It gives you untethered access to the underlying database allowing you to
+  unleash the full power of SQL or break glass *if and when needed*.
+
+In the end, TrailBase is modular by design, allowing you to use only what you
+need and combine it with other technologies.
+For example, you could use it for auth and relational data and combine it with
+a document store, a queuing system, ... .
+
+
+## Is TrailBase Ready for Production?
+
+Yes and no. TrailBase is well tested but is still new and hasn't seen as much
+mileage as more weathered solutions.
+Especially if you're an enthusiast and working on a project that's not
+literally life-or-death, we're keen to give you hands-on support with quick
+turnarounds smoothing over any sharp edges.
+If you're feeling adventures, TrailBase is incredibly easy to get on and easy
+to get off, if needed.
+No matter your experience, we want to improve and very much welcome your honest
+feedback 🙏.
+
+You can take a look at the early-stage [productionization](/documentation/production) docs.
+
+
+## How is TrailBase Different from PocketBase, Supabase and Others?
+
+Naturally there's a lot of overlap but let's start by saying that we're also
+huge fans of Supabase and PocketBase.
+The former is incredibly versatile, while the latter is incredibly easy and
+cheap to use.
+As far as we can tell, PocketBase pioneered the notion of a single-executable,
+SQLite-based, Firebase-like offering.
+
+*TrailBase tries to combine the flexibility and principled architecture of
+Supabase with the ease and low-overhead of PocketBase*.
+We owe a great debt of gratitude to both ❤️.
+
+TrailBase already provides a comprehensive, similar feature set, is super easy
+to deploy and incredibly [fast](/reference/benchmarks).
+For details, you can check out the more detailed comparisons to both
+[PocketBase](/comparison/pocketbase) and [Supabase](/comparison/supabase).
+
+
+## Scale, Performance and Reliability
+
+As my product grows in size, will TrailBase scale with me or will I hit a wall
+eventually?
+Let's start by reminding ourselves that the *success*-problem is a actually
+great problem to have 🎉.
+
+*Short, hand-wavy answer*: SQLite and TrailBase are incredibly
+[fast](/reference/benchmarks).
+Depending on your workload you may even be able to go further before eventually
+facing very similar issues to other databases.
+Unless you're handling hundreds of thousands of latency-critical, consistent
+writes per second, you will be fine 😶‍🌫️[^1].
+
+*Long answer*: in terms of scaling, SQLite and thus TrailBase are very similar
+to something like Postgres.
+They allow both for "multi-reader, single-writer" horizontal scaling, i.e. both
+allow for read replication.
+The main difference is write-lock granularity, with Postgres having more
+granular ones.
+This added complexity may or may not be a benefit for your workload. In
+practice, SQLite is often taking a sizable lead even for mixed read/write
+workloads [^2].
+
+There are more "truly" horizontal relational solutions such as [vitess](https://vitess.io/),
+however they come with their own challenges such as overhead, operational and
+maintenance costs.
+When applicable, there's an inherent simplicity and beauty to vertical scaling.
+Modern hardware can get you very very far, with not breaking a sweat over tens
+or even hundreds of thousands of concurrent users.
+
+Multi-tenant setups, i.e. partitioning your database by user, are an advanced
+way[^3] to shard horizontally using any technology.
+TrailBase being a small, portable single-executable may simplify such a setup
+with a separate instance per user.
+
+Keep in mind: there's no silver bullet. As you approach massive scale, more
+specialized solutions will come into focus to accelerate specific workflows
+such as caches, document stores or columnar OLAP stores for analytics.
+TrailBase explicitly tries to be modular and avoid tight coupling or lock-in.
+The goal is to let you adopt, extend or even replace TrailBase when and where
+it makes sense.
+
+Scaling aside, horizontal solutions often provide additional benefits such as
+disaster-recovery/fail-over or improved edge read latency.
+Fortunately, both can be achieved with SQLite as well using solutions like
+[LiteStream](https://litestream.io/) keeping eventually consistent copies of
+your data.
+We're also exploring built-in distribution strategies for the future such as
+rqlite, hiqlite, ... .
+
+
+## Can I Add Features to TrailBase?
+
+Yes! First take a look at our coarse [roadmap](/reference/roadmap), maybe we're
+already working on it?
+Otherwise, don't hesitate, just open an issue and ask away. We love to hear
+your thoughts.
+Contributions are also very welcome, let's just talk upfront to avoid any
+surprises.
+Especially, in the early days we'll have to see how "things" fit into the
+roadmap.
+For example, having a dark mode for the dashboard would be nice but it's also
+extra work to maintain while the dashboard is still rapidly changing, so it
+becomes a question of when.
+
+
+## Data Import & Export
+
+Few requirements: `STRICT` table and an auto-incrementing primary key for
+collections but the dashboard will work for any table, view, etc.
+You can simply import and export data with standard SQLite tooling, e.g.:
+
+```shell
+sqlite3 main.db < import.sql
+```
+
+Also check out the [getting started](/getting-started/first-cli-app) guide.
+
+---
+
+[^1]:
+    Reaching that level of performance with other more complex, sharded
+    databases isn't trivial either and comes with its own challenges such as
+    significantly higher operational and maintenance cost.
+    For example, Postgres is great but it
+    [doesn't scale well horizontally for writes](https://fly.io/blog/globally-distributed-postgres/).
+    We'd probably be looking at something like a sizable [vitess](https://vitess.io/)
+    clusters.
+
+[^2]:
+    We don't promote any specific benchmarks here, because Postgres and SQLite
+    are architecturally quite different especially when it comes to
+    communication overhead. Many benchmarks compare apples to oranges and we
+    encourage you to do your own research or even better: benchmark your own
+    workload.
+
+[^3]:
+    Affecting your data model and isn't always applicable.

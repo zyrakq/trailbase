@@ -1,0 +1,21 @@
+{
+  "title": "profiles",
+  "type": "object",
+  "properties": {
+    "user": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "created": {
+      "type": "integer"
+    },
+    "updated": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "username"
+  ]
+}

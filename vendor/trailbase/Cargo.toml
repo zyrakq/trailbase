@@ -1,0 +1,117 @@
+[workspace]
+resolver = "2"
+members = [
+  "client/testfixture/guests/rust",
+  "crates/*",
+  "docs/examples/record_api_rs",
+  "examples/coffee-vector-search/guests/rust",
+  "examples/collab-clicker-ssr/guests/rust",
+  "examples/custom-binary",
+  "examples/wasm-guest-rust",
+]
+default-members = [
+  "crates/assets",
+  "crates/cli",
+  "crates/client",
+  "crates/core",
+  "crates/extension",
+  "crates/qs",
+  "crates/schema",
+  "crates/sqlite",
+  "crates/wasm-runtime-common",
+  "crates/wasm-runtime-host",
+]
+exclude = [
+  "crates/extension-so",
+  # Fork of pgrow2serde depends on external PG setup.
+  "vendor/pgrow2serde",
+]
+
+# https://doc.rust-lang.org/cargo/reference/profiles.html
+[profile.release]
+panic = "unwind"
+opt-level = 3
+# LTO is fun. A few observations:
+# * PGO doesn't work with LTO: https://github.com/llvm/llvm-project/issues/57501
+# * Cranelift doesn't work with LTO: missing symbols during linking.
+# * Setting `lto` to true or "fat" has a significant impact on build times
+#   manifesting as `LLVM_passes` and `finish_ongoing_codegen` in the build
+#   timings. Also increasing the `codegen-units` doesn't seem to have an effect
+#   in "fat"-mode.
+# * In TB benchmarks "fat" did not perform better than "thin" LTO.
+# * However, both "fat" LTO and "codegen-units = 1" reduced binary size. We're
+#   still using it in github releases.
+lto = "thin" # ("off", "thin", "fat")
+codegen-units = 16
+strip = "debuginfo" # ("symbols", "debuginfo", "none")
+
+# Workaround for https://github.com/gwenn/lemon-rs/issues/78. sqlite3-parser
+# requires 1+MB stack frames to parse trivial SQL statements, which is larger
+# than Window's default stack size of 1MB. This is due to the rust compiler not
+# overlapping stack variables of disjoint branches in dev mode and instead
+# allocating them all.
+[profile.dev.package.sqlite3-parser]
+opt-level = 1
+
+[workspace.dependencies]
+askama = { version = "0.16.0", default-features = false, features = ["derive", "std", "config"] }
+axum = { version = "^0.8.1", features = ["multipart"] }
+base64 = { version = "0.22.1", default-features = false, features = ["alloc", "std"] }
+crossfire = { version = "3.1.16", default-features = false, features = ["tokio"] }
+env_logger = { version = "^0.11.8", default-features = false, features = ["auto-color", "humantime"] }
+flume = { version = "0.12.0", default-features = false, features = ["select", "async"] }
+futures-util = { version = "0.3.32", default-features = false, features = ["alloc", "spin"] }
+libsqlite3-sys = { version = "0.37.0", default-features = false, features = ["bundled", "preupdate_hook"] }
+litegis = { version = "0.0.7", default-features = false }
+minijinja = { version = "2.1.2", default-features = false }
+parking_lot = { version = "0.12.3", default-features = false, features = ["send_guard", "arc_lock"] }
+rand = "^0.10.0"
+reqwest = { version = "0.13.1", default-features = false, features = ["rustls", "json"] }
+rusqlite = { version = "0.40.0", default-features = false, features = ["bundled", "cache", "column_decltype", "functions", "backup", "preupdate_hook"] }
+rust-embed = { version = "8.4.0", default-features = false, features = ["mime-guess"] }
+serde = { version = "^1.0.203", features = ["derive", "rc"] }
+serde_json = { version = "^1.0.117" }
+serde_qs = { version = "1.0.0", default-features = false, features = [] }
+serde_rusqlite = "0.43.0"
+sqlite-vec = { git = "https://github.com/ignatz/sqlite-vec", branch = "v0.1.10-alpha.4-fork", default-features = false }
+sqlite3-parser = "0.16.0"
+tokio = { version = "^1.38.0", default-features = false, features = ["fs", "io-std", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-rustls = { version = "0.26.1", default-features = false }
+tracing = { version = "0.1.40", default-features = false }
+tracing-subscriber = { version = "0.3.18", default-features = false, features = ["smallvec", "std", "fmt", "json"] }
+trailbase = { path = "crates/core", version = "0.2.0", default-features = false, features=["wasm", "pg"] }
+trailbase-assets = { path = "crates/assets", version = "0.2.0" }
+trailbase-auth-config = { path = "crates/auth-config", version = "0.0.0" }
+trailbase-auth-ui-component = { path = "crates/auth-ui", version = "0.0.0" }
+trailbase-build = { path = "crates/build", version = "0.1.1" }
+trailbase-client = { path = "crates/client", version = "0.8.0" }
+trailbase-extension = { path = "crates/extension", version = "0.3.0" }
+trailbase-pg-schema = { path = "crates/pg-schema", version = "0.0.1" }
+trailbase-pgrow2serde = { git = "https://github.com/ignatz/pgrow2serde", branch = "main" }
+trailbase-qs = { path = "crates/qs", version = "0.1.0" }
+trailbase-reactive = { path = "crates/reactive", version = "0.1.0" }
+trailbase-refinery = { path = "crates/refinery", version = "0.1.0" }
+trailbase-schema = { path = "crates/schema", version = "0.1.0" }
+trailbase-sqlite = { path = "crates/sqlite", version = "0.3.0", default-features = false }
+trailbase-sqlvalue = { path = "crates/sqlvalue", version = "0.1.0" }
+trailbase-wasi-keyvalue = { path = "crates/wasi-keyvalue", version = "0.1.0" }
+trailbase-wasm = { path = "crates/wasm-runtime-guest", version = "0.5.1" }
+trailbase-wasm-common = { path = "crates/wasm-runtime-common", version = "0.2.0" }
+trailbase-wasm-runtime-host = { path = "crates/wasm-runtime-host", version = "0.1.0" }
+ts-rs = { version = "12", features = ["uuid-impl", "serde-json-impl", "indexmap-impl"] }
+uuid = { version = "1", default-features = false, features = ["std", "v4", "v7", "serde"] }
+wasmtime = { version = "46.0.0", features = ["winch"] }
+wasmtime-wasi = { version = "46.0.0", default-features = false, features = [] }
+wasmtime-wasi-http = { version = "46.0.0", features = [] }
+wasmtime-wasi-io = { version = "46.0.0", features = [] }
+
+# When building TrailBase as a standalone workspace, use local submodule paths.
+# These [patch] sections are ignored when TrailBase is consumed as a dependency
+# by an external workspace (e.g. via git subtree without submodules populated),
+# which falls back to the git sources declared above.
+
+[patch."https://github.com/ignatz/sqlite-vec"]
+sqlite-vec = { path = "vendor/sqlite-vec/bindings/rust" }
+
+[patch."https://github.com/ignatz/pgrow2serde"]
+trailbase-pgrow2serde = { path = "vendor/pgrow2serde" }

@@ -1,0 +1,28 @@
+[package]
+name = "trailbase-refinery"
+version = "0.1.0"
+authors = ["TrailBase <contact@trailabse.io>"]
+description = "Fork of Refinery's refinery-core/macro crates"
+license = "OSL-3.0"
+repository = "https://github.com/trailbaseio/trailbase"
+edition = "2024"
+readme = "../../README.md"
+
+[dependencies]
+async-trait = "0.1"
+cfg-if = "1.0"
+futures = { version = "0.3.16", optional = true, features = ["async-await"] }
+log = "0.4"
+regex = "1"
+rusqlite = { workspace = true }
+siphasher = "1.0"
+thiserror = "2"
+trailbase-sqlite = { workspace = true }
+time = { version = "0.3.5", features = ["parsing", "formatting"] }
+walkdir = "2.3.1"
+
+[dev-dependencies]
+temp-dir = "0.2.0"
+tempfile = "3.1.0"
+tokio = { workspace = true }
+futures-util = { workspace = true }

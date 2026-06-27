@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "bundler",
+    "target": "ESNext",
+    "module": "ESNext",
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": [
+      "@testing-library/jest-dom",
+      "@types/wicg-file-system-access",
+      "vite/client"
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@proto/*": ["./proto/*"],
+      "@bindings/*": ["../bindings/*"],
+      "@templates/*": ["../../templates/*"],
+      "@shared/*": ["../shared/*"]
+    }
+  },
+  "exclude": ["dist/", "node_modules/", "public/"]
+}

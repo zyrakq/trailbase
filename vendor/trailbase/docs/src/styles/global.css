@@ -1,0 +1,68 @@
+@layer base, starlight, theme, components, utilities;
+
+@import "@astrojs/starlight-tailwind";
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme {
+  /* Generated accent color palettes for "Ocean AA". */
+  --color-accent-200: #92d1fe;
+  --color-accent-600: #0073aa;
+  --color-accent-900: #003653;
+  --color-accent-950: #00273d;
+  /* Generated gray color palettes "Ocean AA". */
+  --color-gray-100: #f3f7f9;
+  --color-gray-200: #e7eff2;
+  --color-gray-300: #bac4c8;
+  --color-gray-400: #7b8f96;
+  --color-gray-500: #495c62;
+  --color-gray-700: #2a3b41;
+  --color-gray-800: #182a2f;
+  --color-gray-900: #121a1c;
+}
+
+:root {
+  --overlay-accent: #92d1fe30;
+}
+
+:root[data-theme="dark"] {
+  --overlay-accent: #92d1fe70;
+}
+
+[data-has-hero] .page {
+  background:
+    linear-gradient(215deg, var(--overlay-accent), transparent 40%),
+    radial-gradient(var(--overlay-accent), transparent 40%)
+      no-repeat -60vw -40vh / 105vw 200vh,
+    radial-gradient(var(--overlay-accent), transparent 65%) no-repeat 50%
+      calc(100% + 20rem) / 60rem 30rem;
+}
+
+.card {
+  border-radius: 0.75rem;
+}
+
+[data-has-hero] header {
+  border-bottom: 1px solid transparent;
+  background-color: #ffffffc0;
+  -webkit-backdrop-filter: blur(32px);
+  backdrop-filter: blur(32px);
+}
+
+[data-has-hero][data-theme="dark"] header {
+  border-bottom: 1px solid transparent;
+  background-color: transparent;
+  -webkit-backdrop-filter: blur(32px);
+  backdrop-filter: blur(32px);
+}
+
+@utility image-shine {
+  -webkit-mask: linear-gradient(135deg, #000c 20%, #000, #000c 80%) 100%
+    100%/250% 250%;
+
+  @apply transition-all duration-300;
+
+  @variant hover {
+    -webkit-mask-position: 0 0;
+  }
+}

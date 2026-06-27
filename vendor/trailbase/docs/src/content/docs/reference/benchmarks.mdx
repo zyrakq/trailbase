@@ -1,0 +1,357 @@
+---
+title: Benchmarks
+description: Performance comparison with similar products.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+import {
+  Duration100kInsertsChart,
+  PocketBaseAndTrailBaseReadLatencies,
+  PocketBaseAndTrailBaseInsertLatencies,
+  SupaBaseMemoryUsageChart,
+  SupaBaseCpuUsageChart,
+  PocketBaseAndTrailBaseUsageChart,
+  TrailBaseFileSystemReadLatency,
+  TrailBaseFileSystemWriteLatency,
+  FibonacciPocketBaseAndTrailBaseUsageChart,
+} from "./_benchmarks/benchmarks.tsx";
+
+TrailBase is merely the sum of its parts. It's the result of marrying one of
+the lowest-overhead languages, one of the fastest HTTP servers, and one of the
+lightest relational SQL databases, while mostly avoiding extra expenditures.
+We can expect it to go fast but how fast exactly? Let's compare it to a few
+amazing, and certainly more weathered alternatives such as SupaBase,
+PocketBase, and vanilla SQLite.
+
+<Aside type="note" title="Update: TrailBase v0.9.0+">
+  The SQLite execution model changed in v0.3.0 and caching improved in v0.9.0
+  providing some solid performance gains.
+</Aside>
+
+<Aside type="note" title="Update: PocketBase v0.24+">
+  Insertions got streamlined in recent PocketBase releases providing some 30%
+  uplift in our benchmarks. Most benchmarks are run using v0.25.0.
+  The JS benchmarks use v0.22.21.
+</Aside>
+
+### Disclaimer
+
+Generally benchmarks are tricky, both to do well and to interpret.
+Benchmarks **never show how fast something *can* go but merely how
+fast the author managed to make it go**.
+Micro-benchmarks, especially, offer a key-hole insights, which may be biased
+and may not apply to your workload.
+
+Performance also doesn't exist in a vacuum. If something is super fast but
+doesn't do what you need it to do, performance is an illusive luxury.
+Doing less makes it naturally easier to go fast, which is not a bad thing,
+however means that comparing a highly specialized solution to a more general
+one may be misleading, unfair or irrelevant for you.
+
+We tried our hardest to give all contenders the best shot[^1] [^4].
+If you have any suggestions on how to make anyone go faster, make the comparison more
+apples-to-apples or see any issues,
+[let us know](https://github.com/trailbaseio/trailbase-benchmark).
+Even with a chunky grain of salt, we hope the results can provide some
+interesting insights.
+In the end, nothing beats benchmarking your own setup and workloads.
+
+## Insertion Benchmarks
+
+_Total Time for 100k Insertions_
+
+<div class="flex justify-center">
+  <div class="h-[400px] w-[90%]">
+    <Duration100kInsertsChart client:only="solid-js" />
+  </div>
+</div>
+
+The graph shows the overall time it takes to insert 100k messages into a mock
+*chat-room* table setup, i.e. less is better. Click the labels to toggle
+individual measurements.
+
+Maybe surprisingly, remote TrailBase is slightly quicker than in-process
+vanilla SQLite with drizzle and Node.js[^2].
+This is an apples to oranges comparison and was intended to establish an upper
+bound on the cost incurred by IPC leaving the process boundary[^3] and adding
+features like authorization, i.e. more table look-ups.
+
+Looking at the other, more similar setups, the measurement suggests that for
+this test TrailBase can insert 100k records 170 times faster than Payload[^4],
+almost 40 times faster than SupaBase[^5], and comfortably 11 times faster
+than PocketBase [^1].
+
+### Utilization
+
+The total time of inserting a large batch of data tells only part of the story.
+Let's have a look at resource consumption to get an intuition for provisioning
+or footprint requirements, i.e. what kind of machine one would need:
+
+_TrailBase & PocketBase Utilization_
+
+<div class="flex justify-center">
+  <div class="h-[300px] w-[90%]">
+    <PocketBaseAndTrailBaseUsageChart client:only="solid-js" />
+  </div>
+</div>
+
+The graph shows the CPU utilization and memory consumption (RSS) of both
+PocketBase and TrailBase. Squinting, they look fairly similar apart from
+TrailBase finishing earlier.
+They load roughly 4 to 5 CPUs, with PocketBase's utilization being more
+variable [^6].
+
+In terms of memory consumption, they're also both fairly similar consuming
+between 90MB and 150MB  making them suitable for a tiny VPS or a toaster.
+Note that RSS is not an accurate measure of how much memory a process needs but
+rather how much memory has been allocated from the OS. Allocators will
+typically retrieve large chunks of memory and only occasionally return memory
+based on usage, fragmentation and strategy.
+This is also why the allocated memory doesn't drop after the load goes away.
+Independently, fragmentation is a problem where a garbage-collector running
+compactions can help.
+
+Now shifting to SupaBase, things get a bit more involved due to its
+[layered architecture](https://supabase.com/docs/guides/getting-started/architecture)
+including a dozen separate services providing various functionality:
+
+_SupaBase Memory Usage_
+
+<div class="flex justify-center">
+  <div class="h-[340px] w-[90%]">
+    <SupaBaseMemoryUsageChart client:only="solid-js" />
+  </div>
+</div>
+
+Looking at SupaBase's memory usage, it increased from from roughly 6GB at rest to
+7GB fully loaded.
+This means that out of the box, SupaBase has roughly 50 times the memory
+footprint of either PocketBase or TrailBase.
+In all fairness, a lot of SupaBase's functionality isn't needed for this benchmark
+and it might be possible to shed less critical services, e.g. removing
+*supabase-analytics* would save ~40% of memory.
+That said, we don't know how feasible this is in practice.
+
+_SupaBase CPU utilization_
+
+<div class="flex justify-center">
+  <div class="h-[340px] w-[90%]">
+    <SupaBaseCpuUsageChart client:only="solid-js" />
+  </div>
+</div>
+
+As for CPU usage, one can see it jump up to roughly 9 cores (the benchmark ran
+on a machine with 8 physical cores and 16 threads: 7840U).
+Most of the CPUs seem to be consumed by *supabase-rest*, the API frontend, with
+postgres itself hovering at only about 0.7 cores. Also, *supabase-analytics*
+definitely seems to be in use.
+
+## Read and Write Latency
+
+Let's take a closer look at latency distributions. To keep things manageable
+we'll focus on PocketBase and TrailBase, which are architecturally simpler and
+more comparable. Further, we'll focus on PocketBase's Dart client, which was
+slightly faster than the equivalent JS client.
+
+Comparing the Dart clients, both median read and insert latencies were about 5x
+lower for TrailBase.
+Curiously, TrailBase is fast enough that we're being bottlenecked by the client
+runtime. The minimum latency you can expect from Dart and Node.js is around
+3-5ms.
+Looking at other runtimes, TrailBase's read latencies for C# were 21x lower
+compared to PocketBase and 39x for Rust.
+Insertion latencies were 8x lower for C# and 64x for Rust.
+
+<div class="flex justify-center h-[340px] w-[90%]">
+  <div class="w-[50%]">
+    <PocketBaseAndTrailBaseReadLatencies client:only="solid-js" />
+  </div>
+
+  <div class="w-[50%]">
+    <PocketBaseAndTrailBaseInsertLatencies client:only="solid-js" />
+  </div>
+</div>
+
+Latencies are generally lower for TrailBase.
+With sub-millisecond read latencies at full tilt, TrailBase is in the same
+ballpark as something like Redis, however this is primary data and **not a
+cache!**
+Not needing a dedicated cache eliminates an entire class of issues around
+consistency, invalidation and can greatly simplify a stack.
+
+Looking at the latency distributions we can see that the spread is well
+contained for TrailBase. For PocketBase, read latencies are well contained.
+However, insert latencies show a more significant "tail" with the p90 latency
+being roughly 3 times slower than p50.
+Slower insertions can take north of 100ms. This may be related to GC pauses,
+scheduling, or more generally the same CPU variability we observed earlier.
+
+## Runtimes
+
+[TrailBase went through a transition from a V8-based runtime to a WASM one, which can support many guest languages such as JS, TS and Rust](/blog/switching_to_a_wasm_runtime).
+
+With the new WebAssembly-based runtime, execution of JS relies on bundling an
+interpreter and thus performance has regressed to be roughly on-par with Goja
+and other JIT-less engines.
+However, guests languages that can compile natively to WASM, e.g. Rust, can shine
+with roughly a 135x speed-up with strong state isolation between requests (the
+graph's y-axis is logarithmic).
+
+import { RuntimeFib40Times } from "./_benchmarks/wasm_runtime.tsx";
+
+<div class="flex justify-center">
+  <div class="h-[300px] w-[90%]">
+    <RuntimeFib40Times client:only="solid-js" />
+  </div>
+</div>
+
+## File System
+
+File systems play an important role for the performance of storage systems,
+we'll therefore take a quick at their impact on SQLite/TrailBase's performance.
+
+Note that the numbers aren't directly comparable to the ones above, due to
+being taken on a different machine with more storage options,
+specifically an AMD 8700G with a 2TB WD SN850x NVMe SSD running a 6.12 kernel.
+
+<div class="flex justify-center h-[340px] w-[90%]">
+  <div class="w-[50%]">
+    <TrailBaseFileSystemReadLatency client:only="solid-js" />
+  </div>
+
+  <div class="w-[50%]">
+    <TrailBaseFileSystemWriteLatency client:only="solid-js" />
+  </div>
+</div>
+
+Interestingly, the read performance appears identical suggesting that caching
+is at play w/o much real file system interaction.
+In the future we should rerun with a larger data set to observe the degraded
+performance for when not everything fits into memory anymore.
+Yet, most queries being cached is a not too uncommon reality and it's
+reassuring to see that caches are indeed working independent of the file system
+😅.
+
+The write latencies are bit more interesting. Unsurprisingly modern
+copy-on-write (CoW) file systems have a bit more overhead. The relative ranking
+is roughly in line with
+[Phoronix'](https://www.phoronix.com/review/linux-611-filesystems/2)
+results[^7], with the added OpenZFS (2.2.7) falling in line with its peers.
+Also, the differences are attenuated due to the constant overhead TrailBase
+adds over vanilla SQLite.
+
+We won't discuss the specific trade-offs and baggage coming with each file
+system but hope that the numbers can help guide the optimization of your own
+production setup.
+In the end its a trade-off between performance, maturity, reliability, physical
+disc space and feature sets. For example, CoW snapshots may or may not be
+important to you.
+
+
+{/*
+
+## JavaScript
+
+The benchmark sets up a custom HTTP endpoint `/fibonacci?n=<N>` using the same
+slow recursive Fibonacci
+[implementation](https://github.com/trailbaseio/trailbase-benchmark/blob/main/setups/trailbase/traildepot/scripts/index.ts)
+for both, PocketBase and TrailBase.
+This is meant as a proxy for a computationally heavy workload to primarily
+benchmark the performance of the underlying JavaScript engines:
+[goja](https://github.com/dop251/goja) for PocketBase and [V8](https://v8.dev/) for TrailBase.
+In other words, the impact of any overhead within PocketBase or TrailBase is
+diminished by the time it takes to compute `fibonacci(N)` for sufficiently
+large `N`.
+
+We found that for `N=40`, V8 (TrailBase) is around 40 times faster than
+goja (PocketBase):
+
+<div class="flex justify-center">
+  <div class="h-[300px] w-[90%]">
+    <FibonacciPocketBaseAndTrailBaseUsageChart client:only="solid-js" />
+  </div>
+</div>
+
+Interestingly, PocketBase has an initial warm-up of ~30s where it doesn't
+parallelize.
+Not being familiar with [goja's](https://github.com/dop251/goja) execution model,
+one would expect similar behavior for a conservative JIT threshold in
+combination with a global interpreter lock 🤷.
+However, even after using all cores completing the benchmark takes
+significantly longer.
+
+With the addition of V8 to TrailBase, we've experienced a significant increase
+in the memory baseline dominating the overall footprint.
+In this setup, TrailBase consumes roughly 4 times more memory than PocketBase.
+If memory footprint is a major concern for you, constraining the number of V8
+threads will be an effective remedy (`--runtime-threads`).
+
+*/}
+
+{/*
+Output:
+  TB: Called "/fibonacci" for fib(40) 100 times, took 0:00:14.988703 (limit=64)
+  PB: Called "/fibonacci" for fib(40) 100 times, took 0:10:01.096053 (limit=64)
+*/}
+
+## Final Words
+
+We're very happy to confirm that TrailBase's APIs and WASM runtime are quick.
+The significant performance gap we observed for API access is a consequence of
+how fast SQLite itself is making even small overheads matter that much more.
+
+With the numbers fresh off the press, prudence is of the essence and ultimately
+nothing beats benchmarking your own setup and workloads.
+In any case, we hope this was at least somewhat insightful. Let us know if you see
+anything that can or should be improved.
+The benchmarks are available on [GitHub](https://github.com/trailbaseio/trailbase-benchmark).
+
+---
+
+[^1]:
+    Trying to give PocketBase the best chance, we built v0.25.0 with the
+    latest go compiler (v1.23.5 at the time of writing), the mattn/go-sqlite3 driver
+    (which based on PB's docs uses a faster C-based SQLite driver)
+    and `GOAMD64=v4` (for less portable but more aggressive CPU optimizations).
+
+[^2]:
+    Our setup with drizzle and node.js is certainly not the fastest possible.
+    For example, we could drop down to SQLite in C or another low-level
+    language with less FFI overhead.
+    That said, drizzle is a great popular choice which mostly serves as a
+    point-of-reference and sanity check.
+
+[^3]:
+    The actual magnitude on IPC overhead will depend on the communication cost.
+    For the our benchmarks we were using the loopback network device.
+
+[^4]:
+    We picked Payload as representative of popular Node.js CMS, which
+    [itself claims](https://payloadcms.com/blog/performance-benchmarks)
+    to be many times faster than popular options like Strapi or Directus.
+    We were using a v3 pre-release, as recommended, also using the
+    SQLite/drizzle database adapter marked as beta.
+    We manually turned on WAL mode and filed an issue with payload, otherwise
+    stock payload was ~300x slower. That said, we've seen drizzle perform
+    very well meaning there's probably something very wrong here. Given the
+    magnitude, the competition would have likely performed better.
+
+[^5]:
+    The SupaBase benchmark setup skips row-level access checks. Technically,
+    this is in its favor from a performance standpoint, however looking at the
+    overall load on its constituents with PG being only a sliver, it probably
+    would not make much of an overall difference nor would PG17's vectorization,
+    which has been released since the benchmarks were run. That said, these
+    claims deserve re-validation.
+
+[^6]:
+    We're unsure as to what causes these 1-core swings.
+    Runtime-effects, such as garbage collection, may have an effect, however we
+    would have expected these to show on shorter time-scales.
+    This could also indicate a contention or thrashing issue 🤷.
+
+[^7]:
+    Despite being close, XFS' and ext4's relative ranking is swapped, which
+    could be due to a variety of reason like mount options, kernel version,
+    hardware, ...

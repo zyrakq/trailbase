@@ -1,0 +1,1106 @@
+use askama::Template;
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::sync::Arc;
+use trailbase_schema::metadata::{
+  ColumnMetadata, ConnectionMetadata, TableMetadata, ViewMetadata, find_file_column_indexes,
+  find_user_id_foreign_key_columns,
+};
+use trailbase_schema::{QualifiedName, QualifiedNameEscaped};
+use trailbase_sqlite::{Connection, ConnectionType, NamedParams, SyncConnectionTrait, Value};
+
+use crate::auth::user::User;
+use crate::config::proto::{ConflictResolutionStrategy, RecordApiConfig};
+use crate::constants::USER_TABLE;
+use crate::records::params::{LazyParams, Params};
+use crate::records::util::named_placeholder;
+use crate::records::{Permission, RecordError};
+
+#[derive(Debug)]
+pub(crate) struct RecordApiSchema {
+  /// Schema metadata
+  qualified_name: QualifiedName,
+  table_name: QualifiedNameEscaped,
+  attached_databases: Vec<String>,
+
+  is_table: bool,
+  record_pk_column: ColumnMetadata,
+  column_metadata: Vec<ColumnMetadata>,
+
+  has_file_columns: bool,
+  user_id_columns: Vec<usize>,
+
+  // Helpers:
+
+  // SQLite parameter emplate
+  named_params_template: NamedParams,
+  // Mapping form column name to *API column index*.
+  // NOTE: The index may be different from the column's index in the underlying TABLE or VIEW
+  // due to excluded columns.
+  column_name_to_index: HashMap<String, usize>,
+}
+
+// type DeferredAclCheck<T: SyncConnectionTrait> =
+//   Box<dyn (FnOnce(&T) -> Result<(), RecordError>) + Send>;
+
+impl RecordApiSchema {
+  fn from_table(table_metadata: &TableMetadata, config: &RecordApiConfig) -> Result<Self, String> {
+    assert_name(config, table_metadata.name());
+
+    let Some(record_pk_column) = table_metadata.record_pk_column() else {
+      return Err("RecordApi requires integer/UUIDv7 primary key column".into());
+    };
+
+    let column_metadata = filter_excluded_columns(config, &table_metadata.column_metadata);
+    let has_file_columns = !find_file_column_indexes(&column_metadata).is_empty();
+    let user_id_columns = find_user_id_foreign_key_columns(&column_metadata, USER_TABLE);
+
+    let column_name_to_index = HashMap::<String, usize>::from_iter(
+      column_metadata
+        .iter()
+        .enumerate()
+        .map(|(index, meta)| (meta.column.name.clone(), index)),
+    );
+
+    let named_params_template: NamedParams = column_metadata
+      .iter()
+      .map(|meta| {
+        (
+          Cow::Owned(named_placeholder(&meta.column.name)),
+          trailbase_sqlite::Value::Null,
+        )
+      })
+      .collect();
+
+    return Ok(Self {
+      qualified_name: table_metadata.schema.name.clone(),
+      table_name: QualifiedNameEscaped::new(&table_metadata.schema.name),
+      attached_databases: config.attached_databases.clone(),
+      is_table: true,
+      record_pk_column: record_pk_column.clone(),
+      column_metadata,
+      has_file_columns,
+      user_id_columns,
+      column_name_to_index,
+      named_params_template,
+    });
+  }
+
+  fn from_view(view_metadata: &ViewMetadata, config: &RecordApiConfig) -> Result<Self, String> {
+    assert_name(config, view_metadata.name());
+
+    let Some(record_pk_column) = view_metadata.record_pk_column() else {
+      return Err(format!(
+        "RecordApi requires integer/UUIDv7 primary key column: {config:?}"
+      ));
+    };
+
+    let Some(ref column_metadata) = view_metadata.column_metadata else {
+      return Err("RecordApi requires schema".to_string());
+    };
+
+    let column_metadata = filter_excluded_columns(config, column_metadata);
+    let has_file_columns = !find_file_column_indexes(&column_metadata).is_empty();
+    let user_id_columns = find_user_id_foreign_key_columns(&column_metadata, USER_TABLE);
+
+    let column_name_to_index = HashMap::<String, usize>::from_iter(
+      column_metadata
+        .iter()
+        .enumerate()
+        .map(|(index, meta)| (meta.column.name.clone(), index)),
+    );
+
+    return Ok(Self {
+      qualified_name: view_metadata.schema.name.clone(),
+      table_name: QualifiedNameEscaped::new(&view_metadata.schema.name),
+      attached_databases: config.attached_databases.clone(),
+      is_table: false,
+      record_pk_column: record_pk_column.clone(),
+      column_metadata: column_metadata.clone(),
+      has_file_columns,
+      user_id_columns,
+      column_name_to_index,
+      named_params_template: NamedParams::new(),
+    });
+  }
+}
+
+#[derive(Clone)]
+pub struct RecordApi {
+  state: Arc<RecordApiState>,
+}
+
+struct RecordApiState {
+  /// Cached connection for access checks and subscription state construction.
+  conn: Arc<trailbase_sqlite::Connection>,
+  /// Cached connection metadata.
+  metadata: Arc<ConnectionMetadata>,
+
+  /// Schema metadata
+  schema: RecordApiSchema,
+
+  // Below properties are filled from `proto::RecordApiConfig`.
+  api_name: String,
+  acl: [u8; 2],
+  insert_conflict_resolution_strategy: Option<ConflictResolutionStrategy>,
+  insert_autofill_missing_user_id_columns: bool,
+  enable_subscriptions: bool,
+
+  // Foreign key expansion configuration. Affects schema.
+  expand: Option<HashMap<String, serde_json::Value>>,
+
+  listing_hard_limit: Option<usize>,
+
+  // Open question: right now the read_access rule is also used for listing. It might be nice to
+  // allow different permissions, however there's a risk of listing records w/o read access.
+  // Arguably, this could always be modeled as two APIs with different permissions on the same
+  // table.
+  read_access_rule: Option<String>,
+  read_access_query: Option<Arc<str>>,
+  subscription_read_access_query: Option<String>,
+
+  create_access_query: Option<Arc<str>>,
+  update_access_query: Option<Arc<str>>,
+  delete_access_query: Option<Arc<str>>,
+  schema_access_query: Option<Arc<str>>,
+}
+
+impl RecordApiState {
+  pub(crate) fn from_table(
+    conn: Arc<Connection>,
+    metadata: Arc<ConnectionMetadata>,
+    table_metadata: &TableMetadata,
+    config: RecordApiConfig,
+  ) -> Result<Self, String> {
+    assert_name(&config, table_metadata.name());
+
+    return Self::from_impl(
+      conn,
+      metadata,
+      RecordApiSchema::from_table(table_metadata, &config)?,
+      config,
+    );
+  }
+
+  pub(crate) fn from_view(
+    conn: Arc<Connection>,
+    metadata: Arc<ConnectionMetadata>,
+    view_metadata: &ViewMetadata,
+    config: RecordApiConfig,
+  ) -> Result<Self, String> {
+    assert_name(&config, view_metadata.name());
+
+    return Self::from_impl(
+      conn,
+      metadata,
+      RecordApiSchema::from_view(view_metadata, &config)?,
+      config,
+    );
+  }
+
+  fn from_impl(
+    conn: Arc<Connection>,
+    metadata: Arc<ConnectionMetadata>,
+    schema: RecordApiSchema,
+    config: RecordApiConfig,
+  ) -> Result<Self, String> {
+    let Some(api_name) = config.name.clone() else {
+      return Err(format!("RecordApi misses name: {config:?}"));
+    };
+
+    let (read_access_query, subscription_read_access_query) = match &config.read_access_rule {
+      Some(rule) => {
+        let read_access_query = build_read_delete_schema_query(
+          conn.connection_type(),
+          &schema.table_name,
+          &schema.record_pk_column.column.name,
+          rule,
+        );
+
+        let subscription_read_access_query = if schema.is_table {
+          Some(
+            SubscriptionRecordReadTemplate {
+              read_access_rule: rule,
+              column_names: schema
+                .column_metadata
+                .iter()
+                .map(|m| m.column.name.as_str())
+                .collect(),
+            }
+            .render()
+            .map_err(|err| err.to_string())?,
+          )
+        } else {
+          None
+        };
+
+        (Some(read_access_query), subscription_read_access_query)
+      }
+      None => (None, None),
+    };
+
+    let delete_access_query = config.delete_access_rule.as_ref().map(|rule| {
+      build_read_delete_schema_query(
+        conn.connection_type(),
+        &schema.table_name,
+        &schema.record_pk_column.column.name,
+        rule,
+      )
+    });
+
+    let schema_access_query = config.schema_access_rule.as_ref().map(|rule| {
+      build_read_delete_schema_query(
+        conn.connection_type(),
+        &schema.table_name,
+        &schema.record_pk_column.column.name,
+        rule,
+      )
+    });
+
+    let create_access_query = match &config.create_access_rule {
+      Some(rule) => {
+        if schema.is_table {
+          Some(build_create_access_query(
+            conn.connection_type(),
+            &schema.column_metadata,
+            rule,
+          )?)
+        } else {
+          None
+        }
+      }
+      None => None,
+    };
+
+    let update_access_query = match &config.update_access_rule {
+      Some(rule) => {
+        if schema.is_table {
+          Some(build_update_access_query(
+            conn.connection_type(),
+            &schema.table_name,
+            &schema.column_metadata,
+            &schema.record_pk_column.column.name,
+            rule,
+          )?)
+        } else {
+          None
+        }
+      }
+      None => None,
+    };
+
+    return Ok(RecordApiState {
+      conn,
+      metadata,
+
+      schema,
+
+      // proto::RecordApiConfig properties below:
+      api_name,
+
+      // Insert- specific options.
+      insert_conflict_resolution_strategy: config
+        .conflict_resolution
+        .and_then(|cr| cr.try_into().ok()),
+      insert_autofill_missing_user_id_columns: config
+        .autofill_missing_user_id_columns
+        .unwrap_or(false),
+      enable_subscriptions: config.enable_subscriptions.unwrap_or(false),
+
+      expand: if config.expand.is_empty() {
+        None
+      } else {
+        Some(
+          config
+            .expand
+            .iter()
+            .map(|col_name| (col_name.to_string(), serde_json::Value::Null))
+            .collect(),
+        )
+      },
+
+      listing_hard_limit: config.listing_hard_limit.map(|l| l as usize),
+
+      // Access control lists.
+      acl: [
+        convert_acl(&config.acl_world),
+        convert_acl(&config.acl_authenticated),
+      ],
+      // Access rules.
+      //
+      // Create:
+
+      // The raw read rule is needed to construct list queries.
+      read_access_rule: config.read_access_rule,
+      read_access_query,
+      subscription_read_access_query,
+
+      create_access_query,
+      update_access_query,
+      delete_access_query,
+      schema_access_query,
+    });
+  }
+
+  #[inline]
+  fn cached_access_query(&self, p: Permission) -> Option<Arc<str>> {
+    return match p {
+      Permission::Create => self.create_access_query.clone(),
+      Permission::Read => self.read_access_query.clone(),
+      Permission::Update => self.update_access_query.clone(),
+      Permission::Delete => self.delete_access_query.clone(),
+      Permission::Schema => self.schema_access_query.clone(),
+    };
+  }
+}
+
+impl RecordApi {
+  pub(crate) fn build(
+    conn: Arc<trailbase_sqlite::Connection>,
+    metadata: Arc<trailbase_schema::metadata::ConnectionMetadata>,
+    config: RecordApiConfig,
+  ) -> Result<Self, String> {
+    let table_name = QualifiedName::parse(config.table_name()).map_err(|err| err.to_string())?;
+
+    if let Some(table_metadata) = metadata.get_table(&table_name) {
+      return Ok(Self {
+        state: Arc::new(RecordApiState::from_table(
+          conn,
+          metadata.clone(),
+          table_metadata,
+          config,
+        )?),
+      });
+    } else if let Some(view_metadata) = metadata.get_view(&table_name) {
+      return Ok(Self {
+        state: Arc::new(RecordApiState::from_view(
+          conn,
+          metadata.clone(),
+          view_metadata,
+          config,
+        )?),
+      });
+    }
+
+    return Err(format!(
+      "RecordApi references missing table/view: {config:?}"
+    ));
+  }
+
+  #[inline]
+  pub fn api_name(&self) -> &str {
+    &self.state.api_name
+  }
+
+  #[inline]
+  pub fn qualified_name(&self) -> &QualifiedName {
+    return &self.state.schema.qualified_name;
+  }
+
+  #[inline]
+  pub fn table_name(&self) -> &QualifiedNameEscaped {
+    return &self.state.schema.table_name;
+  }
+
+  pub fn attached_databases(&self) -> &[String] {
+    return &self.state.schema.attached_databases;
+  }
+
+  pub fn conn(&self) -> &Arc<trailbase_sqlite::Connection> {
+    return &self.state.conn;
+  }
+
+  // NOTE: We use this for expansions when we follow FKs (read, list, json schema) as well as
+  // constructing per-connection subscription state (though this could probably be untangled).
+  pub(crate) fn connection_metadata(&self) -> &Arc<ConnectionMetadata> {
+    return &self.state.metadata;
+  }
+
+  #[inline]
+  pub fn has_file_columns(&self) -> bool {
+    return self.state.schema.has_file_columns;
+  }
+
+  #[inline]
+  pub fn user_id_columns(&self) -> &[usize] {
+    return &self.state.schema.user_id_columns;
+  }
+
+  #[inline]
+  pub(crate) fn expand(&self) -> Option<&HashMap<String, serde_json::Value>> {
+    return self.state.expand.as_ref();
+  }
+
+  #[inline]
+  pub fn record_pk_column(&self) -> &ColumnMetadata {
+    return &self.state.schema.record_pk_column;
+  }
+
+  #[inline]
+  pub fn columns(&self) -> &[ColumnMetadata] {
+    return &self.state.schema.column_metadata;
+  }
+
+  #[inline]
+  pub fn is_table(&self) -> bool {
+    return self.state.schema.is_table;
+  }
+
+  #[inline]
+  pub fn column_index_by_name(&self, name: &str) -> Option<usize> {
+    return self.state.schema.column_name_to_index.get(name).copied();
+  }
+
+  #[inline]
+  pub fn column_metadata_by_name(&self, name: &str) -> Option<&ColumnMetadata> {
+    return Some(&self.state.schema.column_metadata[self.column_index_by_name(name)?]);
+  }
+
+  pub fn primary_key_to_value(&self, pk: String) -> Result<Value, RecordError> {
+    // NOTE: loosly parse - will convert STRING to INT/REAL.
+    return trailbase_schema::json::parse_string_to_sqlite_value(
+      self.state.schema.record_pk_column.column.data_type,
+      pk,
+    )
+    .map_err(|_| RecordError::BadRequest("Invalid id"));
+  }
+
+  #[inline]
+  pub fn read_access_rule(&self) -> Option<&str> {
+    return self.state.read_access_rule.as_deref();
+  }
+
+  #[inline]
+  pub fn listing_hard_limit(&self) -> Option<usize> {
+    return self.state.listing_hard_limit;
+  }
+
+  #[inline]
+  pub fn insert_autofill_missing_user_id_columns(&self) -> bool {
+    return self.state.insert_autofill_missing_user_id_columns;
+  }
+
+  #[inline]
+  pub fn enable_subscriptions(&self) -> bool {
+    return self.state.enable_subscriptions;
+  }
+
+  #[inline]
+  pub fn insert_conflict_resolution_strategy(&self) -> Option<ConflictResolutionStrategy> {
+    return self.state.insert_conflict_resolution_strategy;
+  }
+
+  /// Check if the given user (if any) can access a record given the request and the operation.
+  pub async fn check_record_level_access(
+    &self,
+    p: Permission,
+    record_id: Option<&Value>,
+    request_params: Option<&mut LazyParams<'_>>,
+    user: Option<&User>,
+  ) -> Result<(), RecordError> {
+    // First check table level access and if present check row-level access based on access rule.
+    self.check_table_level_access(p, user)?;
+
+    let Some(access_query) = self.state.cached_access_query(p) else {
+      return Ok(());
+    };
+
+    if self
+      .check_record_level_access_impl(
+        access_query,
+        self.build_named_params(p, record_id, request_params, user)?,
+      )
+      .await
+    {
+      return Ok(());
+    }
+
+    return Err(RecordError::Forbidden);
+  }
+
+  pub fn record_level_access_check<T: SyncConnectionTrait>(
+    &self,
+    conn: &mut T,
+    p: Permission,
+    record_id: Option<&Value>,
+    request_params: Option<&mut LazyParams<'_>>,
+    user: Option<&User>,
+  ) -> Result<(), RecordError> {
+    // First check table level access and if present check row-level access based on access rule.
+    self.check_table_level_access(p, user)?;
+
+    let Some(access_query) = self.state.cached_access_query(p) else {
+      return Ok(());
+    };
+
+    let params = self.build_named_params(p, record_id, request_params, user)?;
+
+    return match conn
+      .query_row(access_query, params)
+      .ok()
+      .and_then(|row| row.and_then(|r| r.get::<bool>(0).ok()))
+    {
+      Some(allowed) if allowed => Ok(()),
+      _ => Err(RecordError::Forbidden),
+    };
+  }
+
+  #[inline]
+  async fn check_record_level_access_impl(
+    &self,
+    query: impl AsRef<str> + Send + 'static,
+    params: impl trailbase_sqlite::Params + Send + 'static,
+  ) -> bool {
+    // TODO: Remove query from debug_assert and thus the extra allocation.
+    let q = query.as_ref().to_string();
+
+    return match self.state.conn.read_query_row_get(query, params, 0).await {
+      Ok(Some(allowed)) => allowed,
+      Ok(None) => {
+        debug_assert!(false, "RLA query '{q}' returned no result");
+
+        false
+      }
+      Err(err) => {
+        debug_assert!(false, "RLA query '{q}' failed: {err}");
+
+        false
+      }
+    };
+  }
+
+  /// Check if the given user (if any) can access a record given the request and the operation.
+  ///
+  /// QUESTION: Could we structure this in a way that we yield less in case there's no read-access
+  /// rule, e.g. sync and return (yikes):
+  ///   `Result<Option<Box<dyn Future<Output=Result<(), RecordError>>>>, RecordErrorr>`
+  #[inline]
+  pub(crate) async fn check_record_level_read_access_for_subscriptions(
+    &self,
+    record: &Arc<indexmap::IndexMap<String, trailbase_sqlite::Value>>,
+    user: Option<&User>,
+  ) -> Result<(), RecordError> {
+    // First check table level access and if present check row-level access based on access rule.
+    self.check_table_level_access(Permission::Read, user)?;
+
+    let Some(ref access_query) = self.state.subscription_read_access_query else {
+      return Ok(());
+    };
+
+    let params = SubscriptionAclParams {
+      params: record.clone(),
+      user: user.cloned(),
+    };
+
+    if self
+      .check_record_level_access_impl(access_query.clone(), params)
+      .await
+    {
+      return Ok(());
+    }
+
+    return Err(RecordError::Forbidden);
+  }
+
+  #[inline]
+  pub fn check_table_level_access(
+    &self,
+    p: Permission,
+    user: Option<&User>,
+  ) -> Result<(), RecordError> {
+    if (user.is_some() && self.has_access(Entity::Authenticated, p))
+      || self.has_access(Entity::World, p)
+    {
+      return Ok(());
+    }
+
+    return Err(RecordError::Forbidden);
+  }
+
+  #[inline]
+  fn has_access(&self, e: Entity, p: Permission) -> bool {
+    return (self.state.acl[e as usize] & (p as u8)) > 0;
+  }
+
+  // TODO: We should probably break this up into separate functions for CRUD, to only do and inject
+  // what's actually needed. Maybe even break up the entire check_access_and_rls_then. It's pretty
+  // winding right now.
+  // TODO: It may be cheaper to implement trailbase_sqlite::Params for LazyParams than convert to
+  // NamedParams :shrug:.
+  fn build_named_params(
+    &self,
+    p: Permission,
+    record_id: Option<&Value>,
+    request_params: Option<&mut LazyParams<'_>>,
+    user: Option<&User>,
+  ) -> Result<NamedParams, RecordError> {
+    // We need to inject context like: record id, user, request, and row into the access
+    // check. Below we're building the query and binding the context as params accordingly.
+    let mut params = match p {
+      Permission::Create | Permission::Update => {
+        // Create and update cannot write to views.
+        if !self.is_table() {
+          return Err(RecordError::ApiRequiresTable);
+        };
+
+        let (named_params, column_names, column_indexes) = match request_params
+          .ok_or_else(|| RecordError::Internal("missing insert params".into()))?
+          .params()
+          .map_err(|_| RecordError::BadRequest("invalid params"))?
+        {
+          Params::Insert {
+            named_params,
+            column_names,
+            column_indexes,
+            ..
+          } => {
+            assert_eq!(p, Permission::Create);
+            (named_params, column_names, column_indexes)
+          }
+          Params::Update {
+            named_params,
+            column_names,
+            column_indexes,
+            ..
+          } => {
+            assert_eq!(p, Permission::Update);
+            (named_params, column_names, column_indexes)
+          }
+        };
+
+        assert_eq!(column_names.len(), column_indexes.len());
+
+        // NOTE: We cannot have access queries access missing _REQ_.props. So we need to inject an
+        // explicit NULL value for all missing fields on the request. Can we make this cheaper,
+        // either by pre-processing the access query or improving construction?
+        let mut all_named_params = self.state.schema.named_params_template.clone();
+
+        for (index, column_index) in column_indexes.iter().enumerate() {
+          // Override the default NULL value with the request value.
+          all_named_params[*column_index].1 = named_params[index].1.clone();
+        }
+
+        all_named_params.push((
+          Cow::Borrowed(":__fields"),
+          Value::Text(serde_json::to_string(&column_names).expect("json array")),
+        ));
+
+        all_named_params
+      }
+      Permission::Read | Permission::Delete | Permission::Schema => NamedParams::with_capacity(2),
+    };
+
+    params.push((
+      Cow::Borrowed(":__user_id"),
+      user.map_or(Value::Null, |u| Value::Blob(u.uuid.into())),
+    ));
+    params.push((
+      Cow::Borrowed(":__record_id"),
+      record_id.map_or(Value::Null, |id| id.clone()),
+    ));
+
+    return Ok(params);
+  }
+}
+
+struct SubscriptionAclParams {
+  params: Arc<indexmap::IndexMap<String, trailbase_sqlite::Value>>,
+  user: Option<User>,
+}
+
+impl trailbase_sqlite::Params for SubscriptionAclParams {
+  fn bind<S: trailbase_sqlite::Statement>(
+    self,
+    stmt: &mut S,
+  ) -> Result<(), trailbase_sqlite::Error> {
+    for (name, v) in self.params.iter() {
+      if let Some(idx) = stmt.parameter_index(&named_placeholder(name))? {
+        stmt.bind_parameter(idx, v.into())?;
+      };
+    }
+
+    if let Some(user) = self.user
+      && let Some(idx) = stmt.parameter_index(":__user_id")?
+    {
+      stmt.bind_parameter(idx, trailbase_sqlite::Value::Blob(user.uuid.into()).into())?;
+    }
+
+    return Ok(());
+  }
+}
+
+#[derive(Template)]
+#[template(
+  escape = "none",
+  whitespace = "minimize",
+  path = "subscription_record_read.sql"
+)]
+struct SubscriptionRecordReadTemplate<'a> {
+  read_access_rule: &'a str,
+  column_names: Vec<&'a str>,
+}
+
+/// Build access query for record reads, deletes and query access.
+///
+/// Assumes access_rule is an expression: https://www.sqlite.org/syntax/expr.html
+fn build_read_delete_schema_query(
+  connection_type: ConnectionType,
+  qualified_table_name: &QualifiedNameEscaped,
+  pk_column_name: &str,
+  access_rule: &str,
+) -> Arc<str> {
+  return match connection_type {
+    ConnectionType::Pg => format!(
+      "\
+      SELECT \
+        CAST(({access_rule}) AS INTEGER) \
+      FROM \
+        (SELECT CAST(:__user_id AS uuid) AS id) AS _USER_, \
+        (SELECT * FROM {qualified_table_name} WHERE \"{pk_column_name}\" = :__record_id) AS _ROW_ \
+    ",
+    )
+    .into(),
+    ConnectionType::Sqlite => format!(
+      "\
+      SELECT \
+        CAST(({access_rule}) AS INTEGER) \
+      FROM \
+        (SELECT :__user_id AS id) AS _USER_, \
+        (SELECT * FROM {qualified_table_name} WHERE \"{pk_column_name}\" = :__record_id) AS _ROW_ \
+    ",
+    )
+    .into(),
+  };
+}
+
+#[derive(Template)]
+#[template(
+  escape = "none",
+  whitespace = "minimize",
+  path = "create_record_access_query.sql"
+)]
+struct CreateRecordAccessQueryTemplateSqlite<'a> {
+  create_access_rule: &'a str,
+  column_metadata: &'a [ColumnMetadata],
+}
+
+#[derive(Template)]
+#[template(
+  escape = "none",
+  whitespace = "minimize",
+  path = "create_record_access_query_pg.sql"
+)]
+struct CreateRecordAccessQueryTemplatePg<'a> {
+  create_access_rule: &'a str,
+  column_metadata: &'a [ColumnMetadata],
+}
+
+/// Build access query for record creation.
+///
+/// Assumes access_rule is an expression: https://www.sqlite.org/syntax/expr.html
+#[inline]
+fn build_create_access_query(
+  connection_type: ConnectionType,
+  column_metadata: &[ColumnMetadata],
+  create_access_rule: &str,
+) -> Result<Arc<str>, String> {
+  return Ok(match connection_type {
+    ConnectionType::Sqlite => CreateRecordAccessQueryTemplateSqlite {
+      create_access_rule,
+      column_metadata,
+    }
+    .render()
+    .map_err(|err| err.to_string())?
+    .into(),
+    ConnectionType::Pg => CreateRecordAccessQueryTemplatePg {
+      create_access_rule,
+      column_metadata,
+    }
+    .render()
+    .map_err(|err| err.to_string())?
+    .into(),
+  });
+}
+
+#[derive(Template)]
+#[template(
+  escape = "none",
+  whitespace = "minimize",
+  path = "update_record_access_query.sql"
+)]
+struct UpdateRecordAccessQueryTemplateSqlite<'a> {
+  update_access_rule: &'a str,
+  table_name: &'a QualifiedNameEscaped,
+  pk_column_name: &'a str,
+  column_metadata: &'a [ColumnMetadata],
+}
+
+#[derive(Template)]
+#[template(
+  escape = "none",
+  whitespace = "minimize",
+  path = "update_record_access_query_pg.sql"
+)]
+struct UpdateRecordAccessQueryTemplatePg<'a> {
+  update_access_rule: &'a str,
+  table_name: &'a QualifiedNameEscaped,
+  pk_column_name: &'a str,
+  column_metadata: &'a [ColumnMetadata],
+}
+
+/// Build access query for record updates.
+///
+/// Assumes access_rule is an expression: https://www.sqlite.org/syntax/expr.html
+#[inline]
+fn build_update_access_query(
+  connection_type: ConnectionType,
+  table_name: &QualifiedNameEscaped,
+  column_metadata: &[ColumnMetadata],
+  pk_column_name: &str,
+  update_access_rule: &str,
+) -> Result<Arc<str>, String> {
+  return Ok(match connection_type {
+    ConnectionType::Sqlite => UpdateRecordAccessQueryTemplateSqlite {
+      update_access_rule,
+      table_name,
+      pk_column_name,
+      column_metadata,
+    }
+    .render()
+    .map_err(|err| err.to_string())?
+    .into(),
+    ConnectionType::Pg => UpdateRecordAccessQueryTemplatePg {
+      update_access_rule,
+      table_name,
+      pk_column_name,
+      column_metadata,
+    }
+    .render()
+    .map_err(|err| err.to_string())?
+    .into(),
+  });
+}
+
+fn convert_acl(acl: &Vec<i32>) -> u8 {
+  let mut value: u8 = 0;
+  for flag in acl {
+    value |= *flag as u8;
+  }
+  return value;
+}
+
+// Note: ACLs and entities are only enforced on the table-level, this owner (row-level concept) is
+// not here.
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Entity {
+  World = 0,
+  Authenticated = 1,
+}
+
+fn filter_excluded_columns(
+  config: &RecordApiConfig,
+  column_metadata: &[ColumnMetadata],
+) -> Vec<ColumnMetadata> {
+  if config.excluded_columns.is_empty() {
+    return column_metadata.to_vec();
+  }
+
+  return column_metadata
+    .iter()
+    .filter_map(|meta| {
+      if config.excluded_columns.contains(&meta.column.name) {
+        return None;
+      }
+      return Some(meta.clone());
+    })
+    .collect();
+}
+
+#[inline]
+fn assert_name(config: &RecordApiConfig, name: &QualifiedName) {
+  // QUESTION: Should this be disabled in prod? This can only trigger during start and config
+  // reload.
+  match name.database_schema.as_deref() {
+    Some(db) if db != "main" && db != "public" => {
+      assert_eq!(
+        config.table_name.as_deref().unwrap_or_default(),
+        format!("{db}.{}", name.name)
+      );
+    }
+    _ => {
+      assert_eq!(config.table_name.as_deref().unwrap_or_default(), &name.name);
+    }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use trailbase_schema::sqlite::QualifiedName;
+  use trailbase_schema::{parse::parse_into_statement, sqlite::Column};
+
+  use super::*;
+  use crate::{config::proto::PermissionFlag, records::Permission};
+
+  fn sanitize_template(template: &str) {
+    assert!(parse_into_statement(template).is_ok(), "{template}");
+    assert!(!template.contains("   "), "{template}");
+    assert!(!template.contains("\n\n"), "{template}");
+  }
+
+  fn index_metadata() -> ColumnMetadata {
+    return ColumnMetadata {
+      index: 0,
+      column: Column {
+        name: "index".to_string(),
+        type_name: "uuid".to_string(),
+        data_type: trailbase_schema::sqlite::ColumnDataType::Blob,
+        affinity_type: trailbase_schema::sqlite::ColumnAffinityType::Blob,
+        options: vec![],
+      },
+      json: None,
+      is_file: false,
+      is_geometry: false,
+    };
+  }
+
+  #[test]
+  fn test_create_record_access_query_template() {
+    {
+      let query = CreateRecordAccessQueryTemplateSqlite {
+        create_access_rule: "_USER_.id = X'05'",
+        column_metadata: &[],
+      }
+      .render()
+      .unwrap();
+
+      sanitize_template(&query);
+
+      let query = CreateRecordAccessQueryTemplatePg {
+        create_access_rule: "_USER_.id = '\\x05'",
+        column_metadata: &[],
+      }
+      .render()
+      .unwrap();
+
+      sanitize_template(&query);
+    }
+
+    {
+      let query = CreateRecordAccessQueryTemplateSqlite {
+        create_access_rule: r#"_USER_.id = X'05' AND "index" = 'secret'"#,
+        column_metadata: &vec![index_metadata()],
+      }
+      .render()
+      .unwrap();
+
+      sanitize_template(&query);
+    }
+  }
+
+  #[test]
+  fn test_update_record_access_query_template() {
+    {
+      let query = UpdateRecordAccessQueryTemplateSqlite {
+        update_access_rule: r#"_USER_.id = X'05' AND _ROW_."index" = 'secret'"#,
+        table_name: &QualifiedName::parse("table").unwrap().into(),
+        pk_column_name: "index",
+        column_metadata: &[],
+      }
+      .render()
+      .unwrap();
+
+      sanitize_template(&query);
+
+      let query = UpdateRecordAccessQueryTemplatePg {
+        update_access_rule: r#"_USER_.id = X'05' AND _ROW_."index" = 'secret'"#,
+        table_name: &QualifiedName::parse("table").unwrap().into(),
+        pk_column_name: "index",
+        column_metadata: &[],
+      }
+      .render()
+      .unwrap();
+
+      sanitize_template(&query);
+    }
+
+    {
+      let query = UpdateRecordAccessQueryTemplateSqlite {
+        update_access_rule: r#"_USER_.id = X'05' AND _ROW_."index" = _REQ_."index""#,
+        table_name: &QualifiedName::parse("table").unwrap().into(),
+        pk_column_name: "index",
+        column_metadata: &vec![index_metadata()],
+      }
+      .render()
+      .unwrap();
+
+      sanitize_template(&query);
+
+      let query = UpdateRecordAccessQueryTemplatePg {
+        update_access_rule: r#"_USER_.id = X'05' AND _ROW_."index" = _REQ_."index""#,
+        table_name: &QualifiedName::parse("table").unwrap().into(),
+        pk_column_name: "index",
+        column_metadata: &vec![index_metadata()],
+      }
+      .render()
+      .unwrap();
+
+      sanitize_template(&query);
+    }
+  }
+
+  #[test]
+  fn test_subscription_record_read_template() {
+    {
+      let query = SubscriptionRecordReadTemplate {
+        read_access_rule: "TRUE",
+        column_names: vec![],
+      }
+      .render()
+      .unwrap();
+
+      sanitize_template(&query);
+    }
+
+    {
+      let query = SubscriptionRecordReadTemplate {
+        read_access_rule: r#"_USER_.id = X'05' AND "index" = 'secret'"#,
+        column_names: vec!["index"],
+      }
+      .render()
+      .unwrap();
+
+      sanitize_template(&query);
+    }
+  }
+
+  fn has_access(flags: u8, p: Permission) -> bool {
+    return (flags & (p as u8)) > 0;
+  }
+
+  #[test]
+  fn test_acl_conversion() {
+    {
+      let acl = convert_acl(&vec![PermissionFlag::Read as i32]);
+      assert!(has_access(acl, Permission::Read));
+    }
+
+    {
+      let acl = convert_acl(&vec![
+        PermissionFlag::Read as i32,
+        PermissionFlag::Create as i32,
+      ]);
+      assert!(has_access(acl, Permission::Read));
+      assert!(has_access(acl, Permission::Create));
+    }
+
+    {
+      let acl = convert_acl(&vec![
+        PermissionFlag::Delete as i32,
+        PermissionFlag::Update as i32,
+      ]);
+      assert!(has_access(acl, Permission::Delete));
+      assert!(has_access(acl, Permission::Update), "ACL: {acl}");
+    }
+  }
+}
