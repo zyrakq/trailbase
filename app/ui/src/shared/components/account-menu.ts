@@ -26,6 +26,7 @@ function getAvatarColor(user: User): string {
 export class AccountMenu extends LitElement {
   @state() private _isOpen = false;
   @state() private _isAuthenticated = false;
+  @state() private _isAdmin = false;
   @state() private _user: User | null = null;
   @state() private _avatarError = false;
 
@@ -35,6 +36,7 @@ export class AccountMenu extends LitElement {
     window.addEventListener('auth-state-updated', this._handleAuthStateUpdated);
     await authService.init();
     this._isAuthenticated = authService.isAuthenticated();
+    this._isAdmin = authService.isAdmin();
     this._user = authService.getUser();
   }
 
@@ -55,6 +57,7 @@ export class AccountMenu extends LitElement {
 
   private _handleAuthStateUpdated = (): void => {
     this._isAuthenticated = authService.isAuthenticated();
+    this._isAdmin = authService.isAdmin();
     this._user = authService.getUser();
     this._avatarError = false;
   };
@@ -132,6 +135,9 @@ export class AccountMenu extends LitElement {
         ${this._isAuthenticated
           ? html`
               <button class="dropdown-item" @click=${this._handleProfile}>${msg('Profile')}</button>
+              ${this._isAdmin
+                ? html`<a class="dropdown-item" href="/admin">${msg('Manage subscriptions')}</a>`
+                : null}
               <button class="dropdown-item danger" @click=${this._handleSignOut}>${msg('Sign out')}</button>
             `
           : html`

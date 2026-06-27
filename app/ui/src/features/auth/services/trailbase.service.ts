@@ -9,6 +9,7 @@ import { AuthError, AuthErrorCode } from '../types/auth-error';
 export interface TrailBaseUser {
   id: string;
   email?: string;
+  admin?: boolean;
   /** True if the user has TOTP/MFA enabled. Sourced from the SDK User.mfa field. */
   mfa?: boolean;
 }
@@ -48,7 +49,7 @@ class TrailBaseService {
     const client = await this.initClient();
     const user = client.user();
     if (!user) return null;
-    return { id: user.id, email: user.email, mfa: user.mfa };
+    return { id: user.id, email: user.email, admin: user.admin, mfa: user.mfa };
   }
 
   /**
