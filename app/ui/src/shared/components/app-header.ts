@@ -53,10 +53,12 @@ export class AppHeader extends LitElement {
     return html`
       <header>
         <div class="header-content">
-          <div class="logo-section">
-            <img src=${logo} alt=${this.brandName} class="logo" />
-            <span class="app-name">${this.brandName}</span>
-          </div>
+          <a class="logo-link" href="/" aria-label=${msg('Go to home')}>
+            <div class="logo-section">
+              <img src=${logo} alt=${this.brandName} class="logo" />
+              <span class="app-name">${this.brandName}</span>
+            </div>
+          </a>
           <div class="actions">
             ${this._isAuthenticated
               ? html`<account-menu></account-menu>`

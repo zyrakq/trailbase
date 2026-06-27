@@ -116,6 +116,18 @@ describe('app-header', () => {
     expect(appName?.textContent?.trim()).toBe('Custom Brand');
   });
 
+  it('wraps the logo in a home link pointing to /', async () => {
+    element = document.createElement('app-header') as AppHeader;
+    document.body.appendChild(element);
+    await element.updateComplete;
+
+    const link = element.shadowRoot?.querySelector('a.logo-link');
+    expect(link?.getAttribute('href')).toBe('/');
+    // The logo must live inside that link, not alongside it.
+    const logo = link?.querySelector('img.logo');
+    expect(logo?.getAttribute('src')).toBe('/branding/logo-light.svg');
+  });
+
   it('renders the Sign In button when unauthenticated', async () => {
     element = document.createElement('app-header') as AppHeader;
     document.body.appendChild(element);

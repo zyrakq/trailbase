@@ -23,6 +23,12 @@ export const appHeaderStyles = css`
     margin: 0 auto;
   }
 
+  .logo-link {
+    display: inline-flex;
+    color: inherit;
+    text-decoration: none;
+  }
+
   .logo-section {
     display: flex;
     align-items: center;
