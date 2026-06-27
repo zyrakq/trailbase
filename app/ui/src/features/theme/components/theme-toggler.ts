@@ -63,7 +63,7 @@ export class ThemeToggler extends LitElement {
         aria-label=${isDark ? msg('Switch to light theme') : msg('Switch to dark theme')}
         title=${isDark ? msg('Switch to light theme') : msg('Switch to dark theme')}
       >
-        ${!isDark ? this.renderMoonIcon() : this.renderSunIcon()}
+        ${isDark ? this.renderMoonIcon() : this.renderSunIcon()}
       </button>
     `;
   }
