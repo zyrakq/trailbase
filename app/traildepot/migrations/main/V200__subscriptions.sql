@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS subscriptions (
-  id            TEXT PRIMARY KEY,
+  id            BLOB PRIMARY KEY NOT NULL CHECK(is_uuid_v4(id)) DEFAULT (uuid_v4()),
   name          TEXT NOT NULL,
   description   TEXT NOT NULL DEFAULT '',
   logo_url      TEXT NOT NULL DEFAULT '',

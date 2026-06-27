@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS subscription_events (
-  id                   TEXT PRIMARY KEY,
-  user_subscription_id TEXT NOT NULL REFERENCES user_subscriptions(id),
+  id                   BLOB PRIMARY KEY NOT NULL CHECK(is_uuid_v4(id)) DEFAULT (uuid_v4()),
+  user_subscription_id BLOB NOT NULL REFERENCES user_subscriptions(id),
   event_type           TEXT NOT NULL,
   created_at           INTEGER NOT NULL DEFAULT (unixepoch()),
   metadata             TEXT

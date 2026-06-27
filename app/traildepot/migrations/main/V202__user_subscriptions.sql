@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS user_subscriptions (
-  id              TEXT PRIMARY KEY,
-  user_id         TEXT NOT NULL,
-  subscription_id TEXT NOT NULL REFERENCES subscriptions(id),
+  id              BLOB PRIMARY KEY NOT NULL CHECK(is_uuid_v4(id)) DEFAULT (uuid_v4()),
+  user_id         BLOB NOT NULL,
+  subscription_id BLOB NOT NULL REFERENCES subscriptions(id),
   period          TEXT NOT NULL DEFAULT '',
   status          TEXT NOT NULL DEFAULT 'active',
   subscribed_at   INTEGER NOT NULL DEFAULT (unixepoch()),

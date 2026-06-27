@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS subscription_pricing (
-  id              TEXT PRIMARY KEY,
-  subscription_id TEXT NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+  id              BLOB PRIMARY KEY NOT NULL CHECK(is_uuid_v4(id)) DEFAULT (uuid_v4()),
+  subscription_id BLOB NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
   period          TEXT NOT NULL,
   price           INTEGER NOT NULL DEFAULT 0,
   currency        TEXT NOT NULL DEFAULT 'RUB',
