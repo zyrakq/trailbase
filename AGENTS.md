@@ -10,6 +10,11 @@ Primary docs: [ARCHITECTURE.md](./ARCHITECTURE.md) (stack, layout, flows) and
 - **bun** for frontend, **cargo** for backend; all comments/docs in **English**
 - **NEVER `cargo clean`** — rebuild specific packages instead
 
+## Design & Planning — WAIT FOR APPROVAL
+
+**STOP** after presenting any design or plan. Wait for explicit "go" before the
+next phase. Never auto-chain design → plan → execute.
+
 ## Comments
 
 Comment only non-obvious side-effects, counter-intuitive decisions, or invariants.
