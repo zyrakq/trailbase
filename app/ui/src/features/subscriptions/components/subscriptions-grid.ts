@@ -53,20 +53,23 @@ export class SubscriptionsGrid extends LitElement {
     this._loading = true;
     this._error = false;
     try {
-      const userSubs = await subscriptionsService.getUserSubscriptions();
-      if (this.mode === 'user') {
-        const subscribed = await subscriptionsService.getSubscribedSubscriptions(userSubs);
-        this._items = subscribed.map(s => ({
-          ...s,
-          userSubscription: userSubs.find(u => u.subscription_id === s.id),
-        }));
-      } else {
-        const all = await subscriptionsService.getAll();
-        this._items = all.map(s => ({
-          ...s,
-          userSubscription: userSubs.find(u => u.subscription_id === s.id),
-        }));
-      }
+      const [userSubs, data] = await Promise.all([
+        subscriptionsService.getUserSubscriptions(),
+        this.mode === 'user'
+          ? subscriptionsService.getMine()
+          : subscriptionsService.getCatalog(),
+      ]);
+      this._items = data.subscriptions.map(s => ({
+        ...s,
+        userSubscription: userSubs.find(u => u.subscription_id === s.id),
+      }));
+      this.dispatchEvent(
+        new CustomEvent<SubscriptionPeriod[]>('periods-loaded', {
+          detail: data.availablePeriods,
+          bubbles: true,
+          composed: true,
+        })
+      );
     } catch {
       this._error = true;
       notificationService.error(msg('Failed to load subscriptions.'));

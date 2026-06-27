@@ -1,5 +1,6 @@
 import { trailbaseService } from '@/features/auth/index.ts';
 import type {
+  CatalogResponse,
   Subscription,
   SubscriptionEvent,
   SubscriptionEventWithSub,
@@ -75,6 +76,34 @@ function mapEvent(raw: Record<string, unknown>): SubscriptionEvent {
   };
 }
 
+interface RawCatalogResponse {
+  subscriptions: Record<string, unknown>[];
+  available_periods: string[];
+}
+
+async function fetchCatalog(endpoint: string): Promise<CatalogResponse> {
+  const response = await fetch(endpoint, { credentials: 'include' });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Catalog fetch failed: ${response.status} ${text}`);
+  }
+  const raw = (await response.json()) as RawCatalogResponse;
+  const pricingBySubId = new Map<string, SubscriptionPricing[]>();
+  for (const s of raw.subscriptions) {
+    const rawPricing = (s['pricing'] as Record<string, unknown>[] | undefined) ?? [];
+    const id = s['id'] as string;
+    pricingBySubId.set(id, rawPricing.map(mapPricing));
+  }
+  const subscriptions = raw.subscriptions.map(s =>
+    mapSubscription(s, pricingBySubId.get(s['id'] as string) ?? [])
+  );
+  const availablePeriods = raw.available_periods.filter(
+    (p): p is SubscriptionPeriod =>
+      p === 'monthly' || p === 'quarterly' || p === 'yearly' || p === 'onetime'
+  );
+  return { subscriptions, availablePeriods };
+}
+
 async function joinPricingToSubscriptions(
   subs: Record<string, unknown>[]
 ): Promise<Subscription[]> {
@@ -109,12 +138,8 @@ class SubscriptionsService {
     return SubscriptionsService.instance;
   }
 
-  async getAll(): Promise<Subscription[]> {
-    const client = await trailbaseService.initClient();
-    const result = await client
-      .records<Record<string, unknown>>('subscriptions')
-      .list({ filters: [{ column: 'status', op: 'equal', value: 'active' }], pagination: { limit: 1024 } });
-    return joinPricingToSubscriptions(result.records);
+  async getCatalog(): Promise<CatalogResponse> {
+    return fetchCatalog('/api/subscriptions/catalog');
   }
 
   async getAllAdmin(): Promise<Subscription[]> {
@@ -152,16 +177,8 @@ class SubscriptionsService {
       .filter(u => u.expires_at === undefined || u.expires_at > now);
   }
 
-  async getSubscribedSubscriptions(userSubs: UserSubscription[]): Promise<Subscription[]> {
-    const ids = [...new Set(userSubs.map(u => u.subscription_id))];
-    if (ids.length === 0) return [];
-    const client = await trailbaseService.initClient();
-    const result = await client
-      .records<Record<string, unknown>>('subscriptions')
-      .list({ pagination: { limit: 1024 } });
-    const idSet = new Set(ids);
-    const subscribed = result.records.filter(s => idSet.has(s['id'] as string));
-    return joinPricingToSubscriptions(subscribed);
+  async getMine(): Promise<CatalogResponse> {
+    return fetchCatalog('/api/subscriptions/mine');
   }
 
   async getEventHistory(): Promise<SubscriptionEventWithSub[]> {
@@ -229,115 +246,75 @@ class SubscriptionsService {
   }
 
   async create(data: SubscriptionInput): Promise<Subscription> {
-    const client = await trailbaseService.initClient();
-    const id = crypto.randomUUID();
-    await client.records('subscriptions').create({
-      id,
-      name: data.name,
-      description: data.description,
-      logo_url: data.logo_url,
-      resource_url: data.resource_url,
-      what_included: data.what_included ?? '',
-      terms: data.terms ?? '',
-      status: 'active',
+    const response = await fetch('/api/admin/subscriptions', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
-    const pricingRecords = await Promise.all(
-      data.pricing.map(p =>
-        client.records<Record<string, unknown>>('subscription_pricing').create({
-          id: crypto.randomUUID(),
-          subscription_id: id,
-          period: p.period,
-          price: p.price,
-          currency: p.currency,
-          is_archived: 0,
-        } as Record<string, unknown>)
-      )
-    );
-    const pricing: SubscriptionPricing[] = data.pricing.map((p, i) => ({
-      id: pricingRecords[i] as string,
-      subscription_id: id,
-      period: p.period,
-      price: p.price,
-      currency: p.currency,
-      is_archived: false,
-    }));
-    const now = Date.now();
-    return {
-      id,
-      name: data.name,
-      description: data.description,
-      logo_url: data.logo_url,
-      resource_url: data.resource_url,
-      status: 'active',
-      created_at: now,
-      updated_at: now,
-      what_included: data.what_included,
-      terms: data.terms,
-      pricing,
-    };
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`Create failed: ${response.status} ${text}`);
+    }
+    const { id } = (await response.json()) as { id: string };
+    const created = await this.getById(id);
+    if (!created) throw new Error(`Subscription not found after create: ${id}`);
+    return created;
   }
 
   async update(id: string, data: Partial<SubscriptionInput>): Promise<Subscription> {
-    const client = await trailbaseService.initClient();
-    const updatePayload: Record<string, unknown> = {};
-    if (data.name !== undefined) updatePayload['name'] = data.name;
-    if (data.description !== undefined) updatePayload['description'] = data.description;
-    if (data.logo_url !== undefined) updatePayload['logo_url'] = data.logo_url;
-    if (data.resource_url !== undefined) updatePayload['resource_url'] = data.resource_url;
-    if (data.what_included !== undefined) updatePayload['what_included'] = data.what_included;
-    if (data.terms !== undefined) updatePayload['terms'] = data.terms;
-
-    await client.records('subscriptions').update(id, updatePayload);
-
-    if (data.pricing !== undefined) {
-      const existingResult = await client
-        .records<Record<string, unknown>>('subscription_pricing')
-        .list({ filters: [{ column: 'subscription_id', op: 'equal', value: id }], pagination: { limit: 64 } });
-
-      await Promise.all(
-        existingResult.records.map(p =>
-          client.records('subscription_pricing').update(p['id'] as string, { is_archived: 1 })
-        )
-      );
-
-      await Promise.all(
-        data.pricing.map(p =>
-          client.records('subscription_pricing').create({
-            id: crypto.randomUUID(),
-            subscription_id: id,
-            period: p.period,
-            price: p.price,
-            currency: p.currency,
-            is_archived: 0,
-          })
-        )
-      );
+    const response = await fetch(`/api/admin/subscriptions/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`Update failed: ${response.status} ${text}`);
     }
-
     const updated = await this.getById(id);
     if (!updated) throw new Error(`Subscription not found after update: ${id}`);
     return updated;
   }
 
   async archive(id: string): Promise<Subscription> {
-    const client = await trailbaseService.initClient();
-    await client.records('subscriptions').update(id, { status: 'archived' });
+    const response = await fetch(`/api/admin/subscriptions/${encodeURIComponent(id)}/archive`, {
+      method: 'PUT',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`Archive failed: ${response.status} ${text}`);
+    }
     const updated = await this.getById(id);
     if (!updated) throw new Error(`Subscription not found: ${id}`);
     return updated;
   }
 
   async restore(id: string): Promise<Subscription> {
-    const client = await trailbaseService.initClient();
-    await client.records('subscriptions').update(id, { status: 'active' });
+    const response = await fetch(`/api/admin/subscriptions/${encodeURIComponent(id)}/restore`, {
+      method: 'PUT',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`Restore failed: ${response.status} ${text}`);
+    }
     const updated = await this.getById(id);
     if (!updated) throw new Error(`Subscription not found: ${id}`);
     return updated;
   }
 
   async remove(id: string): Promise<void> {
-    const client = await trailbaseService.initClient();
-    await client.records('subscriptions').delete(id);
+    const response = await fetch(`/api/admin/subscriptions/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`Delete failed: ${response.status} ${text}`);
+    }
   }
 
   async getSubscriberCount(subscriptionId: string): Promise<number> {

@@ -16,6 +16,7 @@ type Section = 'my-subscriptions' | 'all-services' | 'history';
 export class DashboardLayout extends LitElement {
   @state() private _activeSection: Section = 'my-subscriptions';
   @state() private _selectedPeriod: SubscriptionPeriod | 'all' = 'all';
+  @state() private _availablePeriods: SubscriptionPeriod[] = [];
   @state() private _ready = false;
 
   async connectedCallback() {
@@ -28,11 +29,31 @@ export class DashboardLayout extends LitElement {
   }
 
   private _handleSection(event: CustomEvent<Section>) {
-    this._activeSection = event.detail;
+    const next = event.detail;
+    if (next === this._activeSection) return;
+    this._activeSection = next;
+    this._selectedPeriod = 'all';
   }
 
   private _handlePeriodChange(event: CustomEvent<SubscriptionPeriod | 'all'>) {
     this._selectedPeriod = event.detail;
+  }
+
+  private _handlePeriodsLoaded = (event: CustomEvent<SubscriptionPeriod[]>): void => {
+    const periods = event.detail;
+    this._availablePeriods = periods;
+    if (
+      this._selectedPeriod !== 'all' &&
+      !periods.includes(this._selectedPeriod)
+    ) {
+      this._selectedPeriod = 'all';
+    }
+  };
+
+  private get _sidebarPeriods(): SubscriptionPeriod[] | null {
+    if (this._activeSection === 'history') return null;
+    if (this._availablePeriods.length < 2) return null;
+    return this._availablePeriods;
   }
 
   private _renderSection(): TemplateResult {
@@ -51,10 +72,13 @@ export class DashboardLayout extends LitElement {
       return html`<p class="loading">${msg('Loading…')}</p>`;
     }
     return html`
-      <div class="layout">
+      <div class="layout"
+        @periods-loaded=${this._handlePeriodsLoaded}
+      >
         <dashboard-sidebar
           .activeSection=${this._activeSection}
           .selectedPeriod=${this._selectedPeriod}
+          .availablePeriods=${this._sidebarPeriods}
           @section-change=${this._handleSection}
           @period-change=${this._handlePeriodChange}
         ></dashboard-sidebar>
