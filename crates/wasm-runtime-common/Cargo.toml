@@ -1,0 +1,14 @@
+[package]
+name = "trailbase-wasm-common"
+version = "0.2.0"
+edition = "2024"
+license = "OSL-3.0"
+description = "WASM runtime for the TrailBase framework"
+homepage = "https://trailbase.io"
+repository = "https://github.com/trailbaseio/trailbase"
+readme = "../../README.md"
+
+[dependencies]
+serde = { workspace = true }
+trailbase-sqlvalue = { workspace = true }
+ts-rs = { workspace = true }

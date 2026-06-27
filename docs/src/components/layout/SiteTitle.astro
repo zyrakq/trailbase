@@ -1,0 +1,189 @@
+---
+// SiteTitle component inspired from starlight's original:
+//   https://github.com/withastro/starlight/blob/7a8007a6e2f8ee744cd83e2bfa39910dd3f50e50/packages/starlight/components/SiteTitle.astro
+import config from "virtual:starlight/user-config";
+import type { ImageMetadata } from "astro";
+import { Image } from "astro:assets";
+import { repo } from "@/config";
+
+// NOTE: We define the actions/links manually below, since actions are only defined on the landing-page otherwise.
+// const { data } = Astro.locals.starlightRoute.entry;
+// const { actions = [] } = data.hero ?? {};
+
+const actions = [
+  {
+    text: "Documentation",
+    link: "/getting-started/install",
+    variant: "primary",
+    icon: { type: "icon", name: "open-book" },
+  },
+  {
+    text: "FAQ",
+    link: "/reference/faq/",
+    variant: "secondary",
+    icon: { type: "icon", name: "external" },
+  },
+  {
+    text: "GitHub",
+    link: repo,
+    variant: "secondary",
+    icon: { type: "icon", name: "github" },
+  },
+  {
+    text: "Demo",
+    link: "https://demo.trailbase.io",
+    variant: "secondary",
+    icon: { type: "icon", name: "rocket" },
+  },
+];
+
+import nut from "@/assets/nut.svg";
+
+function stripLeadingSlash(href: string): string {
+  if (href[0] === "/") return href.slice(1);
+  return href;
+}
+
+function stripTrailingSlash(href: string): string {
+  if (href[href.length - 1] === "/") return href.slice(0, -1);
+  return href;
+}
+
+const base = stripTrailingSlash(import.meta.env.BASE_URL);
+function pathWithBase(path: string) {
+  path = stripLeadingSlash(path);
+  return path ? base + "/" + path : base + "/";
+}
+
+type Logos = {
+  light?: ImageMetadata;
+  dark?: ImageMetadata;
+};
+
+const logos: Logos = {
+  light: undefined,
+  dark: undefined,
+};
+
+interface Props {
+  locale: string | undefined;
+}
+
+if (config.logo) {
+  let err: string | undefined;
+  if ("src" in config.logo) {
+    if (!logos.dark || !logos.light) {
+      err = `Could not resolve logo import for "${config.logo.src}" (logo.src)`;
+    }
+  } else {
+    if (!logos.dark) {
+      err = `Could not resolve logo import for "${config.logo.dark}" (logo.dark)`;
+    } else if (!logos.light) {
+      err = `Could not resolve logo import for "${config.logo.light}" (logo.light)`;
+    }
+  }
+  if (err) throw new Error(err);
+}
+
+const href = pathWithBase(Astro.props.locale || "/");
+---
+
+<div class="flex items-center gap-4">
+  <a {href} class="site-title sl-flex">
+    <Image src={nut} alt="Nut logo" />
+
+    {
+      /*
+      config.logo && logos.dark && (
+        <>
+          <img
+            class:list={{ "dark-only": !("src" in config.logo) }}
+            alt={config.logo.alt}
+            src={logos.dark.src}
+            width={logos.dark.width}
+            height={logos.dark.height}
+          />
+          {!("src" in config.logo) && (
+            <img
+              class="light-only"
+              alt={config.logo.alt}
+              src={logos.light?.src}
+              width={logos.light?.width}
+              height={logos.light?.height}
+            />
+          )}
+        </>
+      )*/
+    }
+
+    <span class:list={{ "sr-only": config.logo?.replacesTitle }}>
+      {config.title[Astro.props.locale ?? "en"] ?? config.title["en"]}
+    </span>
+  </a>
+
+  {
+    actions.length > 0 && (
+      <div class="hidden lg:block">
+        <div class="flex items-center gap-4">
+          {actions.map(
+            ({
+              // attrs: { class: className, ...attrs } = {},
+              // icon,
+              // variant,
+              link: href,
+              text,
+            }) => (
+              <a class="site-title-link" href={href}>
+                {text}
+              </a>
+            ),
+          )}
+
+          <a class="site-title-link" href="/blog">
+            Blog
+          </a>
+        </div>
+      </div>
+    )
+  }
+</div>
+
+<style>
+  .site-title {
+    justify-self: flex-start;
+    max-width: 100%;
+    overflow: hidden;
+    align-items: center;
+    gap: var(--sl-nav-gap);
+    font-size: var(--sl-text-h4);
+    font-weight: 600;
+    color: var(--sl-color-text-accent);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .site-title-link {
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+  }
+
+  .site-title-link:hover {
+    color: var(--sl-color-text-accent);
+  }
+
+  img {
+    height: calc(var(--sl-nav-height) - 2 * var(--sl-nav-pad-y));
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: 0 50%;
+  }
+
+  :global([data-theme="light"]) .dark-only {
+    display: none;
+  }
+
+  :global([data-theme="dark"]) .light-only {
+    display: none;
+  }
+</style>

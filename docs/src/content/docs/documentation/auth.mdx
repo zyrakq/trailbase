@@ -1,0 +1,237 @@
+---
+title: Auth
+description: Managing Users and Access
+---
+
+import { Image } from "astro:assets";
+import { Aside } from "@astrojs/starlight/components";
+
+import implementation from "./_auth.svg";
+
+TrailBase provides core authentication flows: APIs and a basic UI out of the
+box[^1].
+These flows allow your users to log in thus establishing their identity to
+authorize or deny access, lets them change their email address, reset their
+password, etc.
+
+<Aside type="caution" title="Encryption: TLS/HTTPS">
+  Always use TLS/HTTPS in [production](/documentation/production).
+  The safety of any authentication flow hinges on it.
+  It provides the trust that the server users are talking to is actually yours
+  *and* ensures credentials are encrypted on the wire.
+  Either use TrailBase's built-in TLS termination or more flexibly a reverse
+  proxy in front.
+  The latter allows certificates to be updated automatically.
+</Aside>
+
+## Integrating Auth
+
+At an abstract level, whenever a user signs in, either directly with
+`email+password` or via an external OAuth2 provider (Google, Microsoft, ...),
+they receive a set of tokens minted by your TrailBase instance.
+Users or a backend of yours should then attach the *auth* token to their
+TrailBase API requests to identify themselves. TrailBase will then accept or
+reject the request based on the user's authorization.
+
+With this in mind, integrating auth into your application mostly means:
+
+1. Providing UI flows for users to sign in, log out, change passwords, ... .
+   You can either build your own UI using TrailBase's auth APIs or rely on the
+   built-in UIs mounted at `/_/auth/(login|logout|...)`[^1].
+2. And managing tokens, e.g. making sure they get attached to request or
+   dropped when the user logs out. The TrailBase client libraries can help you
+   with that.
+
+There are a few considerations, which may affect your choices:
+
+* Are you building a mobile/desktop or web app or both? If you're building for
+  mobile or desktop, do the auth UIs need to be native or is ok to open a
+  WebView?
+* If you're planning to build your own auth UIs for multiple platforms you may
+  need to implement them multiple times.
+* If you're building something other than a web app and are planning to support
+  sign-in using external OAuth providers, you'll need a Browser or WebView
+  anyway for users to sign in on the external provider's site.
+
+The `examples/blog/(web|flutter)` demonstrates how the built-in UIs, including
+OAuth via WebView, can be used by both web and mobile/desktop apps[^2].
+
+When using the built-in UIs, the general approach is to send users to
+`/_/auth/(login|logout|profile)`.
+
+When building your own UIs, login is handled by:
+
+* [`/api/auth/v1/login`](/api/operations/login_handler/) for password auth.
+  It directly exchanges valid credentials for tokens.
+* [`/api/auth/v1/oauth/<PROVIDER_NAME>/login`](/api/operations/login_with_external_auth_provider/)
+  for OAuth issuing a redirect to the external provider. The redirect will also
+  contain the *redirect uri* back to your TrailBase instance for the external
+  provider to send your users to upon successful sign-in.
+
+### Authentication Code Flow & PKCE
+
+Whenever a native client-side app (mobile, desktop, ...) or
+different-origin web app defers to a web UI[^4] for their users to sign in, a
+protocol for exchanging the tokens is needed.
+
+The *authentication code flow* defines such a protocol. Upon successful
+off-site sign-in with an external provider, users are redirected back,
+
+1. first to your TrailBase instance at
+   `<YOUR_SITE>/api/auth/v1/oauth/<PROVIDER_NAME>/callback?code=<AUTH_CODE>`
+2. and subsequently to a URI registered and provided by your app via
+   `?redirect_uri=my-app://callback`.
+
+This allows TrailBase to observe the external provider's auth code and issue
+one to your app as well.
+After observing the callback with the auth code[^5], the app can
+exchange it, typically alongside another secret, for tokens using the
+[`/api/auth/v1/token`](/api/operations/auth_code_to_token_handler/)
+endpoint, thus completing the signing.
+
+Proof-Key-for-Code-Exchange (PKCE) provides an elegant way to establish the
+secondary secret and also protects against man-in-the-middle attacks by
+infected or malicious browsers/WebViews.
+*Authentication code flow* with PKCE results in a two-step login procedure:
+
+1. `login(creds, pkce_code_challenge) -> auth_code`
+2. `upgrade(auth_code, pkce_code_verifier) -> tokens`
+
+where `pkce_code_verifier` is simply a client-generated random secret and
+`pkce_code_challenge` is a hash thereof.
+Since only the first step is mediated by an external application (browser or
+WebView), the subsequent token exchange cannot be intercepted.
+
+To initiate the authentication code flow with PKCE you have to additionally
+pass:
+
+- `response_type=code`,
+- `pkce_code_challenge=<urlSafeBase64(sha256(pkce_code_verifier)))>`,
+- `redirect_uri=<TARGET>`, e.g. `custom-app-scheme://callback`,
+
+as inputs to `/api/auth/v1/login` or `/api/auth/v1/oauth/<PROVIDER_NAME>/login`.
+Note that native apps will need to register the custom scheme first to receive
+the eventual callback.
+
+
+## Design
+
+TrailBase tries to offer a standard, safe and versatile auth implementation out
+of the box. It combines:
+
+- Asymmetric cryptography based on elliptic curves (ed25519)
+- Stateless, short-lived auth tokens (JWT)
+- Stateful, long-lived, opaque refresh tokens.
+
+Breaking this apart, __asymmetric cryptography__ means that tokens signed with a
+private key by the TrailBase "auth server", which can then be validated by
+others ("resource servers") using only the corresponding public key.
+The __Stateless JWTs__ contain metadata that identities the user w/o having to
+talk to the auth server.
+Combining the two, other back-ends can authenticate, validate & identify, users
+hermetically.
+This is very easy and efficient, however means that hermetic auth tokens cannot
+be invalidated.
+A hermetic auth token released into the wild is valid until it expires.
+To balance the risks and benefits, TrailBase uses short-lived auth tokens
+expiring frequently[^3].
+To avoid burdening users by constantly re-authenticating, TrailBase issues an
+additional __opaque, stateful refresh token__.
+Refresh tokens are simply a unique identifier the server keeps track of as
+sessions.
+Only refresh tokens that have not been revoked can be exchanged for a new auth
+token.
+
+<div class="flex justify-center">
+  <Image
+    class="w-[80%] "
+    src={implementation}
+    alt="Screenshot of TrailBase's admin dashboard"
+  />
+</div>
+
+### Available Flows
+
+TrailBase currently implements the following auth flows:
+
+- Email + password based user registration and email verification.
+- User registration using social OAuth providers (Google, ...)
+- Login & logout.
+- Change & reset password.
+- Change email.
+- User deletion.
+- Avatar management.
+
+Besides the flows above, TrailBase also ships with a set of simple UIs to
+support the above flows. By default it's accessible via the route:
+`<url>/_/auth/login`. Check out the [demo](https://demo.trailbase.io/_/auth/login).
+The built-in auth UIs can be disabled with `--disable-auth-ui` in case you
+prefer rolling your own or have no need web-based authentication.
+
+## Adding Usernames and Other Metadata
+
+Strictly speaking, authentication is merely responsible for uniquely
+identifying who's on the other side.
+This only requires a __unique identifier__ and one or more __secrets__
+(e.g.  a password, hardware token, ...) for the peer to proof they're them.
+
+Any unique identifier will do: a random string (painful to remember), a phone
+number, a username, or an email address.
+Email addresses are a popular choice, since they do double duty as a
+communication channel letting you reach out to your users, e.g. to reset their
+password.
+
+Even from a product angle, building an online shop for example, email addresses
+are the natural choice.
+Asking your customers to think up and remember a globally unique username adds
+extra friction especially since you need their email address anyway to send
+receipts.
+Additional profile data, like a shipment address, is something you can ask for
+at a later time and is independent from auth.
+In contrast, when building a social network, chat app or messaging board, you
+typically don't want to leak everyone's email address.
+You will likely want an additional, more opaque identifier such as a username
+or handle.
+
+Long story short, modeling __profile__ data is very product dependent.
+It's for you to figure out.
+That said, it is straight forward to join auth data, such as the user's email
+address, and custom custom profile data in TrailBase.
+We suggest creating a separate profile table with a `_user.id` `FOREIGN KEY`
+primary key column. You can then freely expose profiles as dedicated record API
+endpoints or join them with other data `_user.id`.
+The blog example in `<repo>/examples/blog` demonstrates this, joining blog
+posts with user profiles on the author id to get an author's name.
+
+## Lifetime Considerations when Persisting Tokens
+
+If you decide to implement your own authentication flows and persist tokens,
+it's your responsibility to clean them up appropriately when a user logs out,
+otherwise users may still appear to be logged in.
+Specifically, when browsing to `/_/auth/logout` or directly invoking the
+log-out API (`/api/auth/v1/logout`), the session will be instantly invalidated.
+In browser environments, cookies carrying tokens will also be removed.
+Session invalidation results in the refresh token no longer being valid.
+However, the auth token will remain valid until it expires. In other words, to
+ensure that users don't appear as logged in anymore, any auth token you may
+have persisted should be dropped.
+
+---
+
+[^1]:
+    Which can be disabled using `--disable-auth-ui`, if you prefer rolling your
+    own or have no need for a web-based authentication UI.
+
+[^2]:
+    The approach is similar for any native application. This example uses Flutter
+    and can run both on Mobile (iOS, Android) and Desktop (Windows, MacOS, Linux).
+
+[^3]:
+    A one hour TTL by default.
+
+[^4]:
+    Both for TrailBase's built-in auth UIs and custom UIs.
+
+[^5]:
+    An intermediary code is used since tokens can get reasonably large and
+    in-lining them would be brittle as well as interceptable.

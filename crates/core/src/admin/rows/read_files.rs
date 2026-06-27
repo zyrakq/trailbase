@@ -1,0 +1,87 @@
+use axum::{
+  extract::{Path, Query, State},
+  response::Response,
+};
+use serde::Deserialize;
+use trailbase_schema::{FileUploads, QualifiedName};
+use ts_rs::TS;
+
+use crate::admin::AdminError as Error;
+use crate::app_state::AppState;
+use crate::connection::ConnectionEntry;
+use crate::records::files::read_file_into_response;
+use crate::records::read_queries::run_get_files_query;
+
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub(crate) struct ReadFilesQuery {
+  pub pk_column: String,
+  pub pk_value: String,
+
+  pub file_column_name: String,
+  pub file_name: Option<String>,
+}
+
+pub async fn read_files_handler(
+  State(state): State<AppState>,
+  Path(table_name): Path<String>,
+  Query(query): Query<ReadFilesQuery>,
+) -> Result<Response, Error> {
+  let table_name = QualifiedName::parse(&table_name)?;
+  let ConnectionEntry {
+    connection: conn,
+    metadata,
+  } = state
+    .connection_manager()
+    .get_entry_for_qn(&table_name)
+    .await?;
+
+  let Some(table_or_view) = metadata.get_table_or_view(&table_name) else {
+    return Err(Error::Precondition(format!(
+      "Table {table_name:?} not found"
+    )));
+  };
+  let Some(pk_meta) = table_or_view.column_by_name(&query.pk_column) else {
+    return Err(Error::Precondition(format!(
+      "Missing PK column: {}",
+      query.pk_column
+    )));
+  };
+
+  let pk_col = &pk_meta.column;
+  if !pk_col.is_primary() {
+    return Err(Error::Precondition(format!(
+      "Not a primary key: {pk_col:?}"
+    )));
+  }
+
+  let Some(file_column_meta) = table_or_view.column_by_name(&query.file_column_name) else {
+    return Err(Error::Precondition(format!(
+      "Missing file column: {}",
+      query.file_column_name
+    )));
+  };
+
+  let FileUploads(mut file_uploads) = run_get_files_query(
+    &conn,
+    &table_name.into(),
+    file_column_meta,
+    &query.pk_column,
+    trailbase_schema::json::parse_string_to_sqlite_value(pk_col.data_type, query.pk_value)?,
+  )
+  .await?;
+
+  if file_uploads.is_empty() {
+    return Err(Error::Precondition("Empty list of files".to_string()));
+  }
+
+  return if let Some(filename) = query.file_name {
+    let Some(file) = file_uploads.into_iter().find(|f| f.filename() == filename) else {
+      return Err(Error::Precondition(format!("File '{filename}' not found")));
+    };
+
+    Ok(read_file_into_response(&state, file).await?)
+  } else {
+    Ok(read_file_into_response(&state, file_uploads.remove(0)).await?)
+  };
+}

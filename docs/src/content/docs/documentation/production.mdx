@@ -1,0 +1,154 @@
+---
+title: Production
+description: Going to production.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Production">
+  TrailBase is still young and hasn't gotten a lot of mileage yet. We're looking
+  for feedback and are happy to help early adopters to get to production.
+</Aside>
+
+Going to production and depending on your requirements, at the mimimum you may
+want to think about:
+
+- [TLS termination](#tls-termination)
+- [Locking down access](#locking-down-access)
+- [Email Setup](#email-setup)
+- [Deployment](#deployment)
+- [Introspection](#introspection)
+- [Disaster recovery](#disaster-recovery)
+
+## TLS Termination
+
+The most important thing alongside ensuring least-priviledge access protection
+is to set up TLS termination establishing your server authority and ensuring
+that your users' traffic is end-to-end encrypted.
+
+TrailBase has built-in support for TLS and will automatically start in HTTPS
+mode, if it finds:
+
+ * a PEM key file under `<traildepot>/secrets/certs/key.pem`,
+ * and a PEM cert file under `<traildepot>/secrets/certs/cert.pem`.
+
+At this point TrailBase does not yet support automated certificate signing and
+renewal.
+We therefore recommend using tools like [certbot](https://certbot.eff.org/) in
+standalone mode to periodically refresh your certificates to avoid accidentally
+being left w/o a valid one.
+
+### Reverse Proxy
+
+You may want to consider using a reverse proxy, e.g. [nginx](https://nginx.org)
+or [caddy](https://caddyserver.com/) with first-class *Let's encrypt*
+integration[^1].
+Make sure the proxy sets the `X-Forwarded-For` header to ensure logging and
+ip-based rate limiting work correctly.
+
+When using a reverse proxy and realtime subscriptions, some extra setup may be
+needed, e.g.
+
+```nginx
+server {
+    server_name demo.trailbase.io;
+    listen [::]:443 ssl;
+    listen 443 ssl;
+
+    location / {
+        # Proxy setup
+        proxy_pass http://127.0.0.1:<INTERNAL_PORT>/;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        # Make SSE streaming work.
+        proxy_set_header Connection '';
+        # proxy_http_version 1.1;
+        chunked_transfer_encoding off;
+        proxy_buffering off;
+        proxy_cache off;
+    }
+
+    # TLS Certificates:
+    ssl_certificate /etc/letsencrypt/live/demo.trailbase.io/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/demo.trailbase.io/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+```
+
+## Locking Down Access
+
+Following the [principle of least privilege](https://en.wikipedia.org/wiki/Principle_of_least_privilege),
+users should only be granted as much access as strictly necessary.
+
+### API Access
+
+Make sure to use record API's authorization primitives to tighten access to
+data as much as possible.
+When applicable, you should consider checking:
+
+- `_REQ_.<user_id_column> = _USER_.id` on record creation and update,
+- `_ROW_.<user_id_column> = _USER_.id` on record retrieval, update, and deletion
+
+to avoid users impersonating other users to access or alter their records.
+
+### Admin Access
+
+Optionally you can move TrailBase's admin APIs and UIs to a separate, private
+port using `--admin-address=<IP>:<PORT>` as a precaution to further reduce
+the public facing surface.
+
+### Protect Configuration
+
+TrailBase's production configuration should be read-only to protect against
+accidental changes when you're one coffee short and intending to change a dev
+instance instead.
+
+This can be a simple as locking down file permissions or mounting the
+configuration as read-only if run within a container.
+In any case, make sure the data directory remains writable.
+
+## Email Setup
+
+By default TrailBase will be using your machine's sendmail setup. This can lead
+to messages not being sent at all and likely getting stuck in spam filters not
+coming from a well-known Email server.
+
+You should likely set up TrailBase with an SMTP server that can send Email
+coming from your domain. If you don't have an Email provider yet, an option
+could be Brevo, Mailchimp, SendGrid, ... .
+
+## Deployment
+
+Deployment is TrailBase' strong suite being a single executable. You can
+reasonably deploy TrailBase by simply copying the executable to your host.
+
+Depending on your and your team's requirements, you can consider deploying a
+containerized TrailBase to integrate into your existing container
+orchestration, e.g. control plane, monitoring, backups, ... .
+
+## Introspection
+
+TrailBase's current introspection can be considered fairly "minimalistic". Logs
+can be accessed via the admin UI or the `logs.db`. Also, there is a
+`/api/healthcheck` endpoint for container orchestrators to probe.
+You could consider setting up probers probing other endpoints.
+
+In the future we'd like to offer richer telemetry data including the ability
+for custom handlers to export their own custom metrics.
+
+## Disaster Recovery
+
+The simplest option is to mount another local or remote drive and use
+TrailBase's periodic backups.
+However, this may lead to significant data loss in case of a disaster, which
+may be acceptable for first party content but likely not for user-generated
+content.
+
+A more comprehensive approach may be to use [Litestream](https://litestream.io/)
+to continuously replicate your database.
+
+---
+
+[^1]:
+    TrailBase would like to support auto-rotation of certificates in the future.

@@ -1,69 +1,85 @@
-###############################################################################
-# Stage 1 — Rust backend (frontend embedded via rust-embed)
-###############################################################################
-FROM rust:1-bookworm AS rust-builder
+ARG TARGETARCH
 
+# NOTE: We cannot use alpine here because rusqlite's `libsqlite3-sys` with
+# `preupdate-hook` has a **build-time** dependency on the `bindgen` crate with
+# the `runtime` feature enabled. This in turn requires a dynamically linked
+# libclang.so, alpine's `clang-dev` package won't work :/.
+FROM messense/rust-musl-cross:x86_64-musl AS builder-amd64
+
+ARG RUST_TOOLCHAIN_VERSION=1.95
+RUN rustup default ${RUST_TOOLCHAIN_VERSION}
+RUN rustup target add x86_64-unknown-linux-musl
+
+
+FROM messense/rust-musl-cross:aarch64-musl AS builder-arm64
+
+ARG RUST_TOOLCHAIN_VERSION=1.95
+RUN rustup default ${RUST_TOOLCHAIN_VERSION}
+RUN rustup target add aarch64-unknown-linux-musl
+
+
+FROM builder-${TARGETARCH} AS base-builder
+
+# Install additional build dependencies. git is needed to bake version metadata.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    cmake clang libclang-dev protobuf-compiler libprotobuf-dev \
-    pkg-config libssl-dev \
-    git curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    curl git libssl-dev pkg-config libclang-dev protobuf-compiler libprotobuf-dev libsqlite3-dev
 
-# Pinned to pnpm@9: pnpm@10 mandates build-script approval (ERR_PNPM_IGNORED_BUILDS),
-# which breaks the trailbase assets build script.
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/* \
-    && corepack enable \
-    && corepack prepare pnpm@9 --activate
+# Install node
+ENV PATH=/usr/local/node/bin:$PATH
+ENV NODE_VERSION=22.13.1
 
-RUN curl -fsSL https://bun.sh/install | bash \
-    && ln -s /root/.bun/bin/bun /usr/local/bin/bun
+RUN curl -sL https://github.com/nodenv/node-build/archive/master.tar.gz | tar xz -C /tmp/ && \
+    /tmp/node-build-master/bin/node-build "${NODE_VERSION}" /usr/local/node && \
+    rm -rf /tmp/node-build-master
 
-WORKDIR /workspace
+RUN npm install -g pnpm
+RUN pnpm --version
 
-# Stub-binary cache layer: APP_SKIP_WASM=1 skips the frontend+WASM builds so
-# this layer depends only on Cargo.lock, not on package.json/bun.lock/appsettings.
-COPY Cargo.toml Cargo.lock ./
-COPY app/Cargo.toml ./app/
-RUN mkdir -p app/src && printf 'fn main() {}' > app/src/main.rs
-RUN APP_SKIP_WASM=1 cargo build --release || true
+WORKDIR /app
+COPY . .
 
-COPY app/src/                        ./app/src/
-COPY app/ui/                         ./app/ui/
-COPY app/appsettings.toml            ./app/
-COPY app/appsettings.production.toml ./app/
+# Start by installing all JS dependencies upfront. This is to avoid
+# `node_modules` collisions due to parallel installs later-on while building
+# packages for various crates.
+RUN pnpm -r install --frozen-lockfile
 
-RUN touch app/src/main.rs && cargo build --release
 
-###############################################################################
-# Stage 2 — Runtime (slim)
-###############################################################################
-FROM debian:bookworm-slim
+FROM base-builder AS auth-ui-builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN rustup target add wasm32-wasip2
+RUN RUST_BACKTRACE=1 PNPM_OFFLINE="TRUE" cargo build --target wasm32-wasip2 --release -p trailbase-auth-ui-component
 
-# /workspace/app must match the CARGO_MANIFEST_DIR baked into the binary:
-# Settings::load() and all manifest-relative paths resolve against it.
-WORKDIR /workspace/app
 
-COPY --from=rust-builder /workspace/target/release/server /usr/local/bin/server
+FROM base-builder AS binary-builder
 
-COPY app/appsettings.toml            ./
-COPY app/appsettings.production.toml ./
+ARG TARGETPLATFORM
 
-# Staged outside the volume mount; entrypoint copies into traildepot on every
-# start so fresh image migrations win over stale volume contents.
-COPY app/traildepot/migrations/        /usr/local/share/traildepot-seed/migrations/
+RUN case ${TARGETPLATFORM} in \
+         "linux/arm64")  RUST_TARGET="aarch64-unknown-linux-musl"  ;; \
+         *)              RUST_TARGET="x86_64-unknown-linux-musl"   ;; \
+    esac && \
+    RUST_BACKTRACE=1 PNPM_OFFLINE="TRUE" cargo build --target ${RUST_TARGET} --features=geos-static --release --bin trail && \
+    mv target/${RUST_TARGET}/release/trail /app/trail.exe
 
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+
+FROM alpine:3.23 AS image
+RUN apk add --no-cache tini curl
+
+RUN mkdir -p /app/traildepot/wasm
+
+COPY --from=binary-builder /app/trail.exe /app/trail
+COPY --from=auth-ui-builder /app/target/wasm32-wasip2/release/trailbase_auth_ui_component.wasm /app/traildepot/wasm/
+
+# When `docker run` is executed, launch the binary as unprivileged user.
+RUN adduser -D trailbase
+RUN chown trailbase /app/traildepot
+USER trailbase
+
+WORKDIR /app
 
 EXPOSE 4000
+ENTRYPOINT ["tini", "--"]
 
-ENV APP_ENV=production
+CMD ["/app/trail", "--data-dir", "/app/traildepot", "run", "--address", "0.0.0.0:4000"]
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["server"]
+HEALTHCHECK CMD curl --fail http://localhost:4000/api/healthcheck || exit 1
