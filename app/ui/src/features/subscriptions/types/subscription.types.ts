@@ -63,3 +63,8 @@ export interface SubscriptionInput {
 export interface SubscriptionEventWithSub extends SubscriptionEvent {
   subscriptionName: string;
 }
+
+export interface CatalogResponse {
+  subscriptions: Subscription[];
+  availablePeriods: SubscriptionPeriod[];
+}
