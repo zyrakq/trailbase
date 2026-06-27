@@ -1,4 +1,35 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+vi.hoisted(() => {
+  if (typeof localStorage !== 'undefined') return;
+  const store = new Map<string, string>();
+  const polyfill: Storage = {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key) {
+      return store.has(key) ? (store.get(key) as string) : null;
+    },
+    key(index) {
+      return Array.from(store.keys())[index] ?? null;
+    },
+    removeItem(key) {
+      store.delete(key);
+    },
+    setItem(key, value) {
+      store.set(key, value);
+    },
+  };
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: polyfill,
+    writable: true,
+    configurable: true,
+  });
+});
+
 import type { SubscriptionsService } from './subscriptions.service.ts';
 import { subscriptionsService } from './subscriptions.service.ts';
 
@@ -16,15 +47,8 @@ async function loadService(): Promise<LoadedService> {
 }
 
 describe('SubscriptionsService', () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
-
-  describe('singleton', () => {
-    it('returns the same instance across calls', async () => {
-      const { subscriptionsService, SubscriptionsService } = await loadService();
-      expect(SubscriptionsService.getInstance()).toBe(subscriptionsService);
-    });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('getCatalog / getMine', () => {
@@ -60,7 +84,6 @@ describe('SubscriptionsService', () => {
         })
       );
 
-      const { subscriptionsService } = await loadService();
       const result = await subscriptionsService.getCatalog();
       expect(result.availablePeriods).toEqual(['yearly', 'monthly']);
       expect(result.subscriptions[0]!.pricing[0]!.period).toBe('monthly');
@@ -75,7 +98,6 @@ describe('SubscriptionsService', () => {
       });
       vi.stubGlobal('fetch', fetchMock);
 
-      const { subscriptionsService } = await loadService();
       const result = await subscriptionsService.getMine();
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/subscriptions/mine',

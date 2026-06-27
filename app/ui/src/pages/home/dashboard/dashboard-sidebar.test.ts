@@ -129,4 +129,54 @@ describe('dashboard-sidebar', () => {
 
     document.removeEventListener('section-change', handler);
   });
+
+  it('hides the period filter when availablePeriods is null', async () => {
+    element.availablePeriods = null;
+    await element.updateComplete;
+    expect(element.shadowRoot?.querySelector('.period-filter')).toBeNull();
+  });
+
+  it('hides the period filter when fewer than 2 periods are available', async () => {
+    element.availablePeriods = ['monthly'];
+    await element.updateComplete;
+    expect(element.shadowRoot?.querySelector('.period-filter')).toBeNull();
+  });
+
+  it('renders the filter with all + the provided periods when 2+ are given', async () => {
+    element.availablePeriods = ['monthly', 'yearly'];
+    await element.updateComplete;
+    await new Promise((r) => setTimeout(r, 50));
+    await element.updateComplete;
+
+    const buttons = element.shadowRoot?.querySelectorAll('.period-btn');
+    expect(buttons?.length).toBe(3);
+
+    const labels = Array.from(buttons ?? []).map((b) => b.textContent?.trim());
+    expect(labels).toEqual(['All', 'Monthly', 'Yearly']);
+  });
+
+  it('dispatches period-change with the clicked period', async () => {
+    element.availablePeriods = ['monthly', 'yearly'];
+    await element.updateComplete;
+    await new Promise((r) => setTimeout(r, 50));
+    await element.updateComplete;
+
+    const events: CustomEvent<string>[] = [];
+    const handler = (e: Event): void => {
+      events.push(e as CustomEvent<string>);
+    };
+    element.addEventListener('period-change', handler);
+
+    const buttons = element.shadowRoot?.querySelectorAll(
+      '.period-btn'
+    ) as NodeListOf<HTMLButtonElement>;
+    buttons[2].click();
+
+    expect(events).toHaveLength(1);
+    expect(events[0].detail).toBe('yearly');
+    expect(events[0].bubbles).toBe(true);
+    expect(events[0].composed).toBe(true);
+
+    element.removeEventListener('period-change', handler);
+  });
 });

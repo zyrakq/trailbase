@@ -25,7 +25,6 @@ export class DashboardSidebar extends LitElement {
   @property()
   selectedPeriod: FilterPeriod = 'all';
 
-  // null hides the filter entirely (history section, loading, single period).
   @property({ attribute: false })
   availablePeriods: SubscriptionPeriod[] | null = null;
 
@@ -91,10 +90,7 @@ export class DashboardSidebar extends LitElement {
   }
 
   private _renderPeriodFilter(): TemplateResult {
-    if (!this.availablePeriods || this.availablePeriods.length < 2) {
-      return html``;
-    }
-    const periods: FilterPeriod[] = ['all', ...this.availablePeriods];
+    const periods: FilterPeriod[] = ['all', ...(this.availablePeriods ?? [])];
     return html`
       <div class="period-filter">
         <span class="filter-label">${msg('Period')}</span>
@@ -111,13 +107,16 @@ export class DashboardSidebar extends LitElement {
   }
 
   render() {
+    const showFilter = !!this.availablePeriods && this.availablePeriods.length >= 2;
     return html`
-      <nav class="nav">
-        ${this._renderItem('my-subscriptions', msg('My Subscriptions'))}
-        ${this._renderItem('all-services', msg('All Services'))}
-        ${this._renderItem('history', msg('History'))}
-      </nav>
-      ${this._renderPeriodFilter()}
+      <div class="sidebar">
+        <nav class="nav">
+          ${this._renderItem('my-subscriptions', msg('My Subscriptions'))}
+          ${this._renderItem('all-services', msg('All Services'))}
+          ${this._renderItem('history', msg('History'))}
+        </nav>
+        ${showFilter ? this._renderPeriodFilter() : null}
+      </div>
     `;
   }
 

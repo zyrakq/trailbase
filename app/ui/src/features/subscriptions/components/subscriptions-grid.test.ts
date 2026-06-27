@@ -31,7 +31,8 @@ vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
-  getAll: vi.fn(),
+  getCatalog: vi.fn(),
+  getMine: vi.fn(),
   getUserSubscriptions: vi.fn(),
   error: vi.fn(),
 }));
@@ -40,7 +41,8 @@ vi.mock('./subscription-card', () => ({}));
 
 vi.mock('../services/subscriptions.service', () => ({
   subscriptionsService: {
-    getAll: mocks.getAll,
+    getCatalog: mocks.getCatalog,
+    getMine: mocks.getMine,
     getUserSubscriptions: mocks.getUserSubscriptions,
   },
 }));
@@ -57,9 +59,11 @@ vi.mock('@/features/notifications', () => ({
 import './subscriptions-grid';
 import type { SubscriptionsGrid } from './subscriptions-grid';
 import type {
+  CatalogResponse,
   Subscription,
   UserSubscription,
 } from '../types/subscription.types.ts';
+import type { SubscriptionPeriod } from '../types/subscription.types.ts';
 import { localizationService } from '@/features/localization';
 
 const ACTIVE_SUBSCRIPTIONS: Subscription[] = [
@@ -98,6 +102,13 @@ const ACTIVE_SUBSCRIPTIONS: Subscription[] = [
   },
 ];
 
+const CATALOG_PERIODS: SubscriptionPeriod[] = ['monthly', 'yearly'];
+const MINE_PERIODS: SubscriptionPeriod[] = ['monthly'];
+
+function catalogResponse(subs: Subscription[], periods: SubscriptionPeriod[]): CatalogResponse {
+  return { subscriptions: subs, availablePeriods: periods };
+}
+
 const USER_SUBS: UserSubscription[] = [
   {
     id: 'us1',
@@ -127,7 +138,8 @@ describe('subscriptions-grid', () => {
   let element: SubscriptionsGrid;
 
   beforeEach(() => {
-    mocks.getAll.mockReset();
+    mocks.getCatalog.mockReset();
+    mocks.getMine.mockReset();
     mocks.getUserSubscriptions.mockReset();
     mocks.error.mockReset();
     localizationService.init();
@@ -138,9 +150,9 @@ describe('subscriptions-grid', () => {
   });
 
   it('renders three skeleton placeholders while loading', async () => {
-    const all = controllablePromise<Subscription[]>();
+    const catalog = controllablePromise<CatalogResponse>();
     const userSubs = controllablePromise<UserSubscription[]>();
-    mocks.getAll.mockReturnValue(all.promise);
+    mocks.getCatalog.mockReturnValue(catalog.promise);
     mocks.getUserSubscriptions.mockReturnValue(userSubs.promise);
 
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
@@ -150,25 +162,26 @@ describe('subscriptions-grid', () => {
     const skeletons = element.shadowRoot?.querySelectorAll('.skeleton');
     expect(skeletons?.length).toBe(3);
 
-    all.resolve([]);
+    catalog.resolve(catalogResponse([], []));
     userSubs.resolve([]);
     await settle(element);
   });
 
-  it('renders a card per active subscription in mode="all"', async () => {
-    mocks.getAll.mockResolvedValue(ACTIVE_SUBSCRIPTIONS);
+  it('renders a card per subscription in mode="all" via getCatalog', async () => {
+    mocks.getCatalog.mockResolvedValue(catalogResponse(ACTIVE_SUBSCRIPTIONS, CATALOG_PERIODS));
     mocks.getUserSubscriptions.mockResolvedValue(USER_SUBS);
 
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
     document.body.appendChild(element);
     await settle(element);
 
+    expect(mocks.getCatalog).toHaveBeenCalledOnce();
     const cards = element.shadowRoot?.querySelectorAll('subscription-card');
     expect(cards?.length).toBe(ACTIVE_SUBSCRIPTIONS.length);
   });
 
-  it('filters items to user subscriptions in mode="user"', async () => {
-    mocks.getAll.mockResolvedValue(ACTIVE_SUBSCRIPTIONS);
+  it('filters items to user subscriptions in mode="user" via getMine', async () => {
+    mocks.getMine.mockResolvedValue(catalogResponse([ACTIVE_SUBSCRIPTIONS[0]!], MINE_PERIODS));
     mocks.getUserSubscriptions.mockResolvedValue(USER_SUBS);
 
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
@@ -176,12 +189,67 @@ describe('subscriptions-grid', () => {
     document.body.appendChild(element);
     await settle(element);
 
+    expect(mocks.getMine).toHaveBeenCalledOnce();
     const cards = element.shadowRoot?.querySelectorAll('subscription-card');
     expect(cards?.length).toBe(1);
   });
 
+  it('dispatches periods-loaded with availablePeriods after loading (all mode)', async () => {
+    mocks.getCatalog.mockResolvedValue(catalogResponse(ACTIVE_SUBSCRIPTIONS, CATALOG_PERIODS));
+    mocks.getUserSubscriptions.mockResolvedValue(USER_SUBS);
+
+    element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
+    document.body.appendChild(element);
+
+    const captured: SubscriptionPeriod[][] = [];
+    element.addEventListener('periods-loaded', (e: Event) => {
+      captured.push((e as CustomEvent<SubscriptionPeriod[]>).detail);
+    });
+    await settle(element);
+
+    expect(captured).toContainEqual(CATALOG_PERIODS);
+  });
+
+  it('dispatches periods-loaded with availablePeriods after loading (user mode)', async () => {
+    mocks.getMine.mockResolvedValue(catalogResponse([ACTIVE_SUBSCRIPTIONS[0]!], MINE_PERIODS));
+    mocks.getUserSubscriptions.mockResolvedValue(USER_SUBS);
+
+    element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
+    element.mode = 'user';
+    document.body.appendChild(element);
+
+    const captured: SubscriptionPeriod[][] = [];
+    element.addEventListener('periods-loaded', (e: Event) => {
+      captured.push((e as CustomEvent<SubscriptionPeriod[]>).detail);
+    });
+    await settle(element);
+
+    expect(captured).toContainEqual(MINE_PERIODS);
+  });
+
+  it('periods-loaded event bubbles and is composed', async () => {
+    mocks.getCatalog.mockResolvedValue(catalogResponse(ACTIVE_SUBSCRIPTIONS, CATALOG_PERIODS));
+    mocks.getUserSubscriptions.mockResolvedValue(USER_SUBS);
+
+    element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
+    document.body.appendChild(element);
+
+    let observed: CustomEvent | null = null;
+    document.addEventListener('periods-loaded', (e: Event) => {
+      observed = e as CustomEvent;
+    });
+
+    await settle(element);
+
+    expect(observed).not.toBeNull();
+    expect(observed?.bubbles).toBe(true);
+    expect(observed?.composed).toBe(true);
+
+    document.removeEventListener('periods-loaded', () => {});
+  });
+
   it('shows empty state when mode="user" and the user has no subscriptions', async () => {
-    mocks.getAll.mockResolvedValue(ACTIVE_SUBSCRIPTIONS);
+    mocks.getMine.mockResolvedValue(catalogResponse([], MINE_PERIODS));
     mocks.getUserSubscriptions.mockResolvedValue([]);
 
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
@@ -196,7 +264,7 @@ describe('subscriptions-grid', () => {
   });
 
   it('dispatches mode-change with detail "all" when the empty-state button is clicked', async () => {
-    mocks.getAll.mockResolvedValue(ACTIVE_SUBSCRIPTIONS);
+    mocks.getMine.mockResolvedValue(catalogResponse([], MINE_PERIODS));
     mocks.getUserSubscriptions.mockResolvedValue([]);
 
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
@@ -220,7 +288,7 @@ describe('subscriptions-grid', () => {
   });
 
   it('shows empty state and surfaces a notification when the load fails', async () => {
-    mocks.getAll.mockRejectedValue(new Error('Network error'));
+    mocks.getCatalog.mockRejectedValue(new Error('Network error'));
     mocks.getUserSubscriptions.mockResolvedValue([]);
 
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
@@ -233,14 +301,14 @@ describe('subscriptions-grid', () => {
   });
 
   it('reloads when a bubbled subscription-subscribed event fires', async () => {
-    mocks.getAll.mockResolvedValue(ACTIVE_SUBSCRIPTIONS);
+    mocks.getCatalog.mockResolvedValue(catalogResponse(ACTIVE_SUBSCRIPTIONS, CATALOG_PERIODS));
     mocks.getUserSubscriptions.mockResolvedValue(USER_SUBS);
 
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
     document.body.appendChild(element);
     await settle(element);
 
-    expect(mocks.getAll).toHaveBeenCalledTimes(1);
+    expect(mocks.getCatalog).toHaveBeenCalledTimes(1);
 
     element.dispatchEvent(
       new CustomEvent('subscription-subscribed', {
@@ -250,18 +318,18 @@ describe('subscriptions-grid', () => {
     );
     await settle(element);
 
-    expect(mocks.getAll).toHaveBeenCalledTimes(2);
+    expect(mocks.getCatalog).toHaveBeenCalledTimes(2);
   });
 
   it('reloads when a bubbled subscription-cancelled event fires', async () => {
-    mocks.getAll.mockResolvedValue(ACTIVE_SUBSCRIPTIONS);
+    mocks.getCatalog.mockResolvedValue(catalogResponse(ACTIVE_SUBSCRIPTIONS, CATALOG_PERIODS));
     mocks.getUserSubscriptions.mockResolvedValue(USER_SUBS);
 
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
     document.body.appendChild(element);
     await settle(element);
 
-    expect(mocks.getAll).toHaveBeenCalledTimes(1);
+    expect(mocks.getCatalog).toHaveBeenCalledTimes(1);
 
     element.dispatchEvent(
       new CustomEvent('subscription-cancelled', {
@@ -271,34 +339,35 @@ describe('subscriptions-grid', () => {
     );
     await settle(element);
 
-    expect(mocks.getAll).toHaveBeenCalledTimes(2);
+    expect(mocks.getCatalog).toHaveBeenCalledTimes(2);
   });
 
   it('reloads when the mode property changes', async () => {
-    mocks.getAll.mockResolvedValue(ACTIVE_SUBSCRIPTIONS);
+    mocks.getCatalog.mockResolvedValue(catalogResponse(ACTIVE_SUBSCRIPTIONS, CATALOG_PERIODS));
+    mocks.getMine.mockResolvedValue(catalogResponse([ACTIVE_SUBSCRIPTIONS[0]!], MINE_PERIODS));
     mocks.getUserSubscriptions.mockResolvedValue(USER_SUBS);
 
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
     document.body.appendChild(element);
     await settle(element);
 
-    expect(mocks.getAll).toHaveBeenCalledTimes(1);
+    expect(mocks.getCatalog).toHaveBeenCalledTimes(1);
 
     element.mode = 'user';
     await settle(element);
 
-    expect(mocks.getAll).toHaveBeenCalledTimes(2);
+    expect(mocks.getMine).toHaveBeenCalled();
   });
 
   it('removes the event listeners on disconnect', async () => {
-    mocks.getAll.mockResolvedValue(ACTIVE_SUBSCRIPTIONS);
+    mocks.getCatalog.mockResolvedValue(catalogResponse(ACTIVE_SUBSCRIPTIONS, CATALOG_PERIODS));
     mocks.getUserSubscriptions.mockResolvedValue(USER_SUBS);
 
     element = document.createElement('subscriptions-grid') as SubscriptionsGrid;
     document.body.appendChild(element);
     await settle(element);
 
-    const callsBefore = mocks.getAll.mock.calls.length;
+    const callsBefore = mocks.getCatalog.mock.calls.length;
     element.remove();
 
     element.dispatchEvent(
@@ -309,6 +378,6 @@ describe('subscriptions-grid', () => {
     );
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(mocks.getAll.mock.calls.length).toBe(callsBefore);
+    expect(mocks.getCatalog.mock.calls.length).toBe(callsBefore);
   });
 });
