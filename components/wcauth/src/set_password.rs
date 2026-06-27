@@ -21,11 +21,16 @@ pub(crate) async fn set_password_handler(
     user: &trailbase_wasm::http::User,
     body: Vec<u8>,
 ) -> Result<Response, HttpError> {
+    let email = user
+        .email
+        .clone()
+        .ok_or_else(|| HttpError::status(StatusCode::UNAUTHORIZED))?;
+
     let req: SetPasswordRequest = serde_json::from_slice(&body).map_err(bad_request)?;
 
     let rows = db::query(
         r#"SELECT password_hash FROM "_user" WHERE email = ?"#,
-        vec![db::Value::Text(user.email.clone())],
+        vec![db::Value::Text(email.clone())],
     )
     .await
     .map_err(internal)?;
@@ -74,7 +79,7 @@ pub(crate) async fn set_password_handler(
 
     let rows_affected = db::execute(
         r#"UPDATE "_user" SET password_hash = ? WHERE email = ? AND password_hash = ''"#,
-        vec![db::Value::Text(hash), db::Value::Text(user.email.clone())],
+        vec![db::Value::Text(hash), db::Value::Text(email)],
     )
     .await
     .map_err(internal)?;

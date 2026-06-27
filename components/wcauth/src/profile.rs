@@ -1,6 +1,6 @@
 use serde::Serialize;
 use trailbase_wasm::db;
-use trailbase_wasm::http::{HttpError, IntoResponse, Json, Response};
+use trailbase_wasm::http::{HttpError, IntoResponse, Json, Response, StatusCode};
 use trailbase_wasm::kv::Store;
 
 use crate::config::{default_min_length, AuthConfig};
@@ -36,9 +36,14 @@ impl Default for PasswordPolicy {
 pub(crate) async fn profile_capabilities_handler(
     user: &trailbase_wasm::http::User,
 ) -> Result<Response, HttpError> {
+    let email = user
+        .email
+        .clone()
+        .ok_or_else(|| HttpError::status(trailbase_wasm::http::StatusCode::UNAUTHORIZED))?;
+
     let rows = db::query(
         r#"SELECT provider_id, password_hash FROM "_user" WHERE email = ?"#,
-        vec![db::Value::Text(user.email.clone())],
+        vec![db::Value::Text(email)],
     )
     .await
     .map_err(internal)?;
