@@ -11,6 +11,6 @@ rebuild = true
 refetch = false
 
 # [[components.items]]
-# name = "auth_ui"
-# wasm = "auth_ui.wasm"
-# source = { zip_name = "auth_ui_component.wasm",  fetch = "https://github.com/trailbaseio/trailbase/releases/download/v0.28.6/trailbase_v0.28.6_wasm_auth_ui.zip" }
+# name = "trailbase-auth-ui"
+# wasm = "trailbase_auth_ui.wasm"
+# source = { zip_name = "trailbase_auth_ui_component.wasm",  fetch = "https://github.com/trailbaseio/trailbase/releases/download/v0.29.0/trailbase_v0.29.0_wasm_auth_ui.zip" }

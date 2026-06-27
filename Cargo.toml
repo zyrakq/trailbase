@@ -20,8 +20,9 @@ config = { version = "0.15", features = ["toml"] }
 # Dependencies required by vendor/trailbase/crates/auth-ui (built as workspace member).
 askama = { version = "0.16.0", default-features = false, features = ["derive", "std", "config"] }
 rust-embed = { version = "8.4.0", default-features = false, features = ["mime-guess"] }
-trailbase-wasm = { git = "https://github.com/zyrakq/trailbase" }
+trailbase-auth-config = { git = "https://github.com/zyrakq/trailbase" }
 trailbase-build = { git = "https://github.com/zyrakq/trailbase" }
+trailbase-wasm = { git = "https://github.com/zyrakq/trailbase" }
 
 trailbase = { git = "https://github.com/zyrakq/trailbase", default-features = false, features = ["wasm", "pg"] }
 mailcrab = { git = "https://github.com/zyrakq/mailcrab" }
@@ -32,8 +33,9 @@ mailcrab-server = { git = "https://github.com/zyrakq/mailcrab" }
 # affects top-level builds of this workspace.
 [patch."https://github.com/zyrakq/trailbase"]
 trailbase = { path = "./vendor/trailbase/crates/core" }
-trailbase-wasm = { path = "./vendor/trailbase/crates/wasm-runtime-guest" }
+trailbase-auth-config = { path = "./vendor/trailbase/crates/auth-config" }
 trailbase-build = { path = "./vendor/trailbase/crates/build" }
+trailbase-wasm = { path = "./vendor/trailbase/crates/wasm-runtime-guest" }
 
 [patch."https://github.com/zyrakq/mailcrab"]
 mailcrab = { path = "./vendor/mailcrab/mailcrab" }
