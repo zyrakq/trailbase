@@ -37,6 +37,9 @@
     "MD036": false,
     "MD041": false
   },
+  "files.exclude": {
+    "**/.git": false
+  },
   "rust-analyzer.cachePriming.enable": false,
   "rust-analyzer.check.workspace": false,
   "rust-analyzer.procMacro.enable": true,
