@@ -27,24 +27,62 @@ describe('SubscriptionsService', () => {
     });
   });
 
-  describe('getAll', () => {
-    it('returns only active subscriptions', async () => {
-      const { subscriptionsService } = await loadService();
-      const result = await subscriptionsService.getAll();
-
-      expect(result.length).toBeGreaterThan(0);
-      expect(result.every((s) => s.status === 'active')).toBe(true);
-      expect(result.some((s) => s.name === 'Grafana (Legacy)')).toBe(false);
+  describe('getCatalog / getMine', () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
     });
 
-    it('includes the active mock subscriptions', async () => {
-      const { subscriptionsService } = await loadService();
-      const result = await subscriptionsService.getAll();
-      const names = result.map((s) => s.name);
+    it('getCatalog maps the response and renames available_periods', async () => {
+      const payload = {
+        subscriptions: [
+          {
+            id: 'abc',
+            name: 'Pro',
+            description: '',
+            logo_url: '',
+            resource_url: '',
+            status: 'active',
+            created_at: 1700000000,
+            updated_at: 1700000000,
+            pricing: [
+              { id: 'p1', subscription_id: 'abc', period: 'monthly', price: 5, currency: 'USD', is_archived: 0 },
+            ],
+          },
+        ],
+        available_periods: ['yearly', 'monthly'],
+      };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          text: () => Promise.resolve(''),
+          json: () => Promise.resolve(payload),
+        })
+      );
 
-      expect(names).toContain('Gitea');
-      expect(names).toContain('Nextcloud');
-      expect(names).toContain('Vaultwarden');
+      const { subscriptionsService } = await loadService();
+      const result = await subscriptionsService.getCatalog();
+      expect(result.availablePeriods).toEqual(['yearly', 'monthly']);
+      expect(result.subscriptions[0]!.pricing[0]!.period).toBe('monthly');
+      expect(result.subscriptions[0]!.pricing[0]!.is_archived).toBe(false);
+    });
+
+    it('getMine hits /api/subscriptions/mine', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(''),
+        json: () => Promise.resolve({ subscriptions: [], available_periods: [] }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { subscriptionsService } = await loadService();
+      const result = await subscriptionsService.getMine();
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/subscriptions/mine',
+        expect.objectContaining({ credentials: 'include' })
+      );
+      expect(result.subscriptions).toEqual([]);
+      expect(result.availablePeriods).toEqual([]);
     });
   });
 
