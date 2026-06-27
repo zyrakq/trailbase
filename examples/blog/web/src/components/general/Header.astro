@@ -1,0 +1,37 @@
+---
+import HamburgerButton from "./HamburgerButton.astro";
+import ModeSwitch from "./ModeSwitch.astro";
+import Navigation from "./Navigation.astro";
+
+import { AuthButton } from "@/components/Auth";
+import { ArticleComposeButton } from "@/components/ArticleComposeButton";
+
+const headerStyle =
+  "container mx-auto max-w-screen-xl px-7 py-10 bg-white flex flex-initial flex-row gap-10 items-center justify-between transition-all duration-300 dark:bg-pacamara-dark relative z-20";
+const logoStyle =
+  "font-bold font-pacamara-space text-lg hover:text-pacamara-accent transition-all duration-300 dark:text-white dark:hover:text-pacamara-accent";
+---
+
+<div
+  id="navigation_wrapper"
+  class="absolute left-0 top-0 z-10 hidden w-full flex-1 bg-pacamara-white p-7 pt-[112px] shadow-2xl transition-all duration-300 dark:bg-pacamara-dark"
+>
+  <Navigation />
+</div>
+
+<header class={headerStyle}>
+  <div class="flex-none">
+    <a href="/" class={logoStyle}>TrailBase</a>
+  </div>
+
+  <div class="hidden flex-1 md:block">
+    <Navigation />
+  </div>
+
+  <div class="relative flex flex-initial flex-row items-center gap-5">
+    <ArticleComposeButton client:only="solid-js" />
+    <AuthButton client:only="solid-js" />
+    <ModeSwitch />
+    <HamburgerButton />
+  </div>
+</header>

@@ -1,0 +1,12 @@
+[package]
+name = "custom-binary"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+axum = "^0.8.1"
+env_logger = { workspace = true }
+tokio = { workspace = true }
+tokio-rustls = { workspace = true }
+trailbase = { workspace = true }

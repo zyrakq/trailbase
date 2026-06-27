@@ -1,0 +1,30 @@
+{
+  "title": "profiles_view",
+  "type": "object",
+  "properties": {
+    "user": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "created": {
+      "type": "integer"
+    },
+    "updated": {
+      "type": "integer"
+    },
+    "avatar_url": {
+      "type": "string"
+    },
+    "is_editor": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "user",
+    "username",
+    "created",
+    "updated"
+  ]
+}

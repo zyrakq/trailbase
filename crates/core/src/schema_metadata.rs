@@ -1,0 +1,927 @@
+use fallible_iterator::FallibleIterator;
+use log::*;
+use parking_lot::RwLock;
+use std::sync::Arc;
+use thiserror::Error;
+use trailbase_extension::jsonschema::JsonSchemaRegistry;
+use trailbase_schema::parse::parse_into_statement;
+use trailbase_schema::sqlite::{Table, View};
+use trailbase_sqlite::{ConnectionType, params, unpack_other_error};
+
+pub use trailbase_schema::metadata::{
+  ConnectionMetadata, JsonColumnMetadata, JsonSchemaError, TableMetadata,
+};
+
+use crate::constants::SQLITE_SCHEMA_TABLE;
+
+#[derive(Debug, Error)]
+pub enum SchemaLookupError {
+  #[error("SqlError: {0}")]
+  Sql(#[from] trailbase_sqlite::Error),
+  #[error("FromSqlError: {0}")]
+  FromSql(#[from] trailbase_sqlite::from_sql::FromSqlError),
+  #[error("SchemaError: {0}")]
+  Schema(#[from] trailbase_schema::sqlite::SchemaError),
+  #[error("InvalidSqlStatement")]
+  InvalidSqlStatement,
+  #[error("QueryReturnedNoRows")]
+  QueryReturnedNoRows,
+  #[error("SqlParseError: {0}")]
+  SqlParse(#[from] sqlite3_parser::lexer::sql::Error),
+  #[error("JsonSchemaError: {0}")]
+  JsonSchema(#[from] trailbase_schema::metadata::JsonSchemaError),
+  #[error("NotFound")]
+  NotFound,
+  #[cfg(feature = "pg")]
+  #[error("PgSchema: {0}")]
+  PgSchema(#[from] trailbase_pg_schema::Error),
+}
+
+pub(crate) async fn build_metadata(
+  conn: &trailbase_sqlite::Connection,
+  json_schema_registry: &Arc<RwLock<trailbase_schema::registry::JsonSchemaRegistry>>,
+) -> Result<ConnectionMetadata, SchemaLookupError> {
+  let json_schema_registry = json_schema_registry.clone();
+
+  // Nested impl just for packaging error.
+  fn build_metadata_impl(
+    conn: &mut trailbase_sqlite::SyncConnection,
+    connection_type: ConnectionType,
+    json_schema_registry: &Arc<RwLock<trailbase_schema::registry::JsonSchemaRegistry>>,
+  ) -> Result<ConnectionMetadata, SchemaLookupError> {
+    let tables = lookup_and_parse_all_table_schemas(conn, connection_type)?;
+    let views = lookup_and_parse_all_view_schemas(conn, connection_type, &tables)?;
+
+    return build_connection_metadata_and_install_file_deletion_triggers(
+      conn,
+      connection_type,
+      tables,
+      views,
+      json_schema_registry,
+    );
+  }
+
+  let connection_type = conn.connection_type();
+  return conn
+    .call_writer(move |mut conn| -> Result<_, trailbase_sqlite::Error> {
+      return build_metadata_impl(&mut conn, connection_type, &json_schema_registry)
+        .map_err(|err| trailbase_sqlite::Error::Other(err.into()));
+    })
+    .await
+    .map_err(|err| {
+      // Unpack potentially packed SchemaLookupErrors.
+      return match unpack_other_error::<SchemaLookupError>(err) {
+        Ok(schema_lookup_err) => schema_lookup_err,
+        Err(sql_err) => sql_err.into(),
+      };
+    });
+}
+
+// FIXME: Table name is unqualified.
+pub async fn lookup_and_parse_table_schema(
+  conn: &trailbase_sqlite::Connection,
+  table_name: &str,
+  database: Option<&str>,
+) -> Result<Table, SchemaLookupError> {
+  #[cfg(feature = "pg")]
+  return match conn.connection_type() {
+    ConnectionType::Pg => lookup_and_parse_table_schema_pg(conn, table_name).await,
+    ConnectionType::Sqlite => {
+      lookup_and_parse_table_schema_sqlite(conn, table_name, database).await
+    }
+  };
+
+  #[cfg(not(feature = "pg"))]
+  return lookup_and_parse_table_schema_sqlite(conn, table_name, database).await;
+}
+
+async fn lookup_and_parse_table_schema_sqlite(
+  conn: &trailbase_sqlite::Connection,
+  table_name: &str,
+  database: Option<&str>,
+) -> Result<Table, SchemaLookupError> {
+  // Then get the actual table.
+  let sql: String = conn
+    .read_query_row_get(
+      format!(
+        "SELECT sql FROM \"{db}\".{SQLITE_SCHEMA_TABLE} WHERE type = 'table' AND name = $1",
+        db = database.unwrap_or("main")
+      ),
+      params!(table_name.to_string()),
+      0,
+    )
+    .await?
+    .ok_or(SchemaLookupError::QueryReturnedNoRows)?;
+
+  let Some(stmt) = parse_into_statement(&sql)? else {
+    return Err(SchemaLookupError::InvalidSqlStatement);
+  };
+
+  let mut table: Table = stmt.try_into()?;
+  if let Some(database) = database {
+    table.name.database_schema = Some(database.to_string());
+  }
+  return Ok(table);
+}
+
+#[cfg(feature = "pg")]
+async fn lookup_and_parse_table_schema_pg(
+  conn: &trailbase_sqlite::Connection,
+  table_name: &str,
+) -> Result<Table, SchemaLookupError> {
+  // TODO: We could just query for a specific table rather than for all and filter.
+  let tables = conn
+    .call_writer(|mut conn| -> Result<_, trailbase_sqlite::Error> {
+      return lookup_and_parse_all_table_schemas_pg(&mut conn)
+        .map_err(|err| trailbase_sqlite::Error::Other(err.into()));
+    })
+    .await?;
+
+  return tables
+    .into_iter()
+    .find(|t| t.name.name == table_name)
+    .ok_or(SchemaLookupError::NotFound);
+}
+
+/// (Re-)build the connections schema representation *with* the side-effect of (re-)installing file
+/// deletion triggers.
+///
+/// Tying the construction of schema metadata and the (re-)installing of file deletion triggers so
+/// closely together is a necessary evil. For example, whenever a schema changes, e.g. a new file
+/// column is added, we need to rebuild the metadata and update or install missing triggers.
+fn build_connection_metadata_and_install_file_deletion_triggers(
+  conn: &mut impl trailbase_sqlite::SyncConnectionTrait,
+  connection_type: ConnectionType,
+  tables: Vec<Table>,
+  views: Vec<View>,
+  registry: &RwLock<JsonSchemaRegistry>,
+) -> Result<ConnectionMetadata, SchemaLookupError> {
+  let metadata = ConnectionMetadata::from_schemas(tables, views, &registry.read())?;
+
+  setup_file_deletion_triggers(conn, connection_type, &metadata)?;
+
+  return Ok(metadata);
+}
+
+// Install file column triggers. This ain't pretty, this might be better on construction and
+// schema changes.
+fn setup_file_deletion_triggers(
+  conn: &mut impl trailbase_sqlite::SyncConnectionTrait,
+  connection_type: ConnectionType,
+  metadata: &ConnectionMetadata,
+) -> Result<(), trailbase_sqlite::Error> {
+  for metadata in metadata.tables.values() {
+    for column_meta in &metadata.column_metadata {
+      if !column_meta.is_file {
+        continue;
+      }
+
+      let table_name = &metadata.schema.name;
+      let unqualified_name = &metadata.schema.name.name;
+      let db = metadata
+        .schema
+        .name
+        .database_schema
+        .as_deref()
+        .unwrap_or(match connection_type {
+          ConnectionType::Pg => "public",
+          ConnectionType::Sqlite => "main",
+        });
+
+      let column_name = &column_meta.column.name;
+
+      conn.execute_batch(match connection_type {
+          ConnectionType::Pg => format!(
+            "\
+            CREATE OR REPLACE FUNCTION \"__{unqualified_name}__{column_name}__trigger_fun\"() RETURNS TRIGGER AS $$ \
+              BEGIN \
+                IF TG_OP = 'UPDATE' THEN
+                  INSERT INTO _file_deletions (table_name, record_rowid, column_name, json, updated_json) VALUES \
+                    ('{table_name}', OLD.ctid, '{column_name}', OLD.\"{column_name}\", NEW.\"{column_name}\");
+
+                  RETURN NEW;
+                ELSE
+                  INSERT INTO _file_deletions (table_name, record_rowid, column_name, json) VALUES \
+                    ('{table_name}', OLD.ctid, '{column_name}', OLD.\"{column_name}\");
+
+                  RETURN OLD;
+                END IF;
+              END; \
+            $$ LANGUAGE plpgsql; \
+            \
+            CREATE OR REPLACE TRIGGER \"__{unqualified_name}__{column_name}__update_trigger\" \
+              AFTER UPDATE ON {table_name} FOR EACH ROW \
+              WHEN (OLD.\"{column_name}\" IS NOT NULL AND OLD.\"{column_name}\" != NEW.\"{column_name}\") \
+              EXECUTE FUNCTION \"__{unqualified_name}__{column_name}__trigger_fun\"(); \
+            \
+            CREATE OR REPLACE TRIGGER \"__{unqualified_name}__{column_name}__delete_trigger\" \
+              AFTER DELETE ON {table_name} FOR EACH ROW \
+              WHEN (OLD.\"{column_name}\" IS NOT NULL) \
+              EXECUTE FUNCTION \"__{unqualified_name}__{column_name}__trigger_fun\"(); \
+          "),
+          ConnectionType::Sqlite => format!(
+            "\
+            DROP TRIGGER IF EXISTS \"{db}\".\"__{unqualified_name}__{column_name}__update_trigger\"; \
+            CREATE TRIGGER IF NOT EXISTS \"{db}\".\"__{unqualified_name}__{column_name}__update_trigger\" AFTER UPDATE ON {table_name} \
+              WHEN OLD.\"{column_name}\" IS NOT NULL AND OLD.\"{column_name}\" != NEW.\"{column_name}\" \
+              BEGIN \
+                INSERT INTO _file_deletions (table_name, record_rowid, column_name, json, updated_json) VALUES \
+                  ('{table_name}', OLD._rowid_, '{column_name}', OLD.\"{column_name}\", NEW.\"{column_name}\"); \
+              END; \
+            \
+            DROP TRIGGER IF EXISTS \"{db}\".\"__{unqualified_name}__{column_name}__delete_trigger\"; \
+            CREATE TRIGGER IF NOT EXISTS \"{db}\".\"__{unqualified_name}__{column_name}__delete_trigger\" AFTER DELETE ON {table_name} \
+              WHEN OLD.\"{column_name}\" IS NOT NULL \
+              BEGIN \
+                INSERT INTO _file_deletions (table_name, record_rowid, column_name, json) VALUES \
+                  ('{table_name}', OLD._rowid_, '{column_name}', OLD.\"{column_name}\"); \
+              END; \
+            ",
+            table_name = table_name.escaped_string(),
+          ),
+        })?;
+    }
+  }
+
+  return Ok(());
+}
+
+fn lookup_and_parse_all_table_schemas(
+  conn: &mut impl trailbase_sqlite::SyncConnectionTrait,
+  #[allow(unused)] connection_type: ConnectionType,
+) -> Result<Vec<Table>, SchemaLookupError> {
+  #[cfg(feature = "pg")]
+  return match connection_type {
+    ConnectionType::Pg => lookup_and_parse_all_table_schemas_pg(conn),
+    ConnectionType::Sqlite => lookup_and_parse_all_table_schemas_sqlite(conn),
+  };
+
+  #[cfg(not(feature = "pg"))]
+  return lookup_and_parse_all_table_schemas_sqlite(conn);
+}
+
+#[cfg(feature = "pg")]
+fn lookup_and_parse_all_table_schemas_pg(
+  conn: &mut impl trailbase_sqlite::SyncConnectionTrait,
+) -> Result<Vec<Table>, SchemaLookupError> {
+  return Ok(trailbase_pg_schema::build_all_table_schemas(conn)?);
+}
+
+fn lookup_and_parse_all_table_schemas_sqlite(
+  conn: &mut impl trailbase_sqlite::SyncConnectionTrait,
+) -> Result<Vec<Table>, SchemaLookupError> {
+  let databases = list_databases(conn)?;
+
+  let mut tables: Vec<Table> = vec![];
+  for db in databases {
+    let query = format!(
+      "SELECT sql FROM \"{db}\".{SQLITE_SCHEMA_TABLE} WHERE type = 'table'",
+      db = db.name
+    );
+
+    for row in conn.query_rows(&query, ())? {
+      let sql: String = row.get(0)?;
+      let Some(stmt) = parse_into_statement(&sql)? else {
+        return Err(SchemaLookupError::InvalidSqlStatement);
+      };
+      tables.push({
+        let mut table: Table = stmt.try_into()?;
+        table.name.database_schema = Some(db.name.clone());
+        table
+      });
+    }
+  }
+
+  return Ok(tables);
+}
+
+fn lookup_and_parse_all_view_schemas(
+  conn: &mut impl trailbase_sqlite::SyncConnectionTrait,
+  #[allow(unused)] connection_type: ConnectionType,
+  tables: &[Table],
+) -> Result<Vec<View>, SchemaLookupError> {
+  #[cfg(feature = "pg")]
+  match connection_type {
+    ConnectionType::Pg => Ok(trailbase_pg_schema::build_all_view_schemas(conn)?),
+    ConnectionType::Sqlite => lookup_and_parse_all_view_schemas_sqlite(conn, tables),
+  }
+
+  #[cfg(not(feature = "pg"))]
+  return lookup_and_parse_all_view_schemas_sqlite(conn, tables);
+}
+
+fn lookup_and_parse_all_view_schemas_sqlite(
+  conn: &mut impl trailbase_sqlite::SyncConnectionTrait,
+  tables: &[Table],
+) -> Result<Vec<View>, SchemaLookupError> {
+  let databases = list_databases(conn)?;
+
+  let mut views: Vec<View> = vec![];
+  for db in databases {
+    // Then get the actual views.
+    let query = format!(
+      "SELECT sql FROM \"{db}\".{SQLITE_SCHEMA_TABLE} WHERE type = 'view'",
+      db = db.name
+    );
+
+    for row in conn.query_rows(&query, ())? {
+      let sql: String = row.get(0)?;
+      match sqlite3_parse_view(&sql, tables) {
+        Ok(mut view) => {
+          view.name.database_schema = Some(db.name.clone());
+          views.push(view);
+        }
+        Err(err) => {
+          error!("Failed to parse VIEW definition '{sql}': {err}");
+        }
+      }
+    }
+  }
+
+  return Ok(views);
+}
+
+fn sqlite3_parse_view(sql: &str, tables: &[Table]) -> Result<View, SchemaLookupError> {
+  let mut parser = sqlite3_parser::lexer::sql::Parser::new(sql.as_bytes());
+  match parser.next()? {
+    None => Err(SchemaLookupError::InvalidSqlStatement),
+    Some(cmd) => {
+      use sqlite3_parser::ast::Cmd;
+      match cmd {
+        Cmd::Stmt(stmt) => Ok(View::from(stmt, tables)?),
+        Cmd::Explain(_) | Cmd::ExplainQueryPlan(_) => Err(SchemaLookupError::InvalidSqlStatement),
+      }
+    }
+  }
+}
+
+fn list_databases(
+  conn: &mut impl trailbase_sqlite::SyncConnectionTrait,
+) -> Result<Vec<trailbase_sqlite::Database>, trailbase_sqlite::Error> {
+  let rows = conn.query_rows("SELECT seq, name FROM pragma_database_list", ())?;
+
+  return rows
+    .iter()
+    .map(|row| {
+      return Ok(trailbase_sqlite::Database {
+        seq: row.get(0)?,
+        name: row.get(1)?,
+      });
+    })
+    .collect::<Result<Vec<_>, _>>();
+}
+
+#[cfg(test)]
+mod tests {
+  use axum::extract::{Json, Path, Query, RawQuery, State};
+  use serde_json::json;
+  use trailbase_schema::QualifiedName;
+  use trailbase_schema::json_schema::{Expand, JsonSchemaMode, build_json_schema_expanded};
+  use trailbase_schema::sqlite::{Column, ColumnAffinityType, ColumnDataType, ColumnOption};
+  use trailbase_sqlite::ConnectionType;
+
+  use crate::app_state::*;
+  use crate::config::proto::{PermissionFlag, RecordApiConfig};
+  use crate::connection::ConnectionEntry;
+  use crate::records::list_records::{ListOrGeoJSONResponse, list_records_handler};
+  use crate::records::read_record::{ReadRecordQuery, read_record_handler};
+  use crate::records::test_utils::add_record_api_config;
+  use crate::test_utils::*;
+
+  #[tokio::test]
+  async fn test_column_nullability() {
+    let state = test_state(None).await.unwrap();
+    let conn = state.conn();
+    let connection_type = conn.connection_type();
+
+    conn
+      .execute_batch(format!(
+        "
+          CREATE TABLE test (
+              id  {serial} PRIMARY KEY,
+              a   int NOT NULL,
+              b   INT NULL,
+              c   INTEGER
+          ) {strict};
+
+          INSERT INTO test (a, b, c) VALUES (5, NULL, NULL), (6, 1, 2);
+        ",
+        strict = strict(conn),
+        serial = serial_column(conn),
+      ))
+      .await
+      .unwrap();
+
+    state.rebuild_connection_metadata().await.unwrap();
+
+    let ConnectionEntry { metadata, .. } = state.connection_manager().main_entry();
+
+    let test_table = metadata
+      .get_table(&QualifiedName {
+        name: "test".to_string(),
+        database_schema: None,
+      })
+      .unwrap();
+
+    assert_eq!(4, test_table.schema.columns.len());
+    assert_eq!(
+      test_table.schema.columns[1],
+      Column {
+        name: "a".to_string(),
+        type_name: match connection_type {
+          ConnectionType::Pg => "integer".to_string(),
+          ConnectionType::Sqlite => "int".to_string(),
+        },
+        data_type: ColumnDataType::Integer,
+        affinity_type: ColumnAffinityType::Integer,
+        options: vec![ColumnOption::NotNull,],
+      }
+    );
+    assert_eq!(
+      test_table.schema.columns[2],
+      Column {
+        name: "b".to_string(),
+        type_name: match connection_type {
+          ConnectionType::Pg => "integer".to_string(),
+          ConnectionType::Sqlite => "INT".to_string(),
+        },
+        data_type: ColumnDataType::Integer,
+        affinity_type: ColumnAffinityType::Integer,
+        options: match connection_type {
+          ConnectionType::Pg => vec![],
+          ConnectionType::Sqlite => vec![ColumnOption::Null],
+        },
+      }
+    );
+    assert_eq!(
+      test_table.schema.columns[3],
+      Column {
+        name: "c".to_string(),
+        type_name: match connection_type {
+          ConnectionType::Pg => "integer".to_string(),
+          ConnectionType::Sqlite => "INTEGER".to_string(),
+        },
+        data_type: ColumnDataType::Integer,
+        affinity_type: ColumnAffinityType::Integer,
+        options: vec![],
+      }
+    );
+  }
+
+  #[tokio::test]
+  async fn test_expanded_foreign_key() {
+    let state = test_state(None).await.unwrap();
+
+    let table_name = QualifiedName {
+      name: "test_table".to_string(),
+      database_schema: None,
+    };
+
+    {
+      let ConnectionEntry {
+        connection: conn, ..
+      } = state.connection_manager().main_entry();
+
+      conn
+        .execute_batch(format!(
+          "
+            CREATE TABLE foreign_table (id INTEGER PRIMARY KEY) {strict};
+
+            CREATE TABLE {table_name} (
+              id       INTEGER PRIMARY KEY,
+              fk       INTEGER NOT NULL REFERENCES foreign_table(id),
+              fk_null  INTEGER REFERENCES foreign_table(id)
+            ) {strict};
+          ",
+          table_name = table_name.escaped_string(),
+          strict = strict(&conn),
+        ))
+        .await
+        .unwrap();
+
+      state.rebuild_connection_metadata().await.unwrap();
+    }
+
+    let expanded_cols = vec!["fk", "fk_null"];
+
+    add_record_api_config(
+      &state,
+      RecordApiConfig {
+        name: Some("test_table_api".to_string()),
+        table_name: Some(table_name.name.clone()),
+        acl_world: [PermissionFlag::Create as i32, PermissionFlag::Read as i32].into(),
+        expand: expanded_cols.iter().map(|c| c.to_string()).collect(),
+        ..Default::default()
+      },
+    )
+    .await
+    .unwrap();
+
+    let ConnectionEntry {
+      connection: conn,
+      metadata,
+      ..
+    } = state.connection_manager().main_entry();
+    let table_metadata = metadata.get_table(&table_name).unwrap();
+
+    let (validator, schema) = build_json_schema_expanded(
+      &state.json_schema_registry().read(),
+      &table_name.name,
+      &table_metadata.column_metadata,
+      JsonSchemaMode::Select,
+      Some(Expand {
+        tables: &metadata.tables.values().collect::<Vec<_>>(),
+        foreign_key_columns: expanded_cols,
+      }),
+    )
+    .unwrap();
+
+    assert_eq!(
+      schema,
+      json!({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": table_name.name,
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "fk": { "$ref": "#/$defs/test_table.fk" },
+          "fk_null": { "$ref": "#/$defs/test_table.fk_null" },
+        },
+        "required": ["id", "fk"],
+        "$defs": {
+          "test_table.fk": {
+            "type": "object",
+            "properties": {
+              "id" : { "type": "integer"},
+              "data": {
+                "title": "foreign_table",
+                "type": "object",
+                "properties": {
+                  "id" : { "type": "integer" },
+                },
+                "required": ["id"],
+              },
+            },
+            "required": ["id"],
+          },
+          "test_table.fk_null": {
+            "type": ["null", "object"],
+            "properties": {
+              "id" : { "type": "integer"},
+              "data": {
+                "title": "foreign_table",
+                "type": "object",
+                "properties": {
+                  "id" : { "type": "integer" },
+                },
+                "required": ["id"],
+              },
+            },
+            "required": ["id"],
+          },
+        },
+      })
+    );
+
+    conn
+      .execute("INSERT INTO foreign_table (id) VALUES (1);", ())
+      .await
+      .unwrap();
+
+    conn
+      .execute(
+        format!(
+          "INSERT INTO {table_name} (id, fk) VALUES (1, 1);",
+          table_name = table_name.escaped_string(),
+        ),
+        (),
+      )
+      .await
+      .unwrap();
+
+    // Expansion of invalid column.
+    {
+      let response = read_record_handler(
+        State(state.clone()),
+        Path(("test_table_api".to_string(), "1".to_string())),
+        Query(ReadRecordQuery {
+          expand: Some("UNKNOWN".to_string()),
+        }),
+        None,
+      )
+      .await;
+
+      assert!(response.is_err());
+
+      let list_response = list_records_handler(
+        State(state.clone()),
+        Path("test_table_api".to_string()),
+        Query(Default::default()),
+        RawQuery(Some("expand=UNKNOWN".to_string())),
+        None,
+      )
+      .await;
+
+      assert!(list_response.is_err());
+    }
+
+    // Not expanded
+    {
+      let expected = json!({
+        "id": 1,
+        "fk": { "id": 1 },
+        "fk_null": null,
+      });
+
+      let Json(value) = read_record_handler(
+        State(state.clone()),
+        Path(("test_table_api".to_string(), "1".to_string())),
+        Query(ReadRecordQuery { expand: None }),
+        None,
+      )
+      .await
+      .unwrap();
+
+      validator.validate(&value).expect(&format!("{value}"));
+
+      assert_eq!(expected, value);
+
+      let ListOrGeoJSONResponse::List(list_response) = list_records_handler(
+        State(state.clone()),
+        Path("test_table_api".to_string()),
+        Query(Default::default()),
+        RawQuery(None),
+        None,
+      )
+      .await
+      .unwrap()
+      .0
+      else {
+        panic!("not a list");
+      };
+
+      assert_eq!(vec![expected.clone()], list_response.records);
+      validator.validate(&list_response.records[0]).unwrap();
+    }
+
+    let expected = json!({
+      "id": 1,
+      "fk":{
+        "id": 1,
+        "data": {
+          "id": 1,
+        },
+      },
+      "fk_null": null,
+    });
+
+    {
+      let Json(value) = read_record_handler(
+        State(state.clone()),
+        Path(("test_table_api".to_string(), "1".to_string())),
+        Query(ReadRecordQuery {
+          expand: Some("fk".to_string()),
+        }),
+        None,
+      )
+      .await
+      .unwrap();
+
+      validator.validate(&value).expect(&format!("{value}"));
+
+      assert_eq!(expected, value);
+    }
+
+    {
+      let ListOrGeoJSONResponse::List(list_response) = list_records_handler(
+        State(state.clone()),
+        Path("test_table_api".to_string()),
+        Query(Default::default()),
+        RawQuery(Some("expand=fk".to_string())),
+        None,
+      )
+      .await
+      .unwrap()
+      .0
+      else {
+        panic!("not a list");
+      };
+
+      assert_eq!(vec![expected.clone()], list_response.records);
+      validator.validate(&list_response.records[0]).unwrap();
+    }
+
+    {
+      let ListOrGeoJSONResponse::List(list_response) = list_records_handler(
+        State(state.clone()),
+        Path("test_table_api".to_string()),
+        Query(Default::default()),
+        RawQuery(Some("count=TRUE&expand=fk".to_string())),
+        None,
+      )
+      .await
+      .unwrap()
+      .0
+      else {
+        panic!("not a list");
+      };
+
+      assert_eq!(Some(1), list_response.total_count);
+      assert_eq!(vec![expected], list_response.records);
+      validator.validate(&list_response.records[0]).unwrap();
+    }
+  }
+
+  #[tokio::test]
+  async fn test_expanded_with_multiple_foreign_keys() {
+    let state = test_state(None).await.unwrap();
+    let conn = state.conn();
+
+    let table_name = "test_table";
+
+    conn
+      .execute_batch(format!(
+        r#"
+          CREATE TABLE foreign_table0 (id INTEGER PRIMARY KEY) {strict};
+          INSERT INTO foreign_table0 (id) VALUES (1);
+
+          CREATE TABLE foreign_table1 (id INTEGER PRIMARY KEY) {strict};
+          INSERT INTO foreign_table1 (id) VALUES (1);
+
+          CREATE TABLE {table_name} (
+            id        INTEGER PRIMARY KEY,
+            fk0       INTEGER REFERENCES foreign_table0(id),
+            fk0_null  INTEGER REFERENCES foreign_table0(id),
+            fk1       INTEGER REFERENCES foreign_table1(id)
+          ) {strict};
+
+          INSERT INTO {table_name} (id, fk0, fk0_null, fk1) VALUES (1, 1, NULL, 1);
+        "#,
+        strict = strict(conn),
+      ))
+      .await
+      .unwrap();
+
+    state.rebuild_connection_metadata().await.unwrap();
+
+    add_record_api_config(
+      &state,
+      RecordApiConfig {
+        name: Some("test_table_api".to_string()),
+        table_name: Some(table_name.to_string()),
+        acl_world: [PermissionFlag::Create as i32, PermissionFlag::Read as i32].into(),
+        expand: vec!["fk0".to_string(), "fk1".to_string()],
+        ..Default::default()
+      },
+    )
+    .await
+    .unwrap();
+
+    // Expand none
+    {
+      let Json(value) = read_record_handler(
+        State(state.clone()),
+        Path(("test_table_api".to_string(), "1".to_string())),
+        Query(ReadRecordQuery { expand: None }),
+        None,
+      )
+      .await
+      .unwrap();
+
+      let expected = json!({
+        "id": 1,
+        "fk0": { "id": 1 },
+        "fk0_null": serde_json::Value::Null,
+        "fk1": { "id": 1 },
+      });
+
+      assert_eq!(expected, value);
+
+      let ListOrGeoJSONResponse::List(list_response) = list_records_handler(
+        State(state.clone()),
+        Path("test_table_api".to_string()),
+        Query(Default::default()),
+        RawQuery(None),
+        None,
+      )
+      .await
+      .unwrap()
+      .0
+      else {
+        panic!("not a list");
+      };
+
+      assert_eq!(vec![expected], list_response.records);
+    }
+
+    // Expand one
+    {
+      let expected = json!({
+        "id": 1,
+        "fk0": { "id": 1 },
+        "fk0_null": serde_json::Value::Null,
+        "fk1": {
+          "id": 1,
+          "data": {
+            "id": 1,
+          },
+        },
+      });
+
+      let Json(value) = read_record_handler(
+        State(state.clone()),
+        Path(("test_table_api".to_string(), "1".to_string())),
+        Query(ReadRecordQuery {
+          expand: Some("fk1".to_string()),
+        }),
+        None,
+      )
+      .await
+      .unwrap();
+
+      assert_eq!(expected, value);
+
+      let ListOrGeoJSONResponse::List(list_response) = list_records_handler(
+        State(state.clone()),
+        Path("test_table_api".to_string()),
+        Query(Default::default()),
+        RawQuery(Some("expand=fk1".to_string())),
+        None,
+      )
+      .await
+      .unwrap()
+      .0
+      else {
+        panic!("not a list");
+      };
+
+      assert_eq!(vec![expected], list_response.records);
+    }
+
+    // Expand all.
+    {
+      let expected = json!({
+        "id": 1,
+        "fk0": {
+          "id": 1,
+          "data": {
+            "id": 1,
+          },
+        },
+        "fk0_null": serde_json::Value::Null,
+        "fk1": {
+          "id": 1,
+          "data": {
+            "id": 1,
+          },
+        },
+      });
+
+      let Json(value) = read_record_handler(
+        State(state.clone()),
+        Path(("test_table_api".to_string(), "1".to_string())),
+        Query(ReadRecordQuery {
+          expand: Some("fk0,fk1".to_string()),
+        }),
+        None,
+      )
+      .await
+      .unwrap();
+
+      assert_eq!(expected, value);
+
+      state
+        .conn()
+        .execute(format!("INSERT INTO {table_name} (id) VALUES (2)"), ())
+        .await
+        .unwrap();
+
+      let ListOrGeoJSONResponse::List(list_response) = list_records_handler(
+        State(state.clone()),
+        Path("test_table_api".to_string()),
+        Query(Default::default()),
+        RawQuery(Some("expand=fk0,fk1".to_string())),
+        None,
+      )
+      .await
+      .unwrap()
+      .0
+      else {
+        panic!("not a list");
+      };
+
+      assert_eq!(
+        vec![
+          json!({
+            "id": 2,
+            "fk0": serde_json::Value::Null,
+            "fk0_null":  serde_json::Value::Null,
+            "fk1":  serde_json::Value::Null,
+          }),
+          expected
+        ],
+        list_response.records
+      );
+    }
+  }
+}

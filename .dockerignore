@@ -1,0 +1,31 @@
+**/traildepot/
+**/target/
+**/target/
+**/node_modules/
+**/dist/
+
+client
+!client/rust
+!client/testfixture/guests/rust
+deploy/
+docs/
+!docs/examples/record_api_rs
+examples/
+!examples/custom-binary
+!examples/wasm-guest-rust
+!examples/coffee-vector-search/guests/rust
+!examples/collab-clicker-ssr/guests/rust
+
+Dockerfile*
+.docker*
+
+# Include the .git/ folder needed to bake version info into the binary but skip
+# all `.git*` files.
+.git*
+!.git/
+
+.hooks/
+.cargo/
+*.image
+.rustfmt.toml
+.env
