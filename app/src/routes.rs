@@ -27,6 +27,14 @@ pub fn build(state: AppState) -> Router {
         .route("/api/hello", get(hello_handler))
         .route("/api/config/public", get(public_config_handler))
         .route("/branding/{*path}", get(branding_handler))
+        .route(
+            "/api/subscriptions/subscribe",
+            axum::routing::post(crate::subscriptions::subscribe_handler),
+        )
+        .route(
+            "/api/subscriptions/cancel/{id}",
+            axum::routing::post(crate::subscriptions::cancel_handler),
+        )
         .with_state(state)
 }
 

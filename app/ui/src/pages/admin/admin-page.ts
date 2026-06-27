@@ -21,7 +21,7 @@ export class AdminPage extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
     await authService.init();
-    this._authorized = authService.isAuthenticated();
+    this._authorized = authService.isAdmin();
     if (this._authorized) {
       await this._load();
     } else {

@@ -6,6 +6,7 @@ mod preflight;
 mod routes;
 mod settings;
 mod smtp;
+mod subscriptions;
 mod trailbase_bootstrap;
 
 use axum::routing::get;

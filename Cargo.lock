@@ -5333,6 +5333,7 @@ dependencies = [
  "dotenvy",
  "env_logger 0.11.10",
  "indoc",
+ "log",
  "mailcrab-server",
  "mime_guess",
  "pretty_env_logger",
@@ -5346,6 +5347,8 @@ dependencies = [
  "tower-http 0.7.0",
  "tracing",
  "trailbase",
+ "trailbase-sqlite",
+ "uuid",
  "zip",
 ]
 
