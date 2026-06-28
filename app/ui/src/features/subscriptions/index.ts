@@ -1,3 +1,4 @@
+export { logoSrc } from './utils/logo-src.ts';
 export { SubscriptionCard } from './components/subscription-card.ts';
 export { SubscriptionsGrid } from './components/subscriptions-grid.ts';
 export { ConfirmSubscribeModal } from './components/confirm-subscribe-modal.ts';

@@ -4,7 +4,7 @@ import { msg, str } from '@lit/localize';
 import { localized } from '@/features/localization';
 import { authService } from '@/features/auth';
 import { notificationService } from '@/features/notifications';
-import { subscriptionsService } from '@/features/subscriptions';
+import { subscriptionsService, logoSrc } from '@/features/subscriptions';
 import type { Subscription } from '@/features/subscriptions';
 import '@/shared/components/app-header';
 import '@/shared/components/footer-info';
@@ -82,7 +82,7 @@ export class AdminPage extends LitElement {
 
   private _renderLogo(sub: Subscription): TemplateResult {
     if (sub.logo_url) {
-      return html`<img class="logo" src=${sub.logo_url} alt=${sub.name} />`;
+      return html`<img class="logo" src=${logoSrc(sub.logo_url, sub.updated_at)} alt=${sub.name} />`;
     }
     return html`<div class="logo-fallback" aria-hidden="true">${sub.name.charAt(0).toUpperCase()}</div>`;
   }

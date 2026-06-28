@@ -56,6 +56,31 @@ export class SubscriptionFormPage extends LitElement {
 
   @state() private _logoMode: 'upload' | 'url' = 'upload';
   @state() private _uploading = false;
+  @state() private _logoPreviewFailed = false;
+  // Increments on every local-logo URL change to force a fresh fetch, bypassing
+  // the immutable HTTP cache for files that may have been deleted server-side.
+  private _logoUrlVersion = 0;
+
+  private get _previewSrc(): string {
+    if (!this._logoUrl) return '';
+    return this._logoUrl.startsWith('/subscription-logos/')
+      ? `${this._logoUrl}?_t=${this._logoUrlVersion}`
+      : this._logoUrl;
+  }
+
+  private get _showPreview(): boolean {
+    return Boolean(this._logoUrl) && !this._logoPreviewFailed;
+  }
+
+  private _setLogoUrl(url: string): void {
+    if (url.startsWith('/subscription-logos/')) this._logoUrlVersion = Date.now();
+    this._logoPreviewFailed = false;
+    this._logoUrl = url;
+  }
+
+  private _onLogoError(): void {
+    this._logoPreviewFailed = true;
+  }
 
   async connectedCallback(): Promise<void> {
     super.connectedCallback();
@@ -71,6 +96,7 @@ export class SubscriptionFormPage extends LitElement {
           this._name = sub.name;
           this._description = sub.description;
           this._logoUrl = sub.logo_url;
+          this._logoUrlVersion = sub.updated_at;
           this._resourceUrl = sub.resource_url;
           this._whatIncluded = sub.what_included ?? '';
           this._terms = sub.terms ?? '';
@@ -108,7 +134,7 @@ export class SubscriptionFormPage extends LitElement {
     this._uploading = true;
     try {
       const url = await subscriptionsService.uploadLogo(e.detail.blob);
-      this._logoUrl = url;
+      this._setLogoUrl(url);
     } catch (err) {
       notificationService.error(
         err instanceof Error ? err.message : msg('Logo upload failed.'),
@@ -269,7 +295,7 @@ export class SubscriptionFormPage extends LitElement {
           ?uploading=${this._uploading}
           @cropped=${this._handleCropped}
         ></image-cropper>
-        <img class="logo-preview" src=${this._logoUrl || ''} alt=${msg('Logo preview')} ?hidden=${!this._logoUrl} />
+        <img class="logo-preview" src=${this._previewSrc} alt=${msg('Logo preview')} ?hidden=${!this._showPreview} @error=${this._onLogoError} />
         <button
           type="button"
           class="btn-link"
@@ -283,7 +309,7 @@ export class SubscriptionFormPage extends LitElement {
               class="input"
               type="url"
               .value=${this._logoUrl}
-              @input=${(e: InputEvent) => { this._logoUrl = (e.target as HTMLInputElement).value; }}
+              @input=${(e: InputEvent) => { this._setLogoUrl((e.target as HTMLInputElement).value); }}
               placeholder="https://..."
             />
             ${this._logoUrl ? html`
@@ -291,7 +317,7 @@ export class SubscriptionFormPage extends LitElement {
                 type="button"
                 class="btn-clear-url"
                 aria-label=${msg('Clear URL')}
-                @click=${() => { this._logoUrl = ''; }}
+                @click=${() => { this._setLogoUrl(''); }}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -300,7 +326,7 @@ export class SubscriptionFormPage extends LitElement {
               </button>
             ` : null}
           </div>
-          <img class="logo-preview" src=${this._logoUrl || ''} alt=${msg('Logo preview')} ?hidden=${!this._logoUrl} />
+          <img class="logo-preview" src=${this._previewSrc} alt=${msg('Logo preview')} ?hidden=${!this._showPreview} @error=${this._onLogoError} />
         </div>
         <button
           type="button"
@@ -411,11 +437,12 @@ export class SubscriptionFormPage extends LitElement {
         <div class="logo-hero">
           <img
             class="logo-img"
-            ?hidden=${!this._logoUrl}
-            src=${this._logoUrl}
+            ?hidden=${!this._showPreview}
+            src=${this._previewSrc}
             alt=${this._name || msg('Preview')}
+            @error=${this._onLogoError}
           />
-          <div class="logo-letter" ?hidden=${this._logoUrl}>${(this._name || '?').charAt(0).toUpperCase()}</div>
+          <div class="logo-letter" ?hidden=${this._showPreview}>${(this._name || '?').charAt(0).toUpperCase()}</div>
         </div>
         <div class="detail-body">
           <div class="title-row">

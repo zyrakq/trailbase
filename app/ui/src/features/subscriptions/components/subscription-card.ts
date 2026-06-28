@@ -5,6 +5,7 @@ import { localized } from '@/features/localization';
 import { notificationService } from '@/features/notifications';
 import type { Subscription, SubscriptionPeriod, SubscriptionPricing, UserSubscription } from '../types/subscription.types.ts';
 import { subscriptionsService } from '../services/subscriptions.service.ts';
+import { logoSrc } from '../utils/logo-src.ts';
 import { subscriptionCardStyles } from './subscription-card.styles';
 import type { ConfirmSubscribeModal } from './confirm-subscribe-modal';
 import './confirm-subscribe-modal';
@@ -157,9 +158,9 @@ export class SubscriptionCard extends LitElement {
     return html`
       <div class="card">
         <div class="logo-hero">
-          ${sub.logo_url
-            ? html`<img class="logo-img" src=${sub.logo_url} alt=${sub.name} />`
-            : html`<div class="logo-letter">${sub.name.charAt(0).toUpperCase()}</div>`}
+${sub.logo_url
+? html`<img class="logo-img" src=${logoSrc(sub.logo_url, sub.updated_at)} alt=${sub.name} />`
+: html`<div class="logo-letter">${sub.name.charAt(0).toUpperCase()}</div>`}
         </div>
         <div class="card-footer">
           <div class="name-row">

@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
 import { authService } from '@/features/auth';
-import { subscriptionsService, type Subscription, type UserSubscription, type SubscriptionPeriod } from '@/features/subscriptions';
+import { subscriptionsService, logoSrc, type Subscription, type UserSubscription, type SubscriptionPeriod } from '@/features/subscriptions';
 import { notificationService } from '@/features/notifications';
 import '@/shared';
 import '@/features/subscriptions';
@@ -148,7 +148,7 @@ export class SubscriptionDetailPage extends LitElement {
         <div class="detail-card">
           <div class="logo-hero">
             ${sub.logo_url
-              ? html`<img class="logo-img" src=${sub.logo_url} alt=${sub.name} />`
+              ? html`<img class="logo-img" src=${logoSrc(sub.logo_url, sub.updated_at)} alt=${sub.name} />`
               : html`<div class="logo-letter">${sub.name.charAt(0).toUpperCase()}</div>`}
           </div>
 
