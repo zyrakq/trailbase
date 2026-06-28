@@ -316,27 +316,7 @@ export class SubscriptionFormPage extends LitElement {
         }}
       ></segmented-control>
       <p class="pricing-empty" ?hidden=${this._pricing.length > 0}>${msg('No pricing tiers. Pick a period above.')}</p>
-      <div class="pricing-tiers-host"></div>
-    `;
-  }
-
-  // happy-dom silently drops arrays of TemplateResults (map/repeat) at
-  // render depth ≥2. Using a standalone render() call breaks the depth.
-  protected override updated(): void {
-    this._syncPricingTiers();
-  }
-
-  private _syncPricingTiers(): void {
-    const host = this.shadowRoot?.querySelector<HTMLElement>('.pricing-tiers-host');
-    if (!host) return;
-    const periodLabels: Record<string, string> = {
-      monthly: msg('Monthly'),
-      quarterly: msg('Quarterly'),
-      yearly: msg('Yearly'),
-      onetime: msg('One-time'),
-    };
-    render(
-      html`${this._pricing.map((p, i) => html`
+      ${repeat(this._pricing, (p) => p.period, (p, i) => html`
         <div class="pricing-tier">
           <span class="period-label">${periodLabels[p.period]}</span>
           <input
@@ -371,9 +351,8 @@ export class SubscriptionFormPage extends LitElement {
             </svg>
           </button>
         </div>
-      `)}`,
-      host,
-    );
+      `)}
+    `;
   }
 
   private _renderDetailsSection(): TemplateResult {
@@ -439,7 +418,7 @@ export class SubscriptionFormPage extends LitElement {
           <div class="section" ?hidden=${activePricing.length === 0}>
             <h2 class="section-heading">${msg('Pricing')}</h2>
             <div class="pricing-table">
-              ${activePricing.map(p => html`
+              ${repeat(activePricing, (p) => p.id, (p) => html`
                 <div class="pricing-row">
                   <span>${periodLabel(p.period)}</span>
                   <span>${p.price} ${p.currency}${p.period !== 'onetime' ? `/${p.period.slice(0, 2)}` : ''}</span>
