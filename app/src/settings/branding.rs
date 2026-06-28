@@ -8,9 +8,14 @@ use crate::settings::frontend::FrontendSettings;
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct BrandingSettings {
     pub brand_name: Option<String>,
-    pub theme_color: Option<String>,
+    pub theme_color_light: Option<String>,
+    pub theme_color_dark: Option<String>,
     #[serde(default)]
     pub branding_dir: String,
+    pub copyright_year: Option<i32>,
+    pub terms_url: Option<String>,
+    pub privacy_url: Option<String>,
+    pub support_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -109,7 +114,7 @@ mod tests {
     fn empty_config_uses_none_defaults() {
         let s = parse("");
         assert_eq!(s.brand_name, None);
-        assert_eq!(s.theme_color, None);
+        assert_eq!(s.theme_color_light, None);
         assert_eq!(s.branding_dir, "");
     }
 
@@ -118,12 +123,12 @@ mod tests {
         let toml = r##"
             [branding]
             brand_name = "Acme Co"
-            theme_color = "#123456"
+            theme_color_light = "#123456"
             branding_dir = "assets/branding"
         "##;
         let s = parse(toml);
         assert_eq!(s.brand_name, Some("Acme Co".to_string()));
-        assert_eq!(s.theme_color, Some("#123456".to_string()));
+        assert_eq!(s.theme_color_light, Some("#123456".to_string()));
         assert_eq!(s.branding_dir, "assets/branding");
     }
 
@@ -135,14 +140,14 @@ mod tests {
         "##;
         let s = parse(toml);
         assert_eq!(s.brand_name, Some("Acme".to_string()));
-        assert_eq!(s.theme_color, None);
+        assert_eq!(s.theme_color_light, None);
         assert_eq!(s.branding_dir, "");
     }
 
     #[test]
     fn env_override_relays_explicit_branding_values() {
         // SAFETY: the test owns this env var and removes it in teardown.
-        unsafe { std::env::set_var("APP_BRANDING__THEME_COLOR", "#123456"); }
+        unsafe { std::env::set_var("APP_BRANDING__THEME_COLOR_LIGHT", "#123456"); }
         let result = Config::builder()
             .add_source(config::File::from_str("", FileFormat::Toml))
             .add_source(
@@ -155,17 +160,18 @@ mod tests {
             .expect("valid config")
             .try_deserialize::<Wrapper>();
         // SAFETY: test teardown — removing our own env var.
-        unsafe { std::env::remove_var("APP_BRANDING__THEME_COLOR"); }
+        unsafe { std::env::remove_var("APP_BRANDING__THEME_COLOR_LIGHT"); }
         let s = result.expect("deserialize Wrapper").branding;
-        assert_eq!(s.theme_color, Some("#123456".to_string()));
+        assert_eq!(s.theme_color_light, Some("#123456".to_string()));
     }
 
     #[test]
     fn overlay_config_uses_disk_mode_paths() {
         let settings = BrandingSettings {
             brand_name: Some("Acme".to_string()),
-            theme_color: Some("#123456".to_string()),
+            theme_color_light: Some("#123456".to_string()),
             branding_dir: "branding-overrides".to_string(),
+            ..Default::default()
         };
         let frontend = FrontendSettings {
             serve_from: "disk".to_string(),

@@ -37,7 +37,12 @@ fn default_serve_from() -> String {
 pub struct PublicConfig {
     pub password_auth_enabled: bool,
     pub brand_name: Option<String>,
-    pub theme_color: Option<String>,
+    pub theme_color_light: Option<String>,
+    pub theme_color_dark: Option<String>,
+    pub copyright_year: Option<i32>,
+    pub terms_url: Option<String>,
+    pub privacy_url: Option<String>,
+    pub support_url: Option<String>,
 }
 
 impl PublicConfig {
@@ -45,7 +50,12 @@ impl PublicConfig {
         Self {
             password_auth_enabled: frontend.password_auth_enabled.unwrap_or(true),
             brand_name: branding.brand_name.clone(),
-            theme_color: branding.theme_color.clone(),
+            theme_color_light: branding.theme_color_light.clone(),
+            theme_color_dark: branding.theme_color_dark.clone(),
+            copyright_year: branding.copyright_year,
+            terms_url: branding.terms_url.clone(),
+            privacy_url: branding.privacy_url.clone(),
+            support_url: branding.support_url.clone(),
         }
     }
 }

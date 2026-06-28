@@ -622,7 +622,7 @@ fn serve_from_embedded_parses() {
 fn branding_absent_section_uses_defaults() {
     let s = settings_from_toml(BASE_TOML, "").expect("should deserialize");
     assert_eq!(s.branding.brand_name, None);
-    assert_eq!(s.branding.theme_color, None);
+    assert_eq!(s.branding.theme_color_light, None);
     assert_eq!(s.branding.branding_dir, "");
 }
 
@@ -631,12 +631,12 @@ fn branding_toml_overrides_all_fields() {
     let overlay = indoc! {r##"
         [branding]
         brand_name = "Acme Co"
-        theme_color = "#123456"
+        theme_color_light = "#123456"
         branding_dir = "assets/branding"
     "##};
     let s = settings_from_toml(BASE_TOML, overlay).expect("should deserialize");
     assert_eq!(s.branding.brand_name, Some("Acme Co".to_string()));
-    assert_eq!(s.branding.theme_color, Some("#123456".to_string()));
+    assert_eq!(s.branding.theme_color_light, Some("#123456".to_string()));
     assert_eq!(s.branding.branding_dir, "assets/branding");
 }
 

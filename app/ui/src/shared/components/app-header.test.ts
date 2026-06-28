@@ -40,7 +40,8 @@ vi.mock('@/features/auth/services/config.service', () => ({
   configService: {
     getConfig: vi.fn().mockReturnValue({
       brandName: 'Custom Brand',
-      themeColor: '#ff6b35',
+      themeColorLight: '#ff6b35',
+      themeColorDark: '#10b981',
       passwordAuthEnabled: true,
       registrationEnabled: true,
       otpEnabled: true,

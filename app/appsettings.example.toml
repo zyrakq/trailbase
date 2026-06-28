@@ -21,22 +21,26 @@ address = "0.0.0.0:4000"
 # ------------------------------------------------------------------------------
 # Branding
 #
-# Identity and theming for the user-facing app. brand_name and theme_color are
+# Identity and theming for the user-facing app. brand_name and theme_color_light are
 # surfaced in the UI; branding_dir is an optional path to additional branding
 # assets (logo, favicon, etc.).
 #
 # Environment overrides (APP_<SECTION>__<KEY>):
 #   APP_BRANDING__BRAND_NAME
-#   APP_BRANDING__THEME_COLOR
+#   APP_BRANDING__THEME_COLOR_LIGHT
+#   APP_BRANDING__THEME_COLOR_DARK
 #   APP_BRANDING__BRANDING_DIR
 # ------------------------------------------------------------------------------
 
 [branding]
 # Brand name shown in the UI.
-brand_name = "velora"
+brand_name = "VELORA"
 
-# Primary theme color (hex).
-theme_color = "#ff6b35"
+# Primary theme color for light mode (hex).
+theme_color_light = "#ff6b35"
+
+# Primary theme color for dark mode (hex). Defaults to #10b981 when unset.
+# theme_color_dark = "#10b981"
 
 # Optional directory with branding assets (logo, favicon, etc.).
 # Empty string → no extra assets.

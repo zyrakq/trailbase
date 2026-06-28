@@ -134,7 +134,12 @@ async fn public_config_handler(
         "registrationEnabled": registration_enabled,
         "otpEnabled": otp_enabled,
         "brandName": config.brand_name,
-        "themeColor": config.theme_color,
+        "themeColorLight": config.theme_color_light,
+        "themeColorDark": config.theme_color_dark,
+        "copyrightYear": config.copyright_year,
+        "termsUrl": config.terms_url,
+        "privacyUrl": config.privacy_url,
+        "supportUrl": config.support_url,
     }))
 }
 
