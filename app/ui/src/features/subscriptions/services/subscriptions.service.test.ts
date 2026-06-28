@@ -330,4 +330,45 @@ describe('SubscriptionsService', () => {
       expect(after).toBe(0);
     });
   });
+
+  describe('uploadLogo', () => {
+    it('posts multipart and returns the server url', async () => {
+      const form = new FormData();
+      form.append('file', new Blob([new Uint8Array([1, 2, 3])]), 'logo.png');
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(''),
+          json: () => Promise.resolve({ url: '/subscription-logos/abc.png' }),
+        })
+      );
+
+      const url = await subscriptionsService.uploadLogo(
+        new Blob([new Uint8Array([1, 2, 3])])
+      );
+
+      expect(url).toBe('/subscription-logos/abc.png');
+      const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(call[0]).toBe('/api/admin/subscriptions/logo');
+      expect(call[1].method).toBe('POST');
+      expect(call[1].body).toBeInstanceOf(FormData);
+    });
+
+    it('throws on 501 (uploads not configured)', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 501,
+          text: () => Promise.resolve('not configured'),
+        })
+      );
+
+      await expect(
+        subscriptionsService.uploadLogo(new Blob([new Uint8Array([1])]))
+      ).rejects.toThrow(/not configured/);
+    });
+  });
 });

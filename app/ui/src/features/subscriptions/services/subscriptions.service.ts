@@ -273,6 +273,25 @@ class SubscriptionsService {
     );
     return result.count;
   }
+
+  async uploadLogo(blob: Blob): Promise<string> {
+    const form = new FormData();
+    form.append('file', blob, 'logo.png');
+    const response = await fetch('/api/admin/subscriptions/logo', {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    });
+    if (response.status === 501) {
+      throw new Error('Logo uploads are not configured on this server.');
+    }
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`Logo upload failed: ${response.status} ${text}`);
+    }
+    const { url } = (await response.json()) as { url: string };
+    return url;
+  }
 }
 
 export const subscriptionsService = SubscriptionsService.getInstance();

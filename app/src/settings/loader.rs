@@ -7,6 +7,7 @@ use super::components::ComponentSettings;
 use super::email::EmailSettings;
 use super::frontend::FrontendSettings;
 use super::server::ServerSettings;
+use super::uploads::UploadsSettings;
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
@@ -22,6 +23,9 @@ pub struct Settings {
     /// Branding (brand name, theme color, optional assets directory).
     #[serde(default)]
     pub branding: BrandingSettings,
+    /// User-uploaded files root (subscription logo today).
+    #[serde(default)]
+    pub uploads: UploadsSettings,
 }
 
 impl Settings {
