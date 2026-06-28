@@ -47,6 +47,23 @@ theme_color_light = "#ff6b35"
 branding_dir = ""
 
 # ------------------------------------------------------------------------------
+# Uploads
+#
+# Root directory for user-uploaded files (subscription logos today, avatars
+# later). Files are written under `<dir>/subscription-logos/<uuid>.png`.
+#
+# Empty string -> upload endpoints return 501 and the external-URL fallback
+# remains the only logo option. Decoupled from branding so this directory can
+# be mounted on S3 later without touching branding config.
+#
+# Environment overrides:
+#   APP_UPLOADS__DIR
+# ------------------------------------------------------------------------------
+
+[uploads]
+dir = ""
+
+# ------------------------------------------------------------------------------
 # Frontend
 # ------------------------------------------------------------------------------
 
