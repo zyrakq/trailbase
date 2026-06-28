@@ -8,7 +8,7 @@ export const subscriptionFormPageStyles = css`
   }
 
   .page-content {
-    max-width: 720px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 2rem 1.5rem;
   }
@@ -19,10 +19,11 @@ export const subscriptionFormPageStyles = css`
     padding: 4rem 0;
   }
 
+  /* ── Top bar ─────────────────────────────────────────────────────── */
+
   .top-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     margin-bottom: 1.5rem;
   }
 
@@ -51,28 +52,7 @@ export const subscriptionFormPageStyles = css`
     height: 18px;
   }
 
-  .mode-toggle {
-    display: flex;
-    border: 1px solid var(--theme-color-border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .mode-btn {
-    padding: 0.375rem 1rem;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 0.875rem;
-    color: var(--theme-color-text-secondary);
-    transition: background-color 0.15s ease, color 0.15s ease;
-  }
-
-  .mode-btn.active {
-    background: var(--theme-color-primary, #6366f1);
-    color: #fff;
-  }
+  /* ── Page title ──────────────────────────────────────────────────── */
 
   .page-title {
     margin: 0 0 1.5rem;
@@ -81,34 +61,41 @@ export const subscriptionFormPageStyles = css`
     color: var(--theme-color-text-primary);
   }
 
+  /* ── Two-column layout ───────────────────────────────────────────── */
+
+  .edit-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .form-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .preview-col {
+    position: sticky;
+    top: 2rem;
+  }
+
+  /* ── Tab bar ─────────────────────────────────────────────────────── */
+
+  segmented-control[variant='tabs'] {
+    width: 100%;
+  }
+
+  /* ── Form ────────────────────────────────────────────────────────── */
+
   .form {
     display: flex;
     flex-direction: column;
-    gap: 0;
-  }
-
-  /* ── Form sections ─────────────────────────────────────────────────── */
-
-  .form-section {
-    display: flex;
-    flex-direction: column;
     gap: 0.875rem;
-    padding: 1.5rem 0;
-    border-bottom: 1px solid var(--theme-color-border);
   }
 
-  .form-section:last-of-type {
-    border-bottom: none;
-  }
-
-  .form-section > .section-heading {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--theme-color-text-primary);
-    margin: 0 0 0.25rem;
-  }
-
-  /* ── Fields ────────────────────────────────────────────────────────── */
+  /* ── Fields ──────────────────────────────────────────────────────── */
 
   .field {
     display: flex;
@@ -118,8 +105,8 @@ export const subscriptionFormPageStyles = css`
 
   .label {
     font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--theme-color-text-secondary);
+    font-weight: 500;
+    color: var(--theme-color-text-primary);
   }
 
   .input {
@@ -130,12 +117,13 @@ export const subscriptionFormPageStyles = css`
     color: var(--theme-color-text-primary);
     font-family: inherit;
     font-size: 0.9375rem;
-    transition: border-color 0.15s ease;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
   }
 
   .input:focus {
     outline: none;
-    border-color: var(--theme-color-primary, #6366f1);
+    border-color: var(--theme-color-primary);
+    box-shadow: 0 0 0 3px var(--theme-color-primary-subtle);
   }
 
   .textarea {
@@ -143,7 +131,7 @@ export const subscriptionFormPageStyles = css`
     min-height: 80px;
   }
 
-  /* ── Logo section ──────────────────────────────────────────────────── */
+  /* ── Logo section ────────────────────────────────────────────────── */
 
   .logo-input-row {
     display: flex;
@@ -172,7 +160,7 @@ export const subscriptionFormPageStyles = css`
     cursor: pointer;
     font-family: inherit;
     font-size: 0.875rem;
-    color: var(--theme-color-primary, #6366f1);
+    color: var(--theme-color-primary);
     text-decoration: underline;
     text-underline-offset: 2px;
   }
@@ -181,7 +169,7 @@ export const subscriptionFormPageStyles = css`
     opacity: 0.8;
   }
 
-  /* ── Pricing section ───────────────────────────────────────────────── */
+  /* ── Pricing section ─────────────────────────────────────────────── */
 
   .pricing-empty {
     color: var(--theme-color-text-secondary);
@@ -208,7 +196,6 @@ export const subscriptionFormPageStyles = css`
 
   .price-input {
     text-align: right;
-    /* hide native number spinners */
     -moz-appearance: textfield;
   }
 
@@ -247,7 +234,7 @@ export const subscriptionFormPageStyles = css`
     height: 16px;
   }
 
-  /* ── Form actions ──────────────────────────────────────────────────── */
+  /* ── Form actions ────────────────────────────────────────────────── */
 
   .form-actions {
     display: flex;
@@ -268,7 +255,7 @@ export const subscriptionFormPageStyles = css`
   }
 
   .btn-primary {
-    background: var(--theme-color-primary, #6366f1);
+    background: var(--theme-color-primary);
     border: none;
     color: #fff;
   }
@@ -292,11 +279,7 @@ export const subscriptionFormPageStyles = css`
     background: var(--theme-color-surface);
   }
 
-  /* ── Preview ───────────────────────────────────────────────────────── */
-
-  .preview-wrapper {
-    margin-top: 0.5rem;
-  }
+  /* ── Preview column ──────────────────────────────────────────────── */
 
   .detail-card {
     background: var(--theme-color-surface);
@@ -384,7 +367,17 @@ export const subscriptionFormPageStyles = css`
     color: var(--theme-color-text-primary);
   }
 
-  /* ── Responsive ────────────────────────────────────────────────────── */
+  /* ── Responsive ──────────────────────────────────────────────────── */
+
+  @media (max-width: 960px) {
+    .edit-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .preview-col {
+      position: static;
+    }
+  }
 
   @media (max-width: 640px) {
     .page-content {
