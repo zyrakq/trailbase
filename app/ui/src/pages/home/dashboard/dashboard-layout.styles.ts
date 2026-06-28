@@ -100,7 +100,6 @@ export const dashboardLayoutStyles = css`
       width: auto;
       height: calc(100vh - 125px);
       transform: translateX(-100%);
-      transition: transform 0.3s ease;
       z-index: 1500;
       background: var(--theme-color-surface);
       box-shadow: var(--theme-shadow-lg, var(--theme-shadow-md));
@@ -109,6 +108,10 @@ export const dashboardLayoutStyles = css`
 
     .layout.drawer-open dashboard-sidebar {
       transform: translateX(0);
+    }
+
+    .layout.drawer-animated dashboard-sidebar {
+      transition: transform 0.3s ease;
     }
 
     .period-overlay {

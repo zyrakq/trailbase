@@ -29,10 +29,14 @@ export class DashboardLayout extends LitElement {
   @state() private _ready = false;
   @state() private _periodDropdownOpen = false;
   @state() private _drawerOpen = false;
+  @state() private _drawerAnimated = false;
+
+  private _mq = window.matchMedia('(max-width: 768px)');
 
   async connectedCallback() {
     super.connectedCallback();
     document.addEventListener('keydown', this._handleKeyDown);
+    this._mq.addEventListener('change', this._handleBreakpointChange);
     const subs = await subscriptionsService.getUserSubscriptions();
     if (subs.length === 0) {
       this._activeSection = 'all-services';
@@ -43,7 +47,16 @@ export class DashboardLayout extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('keydown', this._handleKeyDown);
+    this._mq.removeEventListener('change', this._handleBreakpointChange);
   }
+
+  private _handleBreakpointChange = (e: MediaQueryListEvent): void => {
+    if (!e.matches) {
+      this._drawerOpen = false;
+      this._drawerAnimated = false;
+      this._periodDropdownOpen = false;
+    }
+  };
 
   private _handleKeyDown = (e: KeyboardEvent): void => {
     if (e.key !== 'Escape') return;
@@ -55,6 +68,7 @@ export class DashboardLayout extends LitElement {
   };
 
   private _toggleDrawer = (): void => {
+    this._drawerAnimated = true;
     this._drawerOpen = !this._drawerOpen;
   };
 
@@ -135,8 +149,8 @@ export class DashboardLayout extends LitElement {
       return html`<p class="loading">${msg('Loading…')}</p>`;
     }
     const layoutClass = `layout${this._drawerOpen ? ' drawer-open' : ''}${
-      this._barVisible ? ' bar-visible' : ''
-    }`;
+      this._drawerAnimated ? ' drawer-animated' : ''
+    }${this._barVisible ? ' bar-visible' : ''}`;
     return html`
       <div class="mobile-toolbar">
         <button
