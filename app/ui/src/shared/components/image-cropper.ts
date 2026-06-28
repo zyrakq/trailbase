@@ -22,10 +22,12 @@ export class ImageCropper extends LitElement {
   @property({ type: Object }) file: File | null = null;
   @property({ type: Number }) aspect = 1;
   @property({ type: Number }) outputSize = 256;
+  @property({ type: Boolean }) uploading = false;
 
   @state() private _zoom = 1;
   @state() private _ready = false;
   @state() private _errorMessage = '';
+  @state() private _dragOver = false;
 
   private _bitmap: ImageBitmap | null = null;
   private _offsetX = 0;
@@ -36,6 +38,29 @@ export class ImageCropper extends LitElement {
   private _canvas: HTMLCanvasElement | null = null;
   private _objectUrl: string | null = null;
 
+  private _onDragOver = (e: DragEvent): void => {
+    e.preventDefault();
+    this._dragOver = true;
+  };
+
+  private _onDragLeave = (): void => {
+    this._dragOver = false;
+  };
+
+  private _onDrop = (e: DragEvent): void => {
+    e.preventDefault();
+    this._dragOver = false;
+    const file = e.dataTransfer?.files?.[0] ?? null;
+    if (file) void this._loadFile(file);
+  };
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.addEventListener('dragover', this._onDragOver);
+    this.addEventListener('dragleave', this._onDragLeave);
+    this.addEventListener('drop', this._onDrop);
+  }
+
   updated(changed: Map<string, unknown>): void {
     if (changed.has('file') && this.file) {
       void this._loadFile(this.file);
@@ -44,6 +69,9 @@ export class ImageCropper extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.removeEventListener('dragover', this._onDragOver);
+    this.removeEventListener('dragleave', this._onDragLeave);
+    this.removeEventListener('drop', this._onDrop);
     this._releaseObjectUrl();
     this._bitmap?.close();
     this._bitmap = null;
@@ -180,6 +208,14 @@ export class ImageCropper extends LitElement {
     this.shadowRoot?.querySelector<HTMLInputElement>('.file-input')?.click();
   }
 
+  private _handleChangeImage(): void {
+    this._ready = false;
+    this._bitmap?.close();
+    this._bitmap = null;
+    this._releaseObjectUrl();
+    this._errorMessage = '';
+  }
+
   render(): TemplateResult {
     return html`
       <div class="root">
@@ -198,6 +234,9 @@ export class ImageCropper extends LitElement {
                   @pointermove=${this._handlePointerMove}
                   @pointerup=${this._handlePointerUp}
                 ></canvas>
+                ${this.uploading
+                  ? html`<div class="uploading-overlay"><div class="spinner"></div></div>`
+                  : null}
               </div>
               <div class="controls">
                 <label for="zoom">${msg('Zoom')}</label>
@@ -210,14 +249,45 @@ export class ImageCropper extends LitElement {
                   .value=${String(this._zoom)}
                   @input=${this._handleZoom}
                 />
+                <button
+                  type="button"
+                  class="btn-change"
+                  @click=${this._handleChangeImage}
+                >${msg('Change image')}</button>
               </div>
             `
-          : html`<div class="placeholder">${msg('No image selected.')}</div>`}
-        <button type="button" class="btn-upload" @click=${this._openPicker}>
-          ${this.file ? msg('Replace image') : msg('Choose image')}
-        </button>
+          : html`
+              <div
+                class="drop-zone ${this._dragOver ? 'drag-over' : ''}"
+                @click=${this._openPicker}
+              >
+                <svg
+                  class="drop-zone-icon"
+                  width="40"
+                  height="40"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p class="drop-zone-heading">${msg('Upload image')}</p>
+                <p class="drop-zone-hint">${msg('PNG, JPEG, WebP — max 2 MB')}</p>
+                <button
+                  type="button"
+                  class="btn-choose"
+                  @click=${(e: Event) => { e.stopPropagation(); this._openPicker(); }}
+                >${msg('Choose file')}</button>
+              </div>
+            `}
         ${this._errorMessage
-          ? html`<p class="placeholder" role="alert">${this._errorMessage}</p>`
+          ? html`<p class="error-msg" role="alert">${this._errorMessage}</p>`
           : null}
       </div>
     `;
