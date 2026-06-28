@@ -67,7 +67,7 @@ export class SubscriptionFormPage extends LitElement {
           this._resourceUrl = sub.resource_url;
           this._whatIncluded = sub.what_included ?? '';
           this._terms = sub.terms ?? '';
-          this._pricing = sub.pricing.map(p => ({ ...p }));
+          this._pricing = sub.pricing.filter(p => !p.is_archived).map(p => ({ ...p }));
         }
       } catch {
         notificationService.error(msg('Failed to load subscription.'));
