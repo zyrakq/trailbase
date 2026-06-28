@@ -13,6 +13,8 @@
   --theme-color-primary: #ff6b35;
   --theme-color-primary-hover: #e85d2a;
   --theme-color-primary-active: #d94e1f;
+  --theme-color-primary-subtle: color-mix(in srgb, var(--theme-color-primary) 12%, transparent);
+  --theme-color-surface-hover: color-mix(in srgb, var(--theme-color-text-primary) 4%, var(--theme-color-surface));
 
   /* Background colors */
   --theme-color-background: #f9fafb;
@@ -47,6 +49,8 @@
   --theme-color-primary: #10b981;
   --theme-color-primary-hover: #059669;
   --theme-color-primary-active: #047857;
+  --theme-color-primary-subtle: color-mix(in srgb, var(--theme-color-primary) 12%, transparent);
+  --theme-color-surface-hover: color-mix(in srgb, var(--theme-color-text-primary) 4%, var(--theme-color-surface));
 
   /* Elevated surface for modals and toasts */
   --theme-color-surface-elevated: #343a40;
