@@ -1,9 +1,10 @@
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Multipart, Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
+    Extension, Json,
 };
+use crate::settings::uploads::{sanitize_logo_rel, UploadsOverlayConfig};
 use serde::{Deserialize, Serialize};
 use trailbase::{AppState, User};
 use trailbase::util::b64_to_uuid;
@@ -32,6 +33,7 @@ pub enum ApiError {
     Conflict(String),
     Forbidden(String),
     Internal(String),
+    NotImplemented(String),
 }
 
 impl IntoResponse for ApiError {
@@ -42,6 +44,7 @@ impl IntoResponse for ApiError {
             ApiError::Conflict(m) => (StatusCode::CONFLICT, m),
             ApiError::Forbidden(m) => (StatusCode::FORBIDDEN, m),
             ApiError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m),
+            ApiError::NotImplemented(m) => (StatusCode::NOT_IMPLEMENTED, m),
         };
         (code, msg).into_response()
     }
@@ -1054,4 +1057,95 @@ pub async fn subscriber_count_handler(
     };
 
     Ok(Json(CountResponse { count }))
+}
+
+const LOGO_MAX_BYTES: usize = 2 * 1024 * 1024;
+const LOGO_SUBDIR: &str = "subscription-logos";
+const ALLOWED_LOGO_TYPES: &[&str] = &["image/png", "image/jpeg", "image/webp"];
+
+#[derive(Debug, Serialize)]
+pub struct LogoUploadResponse {
+    pub url: String,
+}
+
+pub async fn logo_upload_handler(
+    State(state): State<AppState>,
+    user: User,
+    Extension(cfg): Extension<UploadsOverlayConfig>,
+    mut multipart: Multipart,
+) -> Result<Json<LogoUploadResponse>, ApiError> {
+    require_admin(&state, &user).await?;
+
+    let Some(dir) = cfg.dir.as_ref() else {
+        return Err(ApiError::NotImplemented("uploads.dir not configured".into()));
+    };
+
+    let mut bytes: Option<Vec<u8>> = None;
+    let mut content_type: Option<String> = None;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::BadRequest(format!("multipart error: {e}")))?
+    {
+        if field.name() == Some("file") {
+            content_type = field.content_type().map(|s| s.to_string());
+            bytes = Some(
+                field
+                    .bytes()
+                    .await
+                    .map_err(|e| ApiError::BadRequest(format!("read field: {e}")))?
+                    .to_vec(),
+            );
+            break;
+        }
+    }
+    let bytes = bytes.ok_or_else(|| ApiError::BadRequest("missing 'file' field".into()))?;
+    if bytes.len() > LOGO_MAX_BYTES {
+        return Err(ApiError::BadRequest(format!(
+            "logo exceeds {} byte cap",
+            LOGO_MAX_BYTES
+        )));
+    }
+    let ctype = content_type.unwrap_or_else(|| "application/octet-stream".to_string());
+    if !ALLOWED_LOGO_TYPES.contains(&ctype.as_str()) {
+        return Err(ApiError::BadRequest(format!("unsupported type: {ctype}")));
+    }
+
+    let logos_dir = dir.join(LOGO_SUBDIR);
+    std::fs::create_dir_all(&logos_dir)
+        .map_err(|e| ApiError::Internal(format!("create logos dir: {e}")))?;
+
+    let id = uuid::Uuid::new_v4();
+    let filename = format!("{id}.png");
+    let path = logos_dir.join(&filename);
+    std::fs::write(&path, &bytes)
+        .map_err(|e| ApiError::Internal(format!("write logo: {e}")))?;
+
+    let url = format!("/{LOGO_SUBDIR}/{filename}");
+    log::info!("admin {} uploaded logo {}", user.id, url);
+    Ok(Json(LogoUploadResponse { url }))
+}
+
+#[cfg(test)]
+mod logo_tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_logo_rel_rejects_traversal() {
+        assert_eq!(sanitize_logo_rel("../x"), None);
+        assert_eq!(sanitize_logo_rel("ok/x.png"), Some("ok/x.png"));
+    }
+
+    #[test]
+    fn allowed_types_are_png_jpeg_webp() {
+        assert!(ALLOWED_LOGO_TYPES.contains(&"image/png"));
+        assert!(ALLOWED_LOGO_TYPES.contains(&"image/jpeg"));
+        assert!(ALLOWED_LOGO_TYPES.contains(&"image/webp"));
+        assert!(!ALLOWED_LOGO_TYPES.contains(&"image/svg+xml"));
+    }
+
+    #[test]
+    fn logo_max_bytes_is_two_mib() {
+        assert_eq!(LOGO_MAX_BYTES, 2 * 1024 * 1024);
+    }
 }
