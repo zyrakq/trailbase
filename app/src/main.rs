@@ -61,6 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let branding_overlay_config = settings
         .branding
         .overlay_config(&settings.frontend, &manifest_dir);
+    let uploads_overlay_config = settings.uploads.overlay_config();
 
     let interceptor = smtp::setup(&settings.mailcrab);
 
@@ -85,7 +86,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let base_router = base_router
         .layer(axum::Extension(public_config))
-        .layer(axum::Extension(branding_overlay_config));
+        .layer(axum::Extension(branding_overlay_config))
+        .layer(axum::Extension(uploads_overlay_config));
 
     let (router, smtp_handle) = smtp::mount(interceptor, base_router);
 
