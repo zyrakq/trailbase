@@ -17,7 +17,7 @@ export const subscriptionCardStyles = css`
   }
 
   .card:hover {
-    border-color: var(--theme-color-primary, #6366f1);
+    border-color: var(--theme-color-primary);
     box-shadow: var(--theme-shadow-md);
   }
 
@@ -119,12 +119,12 @@ export const subscriptionCardStyles = css`
   }
 
   .icon-btn.primary {
-    border-color: var(--theme-color-primary, #6366f1);
-    color: var(--theme-color-primary, #6366f1);
+    border-color: var(--theme-color-primary);
+    color: var(--theme-color-primary);
   }
 
   .icon-btn.primary:hover:not(:disabled) {
-    background: var(--theme-color-primary-subtle, rgba(99, 102, 241, 0.08));
+    background: var(--theme-color-primary-subtle);
   }
 
   .icon-btn.danger {
