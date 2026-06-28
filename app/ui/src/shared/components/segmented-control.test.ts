@@ -7,7 +7,7 @@ vi.hoisted(() => {
     get length() { return store.size; },
     clear() { store.clear(); },
     getItem(key) { return store.has(key) ? (store.get(key) as string) : null; },
-    k(index) { return Array.from(store.keys())[index] ?? null; },
+    key(index) { return Array.from(store.keys())[index] ?? null; },
     removeItem(key) { store.delete(key); },
     setItem(key, value) { store.set(key, value); },
   };
@@ -22,7 +22,7 @@ import type { SegmentedControl } from './segmented-control';
 describe('segmented-control', () => {
   let element: SegmentedControl;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     element = document.createElement('segmented-control') as SegmentedControl;
     element.values = ['monthly', 'quarterly', 'yearly', 'onetime'];
     element.labels = {
@@ -32,6 +32,10 @@ describe('segmented-control', () => {
     element.value = '';
     element.disabledValues = [];
     document.body.appendChild(element);
+    // happy-dom defers Lit's scheduled update via queueMicrotask; flush a
+    // macrotask so the shadow DOM is populated before each test runs.
+    await new Promise(r => setTimeout(r, 0));
+    await element.updateComplete;
   });
 
   afterEach(() => {

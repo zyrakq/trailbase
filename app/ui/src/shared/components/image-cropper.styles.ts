@@ -5,6 +5,10 @@ export const imageCropperStyles = css`
     display: block;
   }
 
+  .root {
+    display: contents;
+  }
+
   .placeholder {
     border: 1px dashed var(--theme-color-border);
     border-radius: 8px;

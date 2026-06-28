@@ -7,7 +7,7 @@ vi.hoisted(() => {
     get length() { return store.size; },
     clear() { store.clear(); },
     getItem(key) { return store.has(key) ? (store.get(key) as string) : null; },
-    k(index) { return Array.from(store.keys())[index] ?? null; },
+    key(index) { return Array.from(store.keys())[index] ?? null; },
     removeItem(key) { store.delete(key); },
     setItem(key, value) { store.set(key, value); },
   };
@@ -22,8 +22,23 @@ vi.hoisted(() => {
   const canvas = document.createElement('canvas');
   canvas.width = 8;
   canvas.height = 8;
+  // ImageBitmap has close(); HTMLCanvasElement does not — add it so
+  // disconnectedCallback doesn't throw when it calls _bitmap?.close().
+  (canvas as unknown as Record<string, unknown>).close = vi.fn();
   Object.defineProperty(globalThis, 'createImageBitmap', {
     value: vi.fn().mockResolvedValue(canvas),
+    writable: true,
+    configurable: true,
+  });
+});
+
+// happy-dom's HTMLCanvasElement.toBlob never invokes the callback with a
+// non-null Blob. Replace it globally so _emitCropped can fire the event.
+vi.hoisted(() => {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'toBlob', {
+    value(callback: BlobCallback) {
+      callback(new Blob([new Uint8Array([1])], { type: 'image/png' }));
+    },
     writable: true,
     configurable: true,
   });
@@ -35,9 +50,12 @@ import type { ImageCropper } from './image-cropper';
 describe('image-cropper', () => {
   let element: ImageCropper;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     element = document.createElement('image-cropper') as ImageCropper;
     document.body.appendChild(element);
+    // Flush the macrotask queue so Lit's shadow DOM is populated before each test.
+    await new Promise(r => setTimeout(r, 0));
+    await element.updateComplete;
   });
 
   afterEach(() => {

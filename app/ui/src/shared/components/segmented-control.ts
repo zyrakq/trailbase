@@ -1,4 +1,4 @@
-import { LitElement, html, nothing, type TemplateResult } from 'lit';
+import { LitElement, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { localized } from '@/features/localization';
 import { segmentedControlStyles } from './segmented-control.styles';
@@ -28,22 +28,23 @@ export class SegmentedControl extends LitElement {
 
   render(): TemplateResult {
     return html`
-      ${this.values.map(value => {
-        const disabled = this.disabledValues.includes(value);
-        const isActive = this.value === value;
-        return html`
-          <button
-            type="button"
-            class="pill ${isActive ? 'active' : ''}"
-            ?data-disabled=${disabled}
-            aria-disabled=${disabled ? 'true' : 'false'}
-            @click=${() => this._handleClick(value, disabled)}
-          >
-            ${this.labels[value] ?? value}
-          </button>
-        `;
-      })}
-      ${this.values.length === 0 ? nothing : null}
+      <div class="pills">
+        ${this.values.map(value => {
+          const disabled = this.disabledValues.includes(value);
+          const isActive = this.value === value;
+          return html`
+            <button
+              type="button"
+              class="pill ${isActive ? 'active' : ''}"
+              ?data-disabled=${disabled}
+              aria-disabled=${disabled ? 'true' : 'false'}
+              @click=${() => this._handleClick(value, disabled)}
+            >
+              ${this.labels[value] ?? value}
+            </button>
+          `;
+        })}
+      </div>
     `;
   }
 

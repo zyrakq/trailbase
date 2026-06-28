@@ -9,6 +9,10 @@ export const segmentedControlStyles = css`
     background: var(--theme-color-surface);
   }
 
+  .pills {
+    display: contents;
+  }
+
   .pill {
     appearance: none;
     border: none;

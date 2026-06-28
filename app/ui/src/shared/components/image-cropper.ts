@@ -106,8 +106,8 @@ export class ImageCropper extends LitElement {
     }, 'image/png');
   }
 
-  private _setCanvasRef(el: HTMLCanvasElement | null): void {
-    this._canvas = el;
+  private _setCanvasRef(el: Element | undefined): void {
+    this._canvas = (el as HTMLCanvasElement | null) ?? null;
   }
 
   private _draw(): void {
@@ -182,42 +182,44 @@ export class ImageCropper extends LitElement {
 
   render(): TemplateResult {
     return html`
-      <input
-        class="file-input"
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        @change=${this._handleFilePick}
-      />
-      ${this._ready && this._bitmap
-        ? html`
-            <div class="canvas-wrap">
-              <canvas
-                ${ref(this._setCanvasRef.bind(this))}
-                @pointerdown=${this._handlePointerDown}
-                @pointermove=${this._handlePointerMove}
-                @pointerup=${this._handlePointerUp}
-              ></canvas>
-            </div>
-            <div class="controls">
-              <label for="zoom">${msg('Zoom')}</label>
-              <input
-                id="zoom"
-                type="range"
-                min="0.5"
-                max="3"
-                step="0.05"
-                .value=${String(this._zoom)}
-                @input=${this._handleZoom}
-              />
-            </div>
-          `
-        : html`<div class="placeholder">${msg('No image selected.')}</div>`}
-      <button type="button" class="btn-upload" @click=${this._openPicker}>
-        ${this.file ? msg('Replace image') : msg('Choose image')}
-      </button>
-      ${this._errorMessage
-        ? html`<p class="placeholder" role="alert">${this._errorMessage}</p>`
-        : null}
+      <div class="root">
+        <input
+          class="file-input"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          @change=${this._handleFilePick}
+        />
+        ${this._ready && this._bitmap
+          ? html`
+              <div class="canvas-wrap">
+                <canvas
+                  ${ref(this._setCanvasRef.bind(this))}
+                  @pointerdown=${this._handlePointerDown}
+                  @pointermove=${this._handlePointerMove}
+                  @pointerup=${this._handlePointerUp}
+                ></canvas>
+              </div>
+              <div class="controls">
+                <label for="zoom">${msg('Zoom')}</label>
+                <input
+                  id="zoom"
+                  type="range"
+                  min="0.5"
+                  max="3"
+                  step="0.05"
+                  .value=${String(this._zoom)}
+                  @input=${this._handleZoom}
+                />
+              </div>
+            `
+          : html`<div class="placeholder">${msg('No image selected.')}</div>`}
+        <button type="button" class="btn-upload" @click=${this._openPicker}>
+          ${this.file ? msg('Replace image') : msg('Choose image')}
+        </button>
+        ${this._errorMessage
+          ? html`<p class="placeholder" role="alert">${this._errorMessage}</p>`
+          : null}
+      </div>
     `;
   }
 
