@@ -10,6 +10,9 @@ import {
   type SubscriptionPeriod,
   type SubscriptionPricing,
 } from '@/features/subscriptions';
+import type { ImageCropperCroppedEventDetail, SegmentedSelectEventDetail } from '@/shared';
+import '@/shared/components/segmented-control';
+import '@/shared/components/image-cropper';
 import '@/shared';
 import { subscriptionFormPageStyles } from './subscription-form-page.styles';
 
@@ -50,6 +53,9 @@ export class SubscriptionFormPage extends LitElement {
   @state() private _terms = '';
   @state() private _pricing: PricingEntry[] = [];
 
+  @state() private _logoMode: 'upload' | 'url' = 'upload';
+  @state() private _uploading = false;
+
   async connectedCallback(): Promise<void> {
     super.connectedCallback();
     await authService.init();
@@ -68,6 +74,7 @@ export class SubscriptionFormPage extends LitElement {
           this._whatIncluded = sub.what_included ?? '';
           this._terms = sub.terms ?? '';
           this._pricing = sub.pricing.filter(p => !p.is_archived).map(p => ({ ...p }));
+          if (sub.logo_url) this._logoMode = 'url';
         }
       } catch {
         notificationService.error(msg('Failed to load subscription.'));
@@ -80,11 +87,9 @@ export class SubscriptionFormPage extends LitElement {
     window.location.href = '/admin';
   }
 
-  private _addPricingTier(): void {
-    const usedPeriods = new Set(this._pricing.map(p => p.period));
-    const available = PERIODS.find(p => !usedPeriods.has(p));
-    if (!available) return;
-    this._pricing = [...this._pricing, { period: available, price: 0, currency: 'RUB' }];
+  private _addPricingTier(period: SubscriptionPeriod): void {
+    if (this._pricing.some(p => p.period === period)) return;
+    this._pricing = [...this._pricing, { period, price: 0, currency: 'RUB' }];
   }
 
   private _removePricingTier(index: number): void {
@@ -95,6 +100,21 @@ export class SubscriptionFormPage extends LitElement {
     this._pricing = this._pricing.map((p, i) =>
       i === index ? { ...p, [field]: value } : p
     );
+  }
+
+  private async _handleCropped(e: CustomEvent<ImageCropperCroppedEventDetail>): Promise<void> {
+    if (this._uploading) return;
+    this._uploading = true;
+    try {
+      const url = await subscriptionsService.uploadLogo(e.detail.blob);
+      this._logoUrl = url;
+    } catch (err) {
+      notificationService.error(
+        err instanceof Error ? err.message : msg('Logo upload failed.'),
+      );
+    } finally {
+      this._uploading = false;
+    }
   }
 
   private async _save(): Promise<void> {
@@ -174,11 +194,28 @@ export class SubscriptionFormPage extends LitElement {
   }
 
   private _renderEditForm(): TemplateResult {
-    const usedPeriods = new Set(this._pricing.map(p => p.period));
-    const canAddMore = usedPeriods.size < PERIODS.length;
-
     return html`
       <form class="form" @submit=${(e: Event) => { e.preventDefault(); void this._save(); }}>
+        ${this._renderGeneralSection()}
+        ${this._renderLogoSection()}
+        ${this._renderPricingSection()}
+        ${this._renderDetailsSection()}
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" @click=${this._goBack}>
+            ${msg('Cancel')}
+          </button>
+          <button type="submit" class="btn-primary" ?disabled=${this._saving}>
+            ${this._saving ? msg('Saving…') : msg('Save')}
+          </button>
+        </div>
+      </form>
+    `;
+  }
+
+  private _renderGeneralSection(): TemplateResult {
+    return html`
+      <section class="form-section">
+        <h2 class="section-heading">${msg('General')}</h2>
         <div class="field">
           <label class="label" for="name">${msg('Name')} *</label>
           <input
@@ -190,33 +227,16 @@ export class SubscriptionFormPage extends LitElement {
             required
           />
         </div>
-
         <div class="field">
           <label class="label" for="description">${msg('Description')}</label>
           <textarea
             id="description"
             class="input textarea"
+            rows="3"
             .value=${this._description}
             @input=${(e: InputEvent) => { this._description = (e.target as HTMLTextAreaElement).value; }}
-            rows="3"
           ></textarea>
         </div>
-
-        <div class="field">
-          <label class="label" for="logo_url">${msg('Logo URL')}</label>
-          <div class="logo-input-row">
-            <input
-              id="logo_url"
-              class="input"
-              type="url"
-              .value=${this._logoUrl}
-              @input=${(e: InputEvent) => { this._logoUrl = (e.target as HTMLInputElement).value; }}
-              placeholder="https://..."
-            />
-            ${this._logoUrl ? html`<img class="logo-preview" src=${this._logoUrl} alt="Logo preview" />` : null}
-          </div>
-        </div>
-
         <div class="field">
           <label class="label" for="resource_url">${msg('Resource URL')}</label>
           <input
@@ -228,102 +248,140 @@ export class SubscriptionFormPage extends LitElement {
             placeholder="https://..."
           />
         </div>
+      </section>
+    `;
+  }
 
+  private _renderLogoSection(): TemplateResult {
+    return html`
+      <section class="form-section">
+        <h2 class="section-heading">${msg('Logo')}</h2>
+        ${this._logoMode === 'upload'
+          ? html`
+              <image-cropper
+                .file=${null}
+                @cropped=${this._handleCropped}
+              ></image-cropper>
+              ${this._logoUrl
+                ? html`<img class="logo-preview" src=${this._logoUrl} alt=${msg('Logo preview')} />`
+                : null}
+              <button
+                type="button"
+                class="btn-link"
+                @click=${() => { this._logoMode = 'url'; }}
+              >${msg('Use a URL instead')}</button>
+            `
+          : html`
+              <div class="logo-input-row">
+                <input
+                  class="input"
+                  type="url"
+                  .value=${this._logoUrl}
+                  @input=${(e: InputEvent) => { this._logoUrl = (e.target as HTMLInputElement).value; }}
+                  placeholder="https://..."
+                />
+                ${this._logoUrl
+                  ? html`<img class="logo-preview" src=${this._logoUrl} alt=${msg('Logo preview')} />`
+                  : null}
+              </div>
+              <button
+                type="button"
+                class="btn-link"
+                @click=${() => { this._logoMode = 'upload'; }}
+              >${msg('Upload an image instead')}</button>
+            `}
+      </section>
+    `;
+  }
+
+  private _renderPricingSection(): TemplateResult {
+    const usedPeriods = new Set(this._pricing.map(p => p.period));
+    const periodLabels: Record<string, string> = {
+      monthly: msg('Monthly'),
+      quarterly: msg('Quarterly'),
+      yearly: msg('Yearly'),
+      onetime: msg('One-time'),
+    };
+    return html`
+      <section class="form-section">
+        <h2 class="section-heading">${msg('Pricing')}</h2>
+        <segmented-control
+          .values=${PERIODS}
+          .labels=${periodLabels}
+          .value=${''}
+          .disabledValues=${[...usedPeriods]}
+          @select=${(e: CustomEvent<SegmentedSelectEventDetail>) => {
+            this._addPricingTier(e.detail.value as SubscriptionPeriod);
+          }}
+        ></segmented-control>
+        ${this._pricing.length === 0
+          ? html`<p class="pricing-empty">${msg('No pricing tiers. Pick a period above.')}</p>`
+          : null}
+        ${this._pricing.map((p, i) => html`
+          <div class="pricing-tier">
+            <span class="period-label">${periodLabels[p.period]}</span>
+            <input
+              class="input price-input"
+              type="number"
+              min="0"
+              .value=${String(p.price)}
+              @input=${(e: InputEvent) => {
+                this._updatePricingTier(i, 'price', Number((e.target as HTMLInputElement).value));
+              }}
+            />
+            <input
+              class="input currency-input"
+              type="text"
+              maxlength="3"
+              .value=${p.currency}
+              @input=${(e: InputEvent) => {
+                this._updatePricingTier(i, 'currency', (e.target as HTMLInputElement).value.toUpperCase());
+              }}
+            />
+            <button
+              type="button"
+              class="btn-remove-tier"
+              title=${msg('Remove')}
+              aria-label=${msg('Remove pricing tier')}
+              @click=${() => this._removePricingTier(i)}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                <path d="M10 11v6M14 11v6"></path>
+              </svg>
+            </button>
+          </div>
+        `)}
+      </section>
+    `;
+  }
+
+  private _renderDetailsSection(): TemplateResult {
+    return html`
+      <section class="form-section">
+        <h2 class="section-heading">${msg('Details')}</h2>
         <div class="field">
           <label class="label" for="what_included">${msg("What's included")}</label>
           <textarea
             id="what_included"
             class="input textarea"
+            rows="4"
             .value=${this._whatIncluded}
             @input=${(e: InputEvent) => { this._whatIncluded = (e.target as HTMLTextAreaElement).value; }}
-            rows="4"
           ></textarea>
         </div>
-
         <div class="field">
           <label class="label" for="terms">${msg('Terms')}</label>
           <textarea
             id="terms"
             class="input textarea"
+            rows="3"
             .value=${this._terms}
             @input=${(e: InputEvent) => { this._terms = (e.target as HTMLTextAreaElement).value; }}
-            rows="3"
           ></textarea>
         </div>
-
-        <div class="field">
-          <div class="pricing-header">
-            <span class="label">${msg('Pricing')}</span>
-            ${canAddMore ? html`
-              <button type="button" class="btn-add-tier" @click=${this._addPricingTier}>
-                + ${msg('Add period')}
-              </button>
-            ` : null}
-          </div>
-          ${this._pricing.length === 0 ? html`
-            <p class="pricing-empty">${msg('No pricing tiers. Add one above.')}</p>
-          ` : null}
-          ${this._pricing.map((p, i) => html`
-            <div class="pricing-tier">
-              <select
-                class="select period-select"
-                .value=${p.period}
-                @change=${(e: Event) => {
-                  this._updatePricingTier(i, 'period', (e.target as HTMLSelectElement).value as SubscriptionPeriod);
-                }}
-              >
-                ${PERIODS.map(period => html`
-                  <option
-                    value=${period}
-                    ?selected=${p.period === period}
-                    ?disabled=${usedPeriods.has(period) && p.period !== period}
-                  >${periodLabel(period)}</option>
-                `)}
-              </select>
-              <input
-                class="input price-input"
-                type="number"
-                min="0"
-                .value=${String(p.price)}
-                @input=${(e: InputEvent) => {
-                  this._updatePricingTier(i, 'price', Number((e.target as HTMLInputElement).value));
-                }}
-              />
-              <input
-                class="input currency-input"
-                type="text"
-                maxlength="3"
-                .value=${p.currency}
-                @input=${(e: InputEvent) => {
-                  this._updatePricingTier(i, 'currency', (e.target as HTMLInputElement).value.toUpperCase());
-                }}
-              />
-              <button
-                type="button"
-                class="btn-remove-tier"
-                title=${msg('Remove')}
-                aria-label=${msg('Remove pricing tier')}
-                @click=${() => this._removePricingTier(i)}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-                  <path d="M10 11v6M14 11v6"></path>
-                </svg>
-              </button>
-            </div>
-          `)}
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn-secondary" @click=${this._goBack}>
-            ${msg('Cancel')}
-          </button>
-          <button type="submit" class="btn-primary" ?disabled=${this._saving}>
-            ${this._saving ? msg('Saving…') : msg('Save')}
-          </button>
-        </div>
-      </form>
+      </section>
     `;
   }
 

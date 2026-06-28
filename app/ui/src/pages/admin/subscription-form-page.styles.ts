@@ -84,8 +84,31 @@ export const subscriptionFormPageStyles = css`
   .form {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 0;
   }
+
+  /* ── Form sections ─────────────────────────────────────────────────── */
+
+  .form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--theme-color-border);
+  }
+
+  .form-section:last-of-type {
+    border-bottom: none;
+  }
+
+  .form-section > .section-heading {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--theme-color-text-primary);
+    margin: 0 0 0.25rem;
+  }
+
+  /* ── Fields ────────────────────────────────────────────────────────── */
 
   .field {
     display: flex;
@@ -120,6 +143,8 @@ export const subscriptionFormPageStyles = css`
     min-height: 80px;
   }
 
+  /* ── Logo section ──────────────────────────────────────────────────── */
+
   .logo-input-row {
     display: flex;
     gap: 0.75rem;
@@ -131,36 +156,32 @@ export const subscriptionFormPageStyles = css`
   }
 
   .logo-preview {
-    width: 48px;
-    height: 48px;
+    width: 64px;
+    height: 64px;
     object-fit: contain;
-    border-radius: 6px;
+    border-radius: 8px;
     border: 1px solid var(--theme-color-border);
     flex-shrink: 0;
   }
 
-  .pricing-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .btn-add-tier {
-    background: transparent;
-    border: 1px dashed var(--theme-color-border);
-    border-radius: 6px;
-    padding: 0.25rem 0.75rem;
+  .btn-link {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    padding: 0;
     cursor: pointer;
-    color: var(--theme-color-text-secondary);
     font-family: inherit;
     font-size: 0.875rem;
-    transition: border-color 0.15s ease, color 0.15s ease;
+    color: var(--theme-color-primary, #6366f1);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
-  .btn-add-tier:hover {
-    border-color: var(--theme-color-primary, #6366f1);
-    color: var(--theme-color-primary, #6366f1);
+  .btn-link:hover {
+    opacity: 0.8;
   }
+
+  /* ── Pricing section ───────────────────────────────────────────────── */
 
   .pricing-empty {
     color: var(--theme-color-text-secondary);
@@ -171,25 +192,36 @@ export const subscriptionFormPageStyles = css`
 
   .pricing-tier {
     display: grid;
-    grid-template-columns: 1fr 100px 72px auto;
+    grid-template-columns: 130px 1fr 72px auto;
     gap: 0.5rem;
     align-items: center;
-    margin-top: 0.5rem;
   }
 
-  .select {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--theme-color-border);
-    border-radius: 6px;
-    background: var(--theme-color-surface);
-    color: var(--theme-color-text-primary);
-    font-family: inherit;
+  .period-label {
     font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--theme-color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .price-input,
-  .currency-input {
+  .price-input {
     text-align: right;
+    /* hide native number spinners */
+    -moz-appearance: textfield;
+  }
+
+  .price-input::-webkit-outer-spin-button,
+  .price-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .currency-input {
+    text-align: center;
+    font-weight: 600;
+    letter-spacing: 0.04em;
   }
 
   .btn-remove-tier {
@@ -215,11 +247,13 @@ export const subscriptionFormPageStyles = css`
     height: 16px;
   }
 
+  /* ── Form actions ──────────────────────────────────────────────────── */
+
   .form-actions {
     display: flex;
     gap: 0.75rem;
     justify-content: flex-end;
-    padding-top: 0.5rem;
+    padding-top: 1.25rem;
   }
 
   .btn-primary,
@@ -257,6 +291,8 @@ export const subscriptionFormPageStyles = css`
   .btn-secondary:hover {
     background: var(--theme-color-surface);
   }
+
+  /* ── Preview ───────────────────────────────────────────────────────── */
 
   .preview-wrapper {
     margin-top: 0.5rem;
@@ -348,13 +384,15 @@ export const subscriptionFormPageStyles = css`
     color: var(--theme-color-text-primary);
   }
 
+  /* ── Responsive ────────────────────────────────────────────────────── */
+
   @media (max-width: 640px) {
     .page-content {
       padding: 1rem;
     }
 
     .pricing-tier {
-      grid-template-columns: 1fr 80px 60px auto;
+      grid-template-columns: 100px 1fr 60px auto;
       gap: 0.375rem;
     }
   }
