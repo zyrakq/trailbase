@@ -4,7 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
     Extension, Json,
 };
-use crate::settings::uploads::{sanitize_logo_rel, UploadsOverlayConfig};
+use crate::settings::uploads::UploadsOverlayConfig;
 use serde::{Deserialize, Serialize};
 use trailbase::{AppState, User};
 use trailbase::util::b64_to_uuid;
