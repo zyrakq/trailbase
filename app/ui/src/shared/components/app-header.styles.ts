@@ -7,6 +7,9 @@ export const appHeaderStyles = css`
   }
 
   header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     background: var(--theme-color-surface);
     border-bottom: 1px solid var(--theme-color-border);
     transition:
