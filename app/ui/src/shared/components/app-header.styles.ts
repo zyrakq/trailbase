@@ -40,6 +40,29 @@ export const appHeaderStyles = css`
   .actions {
     display: flex;
     gap: 1rem;
+    align-items: center;
+  }
+
+  .menu-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 6px;
+    color: var(--theme-color-text-primary);
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+  }
+
+  .menu-btn:hover {
+    background: var(--theme-color-background);
+  }
+
+  .menu-btn svg {
+    width: 24px;
+    height: 24px;
   }
 
   .login-btn {
@@ -56,6 +79,12 @@ export const appHeaderStyles = css`
   }
   .login-btn:hover { background: var(--theme-color-primary-hover); }
   .login-btn:active { background: var(--theme-color-primary-active); }
+
+  @media (max-width: 768px) {
+    .menu-btn {
+      display: inline-flex;
+    }
+  }
 
   @media (max-width: 640px) {
     .header-content {

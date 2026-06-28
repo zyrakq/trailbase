@@ -15,6 +15,7 @@ import './welcome/welcome-content';
 export class HomePage extends LitElement {
   @state() private _isAuthenticated = false;
   @state() private _dashboardReady = false;
+  @state() private _drawerOpen = false;
 
   async connectedCallback() {
     super.connectedCallback();
@@ -34,7 +35,11 @@ export class HomePage extends LitElement {
 
   private _updateAuthState(): void {
     const authState = authService.getAuthState();
+    const wasAuthenticated = this._isAuthenticated;
     this._isAuthenticated = authState.isAuthenticated;
+    if (!authState.isAuthenticated && wasAuthenticated) {
+      this._drawerOpen = false;
+    }
     if (authState.isAuthenticated && !this._dashboardReady) {
       this._loadDashboard();
     }
@@ -50,9 +55,20 @@ export class HomePage extends LitElement {
       });
   }
 
+  private _toggleDrawer = (): void => {
+    this._drawerOpen = !this._drawerOpen;
+  };
+
+  private _closeDrawer = (): void => {
+    this._drawerOpen = false;
+  };
+
   private renderMain(): TemplateResult {
     if (this._isAuthenticated && this._dashboardReady) {
-      return html`<dashboard-layout></dashboard-layout>`;
+      return html`<dashboard-layout
+        .drawerOpen=${this._drawerOpen}
+        @drawer-close=${this._closeDrawer}
+      ></dashboard-layout>`;
     }
     if (this._isAuthenticated) {
       return html`<div class="loading">${msg('Loading…')}</div>`;
@@ -63,7 +79,7 @@ export class HomePage extends LitElement {
   render() {
     return html`
       <div class="page">
-        <app-header></app-header>
+        <app-header @menu-toggle=${this._toggleDrawer}></app-header>
         <main class="main-content">${this.renderMain()}</main>
         <footer-info></footer-info>
       </div>

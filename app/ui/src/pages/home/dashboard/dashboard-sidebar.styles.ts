@@ -91,4 +91,10 @@ export const dashboardSidebarStyles = css`
     color: var(--theme-color-primary, #6366f1);
     font-weight: 600;
   }
+
+  @media (max-width: 768px) {
+    .period-filter {
+      display: none;
+    }
+  }
 `;

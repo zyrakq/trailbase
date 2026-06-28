@@ -27,14 +27,17 @@ export const welcomeContentStyles = css`
   }
 
   .features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 1.5rem;
     margin: 3rem 0;
     text-align: left;
   }
 
   .feature-card {
+    flex: 1 1 280px;
+    max-width: 360px;
     background: var(--theme-color-surface);
     border: 1px solid var(--theme-color-border);
     border-radius: 8px;

@@ -46,6 +46,13 @@ export class AppHeader extends LitElement {
   private _handleSignIn(): void {
     authService.showLogin();
   }
+
+  private _handleMenuToggle(): void {
+    this.dispatchEvent(
+      new CustomEvent('menu-toggle', { bubbles: true, composed: true })
+    );
+  }
+
   render() {
     const mark = `/branding/mark-${this.theme.theme}.svg`;
 
@@ -56,6 +63,27 @@ export class AppHeader extends LitElement {
             <img src=${mark} alt=${this.brandName} class="logo-mark" />
           </a>
           <div class="actions">
+            ${this._isAuthenticated
+              ? html`<button
+                  class="menu-btn"
+                  @click=${() => this._handleMenuToggle()}
+                  aria-label=${msg('Menu')}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                  </svg>
+                </button>`
+              : null}
             ${this._isAuthenticated
               ? html`<account-menu></account-menu>`
               : html`

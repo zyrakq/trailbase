@@ -88,6 +88,7 @@
 'sb061ff5a347a296e': `Profile`,
 'se4f7eba403105eec': `Manage subscriptions`,
 's7cfe12cd14df9950': `Sign out`,
+'s6d8c02aee480af7a': `Menu`,
 'sd4647caeb94889ec': `Terms`,
 'se78c02e9a98a0f47': `Privacy`,
 's3736464cf8d6fa08': `Support`,
