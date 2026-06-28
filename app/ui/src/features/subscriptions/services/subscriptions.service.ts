@@ -1,4 +1,3 @@
-import { trailbaseService } from '@/features/auth/index.ts';
 import type {
   CatalogResponse,
   Subscription,
@@ -10,7 +9,6 @@ import type {
   UserSubscription,
 } from '../types/subscription.types.ts';
 
-// DB stores timestamps as unixepoch (seconds); TS types use milliseconds.
 function secToMs(sec: unknown): number {
   return (sec as number) * 1000;
 }
@@ -22,7 +20,7 @@ function mapPricing(raw: Record<string, unknown>): SubscriptionPricing {
     period: raw['period'] as SubscriptionPricing['period'],
     price: raw['price'] as number,
     currency: raw['currency'] as string,
-    is_archived: !!(raw['is_archived'] as number),
+    is_archived: !!raw['is_archived'],
   };
 }
 
@@ -104,26 +102,13 @@ async function fetchCatalog(endpoint: string): Promise<CatalogResponse> {
   return { subscriptions, availablePeriods };
 }
 
-async function joinPricingToSubscriptions(
-  subs: Record<string, unknown>[]
-): Promise<Subscription[]> {
-  if (subs.length === 0) return [];
-  const client = await trailbaseService.initClient();
-  const pricingResult = await client
-    .records<Record<string, unknown>>('subscription_pricing')
-    .list({ filters: [{ column: 'is_archived', op: 'equal', value: '0' }], pagination: { limit: 1024 } });
-
-  const pricingBySubId = new Map<string, SubscriptionPricing[]>();
-  for (const p of pricingResult.records) {
-    const mapped = mapPricing(p);
-    const existing = pricingBySubId.get(mapped.subscription_id) ?? [];
-    existing.push(mapped);
-    pricingBySubId.set(mapped.subscription_id, existing);
+async function fetchJson<T>(endpoint: string): Promise<T> {
+  const response = await fetch(endpoint, { credentials: 'include' });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Request failed: ${response.status} ${text}`);
   }
-
-  return subs.map(raw =>
-    mapSubscription(raw, pricingBySubId.get(raw['id'] as string) ?? [])
-  );
+  return (await response.json()) as T;
 }
 
 class SubscriptionsService {
@@ -142,81 +127,39 @@ class SubscriptionsService {
     return fetchCatalog('/api/subscriptions/catalog');
   }
 
-  async getAllAdmin(): Promise<Subscription[]> {
-    const client = await trailbaseService.initClient();
-    const result = await client
-      .records<Record<string, unknown>>('subscriptions')
-      .list({ pagination: { limit: 1024 } });
-    return joinPricingToSubscriptions(result.records);
-  }
-
-  async getById(id: string): Promise<Subscription | undefined> {
-    const client = await trailbaseService.initClient();
-    const [raw, pricingResult] = await Promise.all([
-      client.records<Record<string, unknown>>('subscriptions').read(id),
-      client.records<Record<string, unknown>>('subscription_pricing').list({
-        filters: [{ column: 'subscription_id', op: 'equal', value: id }],
-        pagination: { limit: 64 },
-      }),
-    ]);
-    const pricing = pricingResult.records.map(mapPricing);
-    return mapSubscription(raw, pricing);
-  }
-
-  async getUserSubscriptions(): Promise<UserSubscription[]> {
-    const client = await trailbaseService.initClient();
-    const result = await client
-      .records<Record<string, unknown>>('user_subscriptions')
-      .list({
-        filters: [{ column: 'status', op: 'equal', value: 'active' }],
-        pagination: { limit: 256 },
-      });
-    const now = Date.now();
-    return result.records
-      .map(mapUserSubscription)
-      .filter(u => u.expires_at === undefined || u.expires_at > now);
-  }
-
   async getMine(): Promise<CatalogResponse> {
     return fetchCatalog('/api/subscriptions/mine');
   }
 
-  async getEventHistory(): Promise<SubscriptionEventWithSub[]> {
-    const client = await trailbaseService.initClient();
-
-    const [userSubsResult, eventsResult] = await Promise.all([
-      client.records<Record<string, unknown>>('user_subscriptions').list({ pagination: { limit: 256 } }),
-      client.records<Record<string, unknown>>('subscription_events').list({
-        order: ['-created_at'],
-        pagination: { limit: 256 },
-      }),
-    ]);
-
-    const subIds = [...new Set(
-      userSubsResult.records.map(us => us['subscription_id'] as string)
-    )];
-
-    let subsResult: Record<string, unknown>[] = [];
-    if (subIds.length > 0) {
-      const r = await client
-        .records<Record<string, unknown>>('subscriptions')
-        .list({ pagination: { limit: 256 } });
-      subsResult = r.records;
-    }
-
-    const subNameById = new Map(subsResult.map(s => [s['id'] as string, s['name'] as string]));
-    const userSubById = new Map(
-      userSubsResult.records.map(us => [us['id'] as string, us])
-    );
-
-    return eventsResult.records.map(raw => {
-      const event = mapEvent(raw);
-      const userSub = userSubById.get(event.user_subscription_id);
-      const subName = userSub
-        ? (subNameById.get(userSub['subscription_id'] as string) ?? 'Unknown')
-        : 'Unknown';
-      return { ...event, subscriptionName: subName };
+  async getAllAdmin(): Promise<Subscription[]> {
+    const raw = await fetchJson<Record<string, unknown>[]>('/api/admin/subscriptions');
+    return raw.map(s => {
+      const pricing = ((s['pricing'] as Record<string, unknown>[] | undefined) ?? []).map(mapPricing);
+      return mapSubscription(s, pricing);
     });
+  }
+
+  async getById(id: string): Promise<Subscription | undefined> {
+    try {
+      const raw = await fetchJson<Record<string, unknown>>(`/api/subscriptions/${encodeURIComponent(id)}`);
+      const pricing = ((raw['pricing'] as Record<string, unknown>[] | undefined) ?? []).map(mapPricing);
+      return mapSubscription(raw, pricing);
+    } catch {
+      return undefined;
+    }
+  }
+
+  async getUserSubscriptions(): Promise<UserSubscription[]> {
+    const raw = await fetchJson<Record<string, unknown>[]>('/api/subscriptions/user-subs');
+    return raw.map(mapUserSubscription);
+  }
+
+  async getEventHistory(): Promise<SubscriptionEventWithSub[]> {
+    const raw = await fetchJson<Record<string, unknown>[]>('/api/subscriptions/events');
+    return raw.map(r => ({
+      ...mapEvent(r),
+      subscriptionName: r['subscription_name'] as string,
+    }));
   }
 
   async subscribe(subscriptionId: string, period: SubscriptionPeriod): Promise<UserSubscription> {
@@ -318,38 +261,19 @@ class SubscriptionsService {
   }
 
   async getSubscriberCount(subscriptionId: string): Promise<number> {
-    const client = await trailbaseService.initClient();
-    // count=true requires TrailBase to return total_count; use a large limit as fallback.
-    const result = await client
-      .records<Record<string, unknown>>('user_subscriptions')
-      .list({
-        filters: [
-          { column: 'subscription_id', op: 'equal', value: subscriptionId },
-          { column: 'status', op: 'equal', value: 'active' },
-        ],
-        count: true,
-        pagination: { limit: 1 },
-      });
-    return result.total_count ?? result.records.length;
+    const result = await fetchJson<{ count: number }>(
+      `/api/subscriptions/${encodeURIComponent(subscriptionId)}/subscribers`
+    );
+    return result.count;
   }
 
   async getPricingSubscriberCount(period: SubscriptionPeriod, subscriptionId: string): Promise<number> {
-    const client = await trailbaseService.initClient();
-    const result = await client
-      .records<Record<string, unknown>>('user_subscriptions')
-      .list({
-        filters: [
-          { column: 'subscription_id', op: 'equal', value: subscriptionId },
-          { column: 'status', op: 'equal', value: 'active' },
-          { column: 'period', op: 'equal', value: period },
-        ],
-        count: true,
-        pagination: { limit: 1 },
-      });
-    return result.total_count ?? result.records.length;
+    const result = await fetchJson<{ count: number }>(
+      `/api/subscriptions/${encodeURIComponent(subscriptionId)}/subscribers?period=${period}`
+    );
+    return result.count;
   }
 }
 
 export const subscriptionsService = SubscriptionsService.getInstance();
 export { SubscriptionsService };
-

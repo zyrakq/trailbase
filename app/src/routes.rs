@@ -44,6 +44,26 @@ pub fn build(state: AppState) -> Router {
             axum::routing::get(crate::subscriptions::mine_handler),
         )
         .route(
+            "/api/subscriptions/{id}",
+            axum::routing::get(crate::subscriptions::get_by_id_handler),
+        )
+        .route(
+            "/api/subscriptions/user-subs",
+            axum::routing::get(crate::subscriptions::user_subs_handler),
+        )
+        .route(
+            "/api/subscriptions/events",
+            axum::routing::get(crate::subscriptions::event_history_handler),
+        )
+        .route(
+            "/api/subscriptions/{id}/subscribers",
+            axum::routing::get(crate::subscriptions::subscriber_count_handler),
+        )
+        .route(
+            "/api/admin/subscriptions",
+            axum::routing::get(crate::subscriptions::admin_list_handler),
+        )
+        .route(
             "/api/admin/subscriptions",
             axum::routing::post(crate::subscriptions::create_subscription_handler),
         )

@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
@@ -781,4 +781,277 @@ pub async fn delete_subscription_handler(
 
     log::info!("admin {} deleted subscription {}", user.id, id);
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Serialize)]
+pub struct UserSubscriptionDto {
+    pub id: String,
+    pub user_id: String,
+    pub subscription_id: String,
+    pub period: String,
+    pub status: String,
+    pub subscribed_at: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cancelled_at: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EventWithSubDto {
+    pub id: String,
+    pub user_subscription_id: String,
+    pub event_type: String,
+    pub created_at: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<String>,
+    pub subscription_name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CountResponse {
+    pub count: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CountQuery {
+    pub period: Option<String>,
+}
+
+pub async fn admin_list_handler(
+    State(state): State<AppState>,
+    user: User,
+) -> Result<Json<Vec<SubscriptionDto>>, ApiError> {
+    require_admin(&state, &user).await?;
+    let conn = state.user_conn();
+
+    let sub_rows = conn
+        .read_query_rows(
+            r#"SELECT id, name, description, logo_url, resource_url,
+                      what_included, terms, status, created_at, updated_at
+               FROM subscriptions ORDER BY created_at"#,
+            (),
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let pricing_rows = conn
+        .read_query_rows(
+            r#"SELECT id, subscription_id, period, price, currency, is_archived
+               FROM subscription_pricing"#,
+            (),
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let mut pricing_by_sub: std::collections::HashMap<Vec<u8>, Vec<PricingDto>> =
+        std::collections::HashMap::new();
+    for r in pricing_rows.iter() {
+        let sub_id: Vec<u8> = match r.get::<Vec<u8>>(1) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let dto = PricingDto {
+            id: blob_to_b64(&r.get::<Vec<u8>>(0).unwrap_or_default())?,
+            subscription_id: blob_to_b64(&sub_id)?,
+            period: r.get::<String>(2).unwrap_or_default(),
+            price: r.get::<i64>(3).unwrap_or(0),
+            currency: r.get::<String>(4).unwrap_or_else(|_| "USD".into()),
+            is_archived: r.get::<i64>(5).unwrap_or(0) != 0,
+        };
+        pricing_by_sub.entry(sub_id).or_default().push(dto);
+    }
+
+    let mut subs: Vec<SubscriptionDto> = Vec::with_capacity(sub_rows.len());
+    for r in sub_rows.iter() {
+        let id_bytes: Vec<u8> = r.get::<Vec<u8>>(0).unwrap_or_default();
+        let pricing = pricing_by_sub.remove(&id_bytes).unwrap_or_default();
+        subs.push(SubscriptionDto {
+            id: blob_to_b64(&id_bytes)?,
+            name: r.get::<String>(1).unwrap_or_default(),
+            description: r.get::<String>(2).unwrap_or_default(),
+            logo_url: r.get::<String>(3).unwrap_or_default(),
+            resource_url: r.get::<String>(4).unwrap_or_default(),
+            what_included: r.get::<Option<String>>(5).ok().flatten(),
+            terms: r.get::<Option<String>>(6).ok().flatten(),
+            status: r.get::<String>(7).unwrap_or_else(|_| "active".into()),
+            created_at: r.get::<i64>(8).unwrap_or(0),
+            updated_at: r.get::<i64>(9).unwrap_or(0),
+            pricing,
+        });
+    }
+
+    log::info!("admin {} listed {} subscriptions", user.id, subs.len());
+    Ok(Json(subs))
+}
+
+pub async fn get_by_id_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<SubscriptionDto>, ApiError> {
+    let sub_uuid = trailbase::util::b64_to_uuid(&id)
+        .map_err(|_| ApiError::BadRequest("invalid id".into()))?;
+    let sub_bytes = sub_uuid.as_bytes().to_vec();
+    let conn = state.user_conn();
+
+    let sub_rows = conn
+        .read_query_rows(
+            r#"SELECT id, name, description, logo_url, resource_url,
+                      what_included, terms, status, created_at, updated_at
+               FROM subscriptions WHERE id = $1"#,
+            trailbase_sqlite::params![sub_bytes.clone()],
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    if sub_rows.is_empty() {
+        return Err(ApiError::NotFound("subscription not found".into()));
+    }
+
+    let r = &sub_rows[0];
+    let pricing_rows = conn
+        .read_query_rows(
+            r#"SELECT id, subscription_id, period, price, currency, is_archived
+               FROM subscription_pricing WHERE subscription_id = $1"#,
+            trailbase_sqlite::params![sub_bytes.clone()],
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let mut pricing: Vec<PricingDto> = Vec::with_capacity(pricing_rows.len());
+    for p in pricing_rows.iter() {
+        pricing.push(PricingDto {
+            id: blob_to_b64(&p.get::<Vec<u8>>(0).unwrap_or_default())?,
+            subscription_id: blob_to_b64(&p.get::<Vec<u8>>(1).unwrap_or_default())?,
+            period: p.get::<String>(2).unwrap_or_default(),
+            price: p.get::<i64>(3).unwrap_or(0),
+            currency: p.get::<String>(4).unwrap_or_else(|_| "USD".into()),
+            is_archived: p.get::<i64>(5).unwrap_or(0) != 0,
+        });
+    }
+
+    Ok(Json(SubscriptionDto {
+        id: blob_to_b64(&sub_bytes)?,
+        name: r.get::<String>(1).unwrap_or_default(),
+        description: r.get::<String>(2).unwrap_or_default(),
+        logo_url: r.get::<String>(3).unwrap_or_default(),
+        resource_url: r.get::<String>(4).unwrap_or_default(),
+        what_included: r.get::<Option<String>>(5).ok().flatten(),
+        terms: r.get::<Option<String>>(6).ok().flatten(),
+        status: r.get::<String>(7).unwrap_or_else(|_| "active".into()),
+        created_at: r.get::<i64>(8).unwrap_or(0),
+        updated_at: r.get::<i64>(9).unwrap_or(0),
+        pricing,
+    }))
+}
+
+pub async fn user_subs_handler(
+    State(state): State<AppState>,
+    user: User,
+) -> Result<Json<Vec<UserSubscriptionDto>>, ApiError> {
+    let conn = state.user_conn();
+    let user_bytes = user.uuid.as_bytes().to_vec();
+
+    let rows = conn
+        .read_query_rows(
+            r#"SELECT id, user_id, subscription_id, period, status,
+                      subscribed_at, expires_at, cancelled_at
+               FROM user_subscriptions
+               WHERE user_id = $1 AND status = 'active'
+                 AND (expires_at IS NULL OR expires_at > unixepoch())"#,
+            trailbase_sqlite::params![user_bytes],
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let mut result: Vec<UserSubscriptionDto> = Vec::with_capacity(rows.len());
+    for r in rows.iter() {
+        result.push(UserSubscriptionDto {
+            id: blob_to_b64(&r.get::<Vec<u8>>(0).unwrap_or_default())?,
+            user_id: blob_to_b64(&r.get::<Vec<u8>>(1).unwrap_or_default())?,
+            subscription_id: blob_to_b64(&r.get::<Vec<u8>>(2).unwrap_or_default())?,
+            period: r.get::<String>(3).unwrap_or_default(),
+            status: r.get::<String>(4).unwrap_or_default(),
+            subscribed_at: r.get::<i64>(5).unwrap_or(0),
+            expires_at: r.get::<Option<i64>>(6).ok().flatten(),
+            cancelled_at: r.get::<Option<i64>>(7).ok().flatten(),
+        });
+    }
+
+    Ok(Json(result))
+}
+
+pub async fn event_history_handler(
+    State(state): State<AppState>,
+    user: User,
+) -> Result<Json<Vec<EventWithSubDto>>, ApiError> {
+    let conn = state.user_conn();
+    let user_bytes = user.uuid.as_bytes().to_vec();
+
+    let rows = conn
+        .read_query_rows(
+            r#"SELECT se.id, se.user_subscription_id, se.event_type,
+                      se.created_at, se.metadata, s.name
+               FROM subscription_events se
+               JOIN user_subscriptions us ON us.id = se.user_subscription_id
+               JOIN subscriptions s ON s.id = us.subscription_id
+               WHERE us.user_id = $1
+               ORDER BY se.created_at DESC"#,
+            trailbase_sqlite::params![user_bytes],
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let mut events: Vec<EventWithSubDto> = Vec::with_capacity(rows.len());
+    for r in rows.iter() {
+        events.push(EventWithSubDto {
+            id: blob_to_b64(&r.get::<Vec<u8>>(0).unwrap_or_default())?,
+            user_subscription_id: blob_to_b64(&r.get::<Vec<u8>>(1).unwrap_or_default())?,
+            event_type: r.get::<String>(2).unwrap_or_default(),
+            created_at: r.get::<i64>(3).unwrap_or(0),
+            metadata: r.get::<Option<String>>(4).ok().flatten(),
+            subscription_name: r.get::<String>(5).unwrap_or_else(|_| "Unknown".into()),
+        });
+    }
+
+    Ok(Json(events))
+}
+
+pub async fn subscriber_count_handler(
+    State(state): State<AppState>,
+    _user: User,
+    Path(id): Path<String>,
+    Query(q): Query<CountQuery>,
+) -> Result<Json<CountResponse>, ApiError> {
+    let sub_uuid = trailbase::util::b64_to_uuid(&id)
+        .map_err(|_| ApiError::BadRequest("invalid id".into()))?;
+    let sub_bytes = sub_uuid.as_bytes().to_vec();
+    let conn = state.user_conn();
+
+    let count: i64 = match &q.period {
+        Some(period) => {
+            conn.read_query_row_get(
+                r#"SELECT COUNT(*) FROM user_subscriptions
+                   WHERE subscription_id = $1 AND status = 'active' AND period = $2"#,
+                trailbase_sqlite::params![sub_bytes, period.clone()],
+                0,
+            )
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            .unwrap_or(0)
+        }
+        None => {
+            conn.read_query_row_get(
+                r#"SELECT COUNT(*) FROM user_subscriptions
+                   WHERE subscription_id = $1 AND status = 'active'"#,
+                trailbase_sqlite::params![sub_bytes],
+                0,
+            )
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            .unwrap_or(0)
+        }
+    };
+
+    Ok(Json(CountResponse { count }))
 }
