@@ -93,8 +93,29 @@ export const dashboardSidebarStyles = css`
   }
 
   @media (max-width: 768px) {
+    :host {
+      height: 100%;
+    }
+
     .period-filter {
       display: none;
+    }
+
+    .nav {
+      gap: 8px;
+      padding: 1rem;
+    }
+
+    .nav-item {
+      padding: 1rem 1.25rem;
+      font-size: 1.125rem;
+      border-radius: 10px;
+      gap: 1rem;
+    }
+
+    .icon {
+      width: 26px;
+      height: 26px;
     }
   }
 `;

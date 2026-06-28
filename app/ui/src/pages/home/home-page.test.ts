@@ -88,7 +88,7 @@ describe('home-page', () => {
     expect(element.shadowRoot?.querySelector('welcome-content')).not.toBeNull();
   });
 
-  it('renders dashboard-layout with drawerOpen=false when authenticated', async () => {
+  it('renders dashboard-layout when authenticated', async () => {
     vi.mocked(authService.getAuthState).mockReturnValue({
       isAuthenticated: true,
       user: null,
@@ -99,102 +99,5 @@ describe('home-page', () => {
 
     const layout = element.shadowRoot?.querySelector('dashboard-layout');
     expect(layout).not.toBeNull();
-    expect((layout as any).drawerOpen).toBe(false);
-  });
-
-  it('flips drawerOpen to true when app-header dispatches menu-toggle', async () => {
-    vi.mocked(authService.getAuthState).mockReturnValue({
-      isAuthenticated: true,
-      user: null,
-      hasMfa: false,
-    });
-    window.dispatchEvent(new CustomEvent('auth-state-updated'));
-    await flushReady(element);
-
-    const header = element.shadowRoot?.querySelector(
-      'app-header'
-    ) as HTMLElement;
-    header.dispatchEvent(
-      new CustomEvent('menu-toggle', { bubbles: true, composed: true })
-    );
-    await element.updateComplete;
-
-    const layout = element.shadowRoot?.querySelector('dashboard-layout');
-    expect((layout as any).drawerOpen).toBe(true);
-  });
-
-  it('sets drawerOpen back to false when dashboard-layout dispatches drawer-close', async () => {
-    vi.mocked(authService.getAuthState).mockReturnValue({
-      isAuthenticated: true,
-      user: null,
-      hasMfa: false,
-    });
-    window.dispatchEvent(new CustomEvent('auth-state-updated'));
-    await flushReady(element);
-
-    const header = element.shadowRoot?.querySelector(
-      'app-header'
-    ) as HTMLElement;
-    header.dispatchEvent(
-      new CustomEvent('menu-toggle', { bubbles: true, composed: true })
-    );
-    await element.updateComplete;
-    expect(
-      (element.shadowRoot?.querySelector('dashboard-layout') as any).drawerOpen
-    ).toBe(true);
-
-    const layout = element.shadowRoot?.querySelector(
-      'dashboard-layout'
-    ) as HTMLElement;
-    layout.dispatchEvent(
-      new CustomEvent('drawer-close', { bubbles: true, composed: true })
-    );
-    await element.updateComplete;
-
-    expect(
-      (element.shadowRoot?.querySelector('dashboard-layout') as any).drawerOpen
-    ).toBe(false);
-  });
-
-  it('resets drawerOpen to false on sign-out and stays closed on re-auth', async () => {
-    vi.mocked(authService.getAuthState).mockReturnValue({
-      isAuthenticated: true,
-      user: null,
-      hasMfa: false,
-    });
-    window.dispatchEvent(new CustomEvent('auth-state-updated'));
-    await flushReady(element);
-
-    const header = element.shadowRoot?.querySelector(
-      'app-header'
-    ) as HTMLElement;
-    header.dispatchEvent(
-      new CustomEvent('menu-toggle', { bubbles: true, composed: true })
-    );
-    await element.updateComplete;
-    expect(
-      (element.shadowRoot?.querySelector('dashboard-layout') as any).drawerOpen
-    ).toBe(true);
-
-    vi.mocked(authService.getAuthState).mockReturnValue({
-      isAuthenticated: false,
-      user: null,
-      hasMfa: false,
-    });
-    window.dispatchEvent(new CustomEvent('auth-state-updated'));
-    await element.updateComplete;
-    expect(element.shadowRoot?.querySelector('dashboard-layout')).toBeNull();
-
-    vi.mocked(authService.getAuthState).mockReturnValue({
-      isAuthenticated: true,
-      user: null,
-      hasMfa: false,
-    });
-    window.dispatchEvent(new CustomEvent('auth-state-updated'));
-    await flushReady(element);
-
-    const layout = element.shadowRoot?.querySelector('dashboard-layout');
-    expect(layout).not.toBeNull();
-    expect((layout as any).drawerOpen).toBe(false);
   });
 });

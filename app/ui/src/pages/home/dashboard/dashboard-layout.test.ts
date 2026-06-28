@@ -60,6 +60,22 @@ function feedPeriods(
   );
 }
 
+function selectSection(
+  element: DashboardLayout,
+  section: string
+): void {
+  const sidebar = element.shadowRoot?.querySelector(
+    'dashboard-sidebar'
+  ) as HTMLElement;
+  sidebar.dispatchEvent(
+    new CustomEvent('section-change', {
+      detail: section,
+      bubbles: true,
+      composed: true,
+    })
+  );
+}
+
 describe('dashboard-layout', () => {
   let element: DashboardLayout;
 
@@ -74,138 +90,117 @@ describe('dashboard-layout', () => {
     element.remove();
   });
 
-  it('applies the drawer-open class when drawerOpen is true', async () => {
+  it('renders the mobile toolbar with burger when ready', async () => {
     await flushReady(element);
-    element.drawerOpen = true;
+    expect(
+      element.shadowRoot?.querySelector('.mobile-toolbar')
+    ).not.toBeNull();
+    expect(element.shadowRoot?.querySelector('.menu-btn')).not.toBeNull();
+  });
+
+  it('does not render the period trigger when fewer than 2 periods are available', async () => {
+    await flushReady(element);
+    feedPeriods(element, ['monthly']);
+    await element.updateComplete;
+    expect(element.shadowRoot?.querySelector('.period-trigger')).toBeNull();
+  });
+
+  it('does not render the period sheet on the history section', async () => {
+    await flushReady(element);
+    feedPeriods(element, ['monthly', 'yearly']);
+    await element.updateComplete;
+    selectSection(element, 'history');
+    await element.updateComplete;
+    expect(element.shadowRoot?.querySelector('.period-sheet')).toBeNull();
+  });
+
+  it('renders the period trigger and sheet and applies bar-visible when 2+ periods are available', async () => {
+    await flushReady(element);
+    feedPeriods(element, ['monthly', 'yearly']);
+    await element.updateComplete;
+    const layout = element.shadowRoot?.querySelector('.layout');
+    expect(layout?.classList.contains('bar-visible')).toBe(true);
+    expect(
+      element.shadowRoot?.querySelector('.period-trigger')
+    ).not.toBeNull();
+    expect(element.shadowRoot?.querySelector('.period-sheet')).not.toBeNull();
+  });
+
+  it('opens the drawer and applies drawer-open class on burger click', async () => {
+    await flushReady(element);
+    const burger = element.shadowRoot?.querySelector(
+      '.menu-btn'
+    ) as HTMLButtonElement;
+    burger.click();
     await element.updateComplete;
 
     const layout = element.shadowRoot?.querySelector('.layout');
     expect(layout?.classList.contains('drawer-open')).toBe(true);
+    expect(burger.getAttribute('aria-label')).toBe('Close menu');
   });
 
-  it('does not apply the drawer-open class when drawerOpen is false', async () => {
+  it('closes the drawer by clicking the burger again', async () => {
     await flushReady(element);
-    element.drawerOpen = false;
+    const burger = element.shadowRoot?.querySelector(
+      '.menu-btn'
+    ) as HTMLButtonElement;
+    burger.click();
+    await element.updateComplete;
+
+    burger.click();
+    await element.updateComplete;
+
+    const layout = element.shadowRoot?.querySelector('.layout');
+    expect(layout?.classList.contains('drawer-open')).toBe(false);
+    expect(burger.getAttribute('aria-label')).toBe('Menu');
+  });
+
+  it('closes the drawer internally when a new section is selected', async () => {
+    await flushReady(element);
+    const burger = element.shadowRoot?.querySelector(
+      '.menu-btn'
+    ) as HTMLButtonElement;
+    burger.click();
+    await element.updateComplete;
+
+    selectSection(element, 'all-services');
     await element.updateComplete;
 
     const layout = element.shadowRoot?.querySelector('.layout');
     expect(layout?.classList.contains('drawer-open')).toBe(false);
   });
 
-  it('dispatches drawer-close when the backdrop is clicked', async () => {
+  it('does not close the drawer when the same section is re-selected', async () => {
     await flushReady(element);
-
-    const events: CustomEvent[] = [];
-    const handler = (e: Event): void => {
-      events.push(e as CustomEvent);
-    };
-    element.addEventListener('drawer-close', handler);
-
-    const backdrop = element.shadowRoot?.querySelector(
-      '.backdrop'
-    ) as HTMLElement;
-    backdrop.click();
-
-    expect(events).toHaveLength(1);
-    expect(events[0].type).toBe('drawer-close');
-    expect(events[0].bubbles).toBe(true);
-    expect(events[0].composed).toBe(true);
-
-    element.removeEventListener('drawer-close', handler);
-  });
-
-  it('dispatches drawer-close when a new section is selected from the sidebar', async () => {
-    await flushReady(element);
-
-    const events: CustomEvent[] = [];
-    const handler = (e: Event): void => {
-      events.push(e as CustomEvent);
-    };
-    element.addEventListener('drawer-close', handler);
-
-    const sidebar = element.shadowRoot?.querySelector(
-      'dashboard-sidebar'
-    ) as HTMLElement;
-    sidebar.dispatchEvent(
-      new CustomEvent('section-change', {
-        detail: 'all-services',
-        bubbles: true,
-        composed: true,
-      })
-    );
+    const burger = element.shadowRoot?.querySelector(
+      '.menu-btn'
+    ) as HTMLButtonElement;
+    burger.click();
     await element.updateComplete;
 
-    expect(events).toHaveLength(1);
-    expect(events[0].type).toBe('drawer-close');
-    element.removeEventListener('drawer-close', handler);
-  });
-
-  it('does not dispatch drawer-close when the same section is re-selected', async () => {
-    await flushReady(element);
-
-    const events: CustomEvent[] = [];
-    const handler = (e: Event): void => {
-      events.push(e as CustomEvent);
-    };
-    element.addEventListener('drawer-close', handler);
-
-    const sidebar = element.shadowRoot?.querySelector(
-      'dashboard-sidebar'
-    ) as HTMLElement;
-    sidebar.dispatchEvent(
-      new CustomEvent('section-change', {
-        detail: 'my-subscriptions',
-        bubbles: true,
-        composed: true,
-      })
-    );
-    await element.updateComplete;
-
-    expect(events).toHaveLength(0);
-    element.removeEventListener('drawer-close', handler);
-  });
-
-  it('does not render the mobile period bar when fewer than 2 periods are available', async () => {
-    await flushReady(element);
-    feedPeriods(element, ['monthly']);
-    await element.updateComplete;
-
-    expect(element.shadowRoot?.querySelector('.mobile-period-bar')).toBeNull();
-  });
-
-  it('does not render the mobile period bar on the history section', async () => {
-    await flushReady(element);
-    feedPeriods(element, ['monthly', 'yearly']);
-    await element.updateComplete;
-
-    const sidebar = element.shadowRoot?.querySelector(
-      'dashboard-sidebar'
-    ) as HTMLElement;
-    sidebar.dispatchEvent(
-      new CustomEvent('section-change', {
-        detail: 'history',
-        bubbles: true,
-        composed: true,
-      })
-    );
-    await element.updateComplete;
-
-    expect(element.shadowRoot?.querySelector('.mobile-period-bar')).toBeNull();
-  });
-
-  it('renders the mobile period bar and applies bar-visible when 2+ periods are available', async () => {
-    await flushReady(element);
-    feedPeriods(element, ['monthly', 'yearly']);
+    selectSection(element, 'my-subscriptions');
     await element.updateComplete;
 
     const layout = element.shadowRoot?.querySelector('.layout');
-    expect(layout?.classList.contains('bar-visible')).toBe(true);
-    expect(
-      element.shadowRoot?.querySelector('.mobile-period-bar')
-    ).not.toBeNull();
+    expect(layout?.classList.contains('drawer-open')).toBe(true);
   });
 
-  it('opens the period dropdown on trigger click and lists all + available periods', async () => {
+  it('closes the drawer on Escape when the dropdown is closed', async () => {
+    await flushReady(element);
+    const burger = element.shadowRoot?.querySelector(
+      '.menu-btn'
+    ) as HTMLButtonElement;
+    burger.click();
+    await element.updateComplete;
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await element.updateComplete;
+
+    const layout = element.shadowRoot?.querySelector('.layout');
+    expect(layout?.classList.contains('drawer-open')).toBe(false);
+  });
+
+  it('opens the period sheet on trigger click and lists all + available periods', async () => {
     await flushReady(element);
     feedPeriods(element, ['monthly', 'yearly']);
     await element.updateComplete;
@@ -216,19 +211,20 @@ describe('dashboard-layout', () => {
     trigger.click();
     await element.updateComplete;
 
-    const dropdown = element.shadowRoot?.querySelector('.period-dropdown');
-    expect(dropdown).not.toBeNull();
+    const sheet = element.shadowRoot?.querySelector('.period-sheet');
+    expect(sheet?.classList.contains('open')).toBe(true);
+    const overlay = element.shadowRoot?.querySelector('.period-overlay');
+    expect(overlay?.classList.contains('open')).toBe(true);
 
     const options = element.shadowRoot?.querySelectorAll('.period-option');
     expect(options?.length).toBe(3);
-
     const labels = Array.from(options ?? []).map(
       (o) => o.textContent?.trim()
     );
     expect(labels).toEqual(['All', 'Monthly', 'Yearly']);
   });
 
-  it('closes the period dropdown on outside click without changing the selection', async () => {
+  it('closes the period sheet on overlay click without changing the selection', async () => {
     await flushReady(element);
     feedPeriods(element, ['monthly', 'yearly']);
     await element.updateComplete;
@@ -238,15 +234,18 @@ describe('dashboard-layout', () => {
     ) as HTMLButtonElement;
     trigger.click();
     await element.updateComplete;
-    expect(element.shadowRoot?.querySelector('.period-dropdown')).not.toBeNull();
 
-    document.body.click();
+    const overlay = element.shadowRoot?.querySelector(
+      '.period-overlay'
+    ) as HTMLElement;
+    overlay.click();
     await element.updateComplete;
 
-    expect(element.shadowRoot?.querySelector('.period-dropdown')).toBeNull();
+    const sheet = element.shadowRoot?.querySelector('.period-sheet');
+    expect(sheet?.classList.contains('open')).toBe(false);
   });
 
-  it('updates the selected period and closes the dropdown when an option is chosen', async () => {
+  it('updates the selected period and closes the sheet when an option is chosen', async () => {
     await flushReady(element);
     feedPeriods(element, ['monthly', 'yearly']);
     await element.updateComplete;
@@ -263,16 +262,23 @@ describe('dashboard-layout', () => {
     options[2].click();
     await element.updateComplete;
 
-    expect(element.shadowRoot?.querySelector('.period-dropdown')).toBeNull();
+    const sheet = element.shadowRoot?.querySelector('.period-sheet');
+    expect(sheet?.classList.contains('open')).toBe(false);
     const triggerLabel = trigger.textContent?.trim() ?? '';
     expect(triggerLabel).toContain('Yearly');
     const sidebar = element.shadowRoot?.querySelector('dashboard-sidebar');
     expect((sidebar as any).selectedPeriod).toBe('yearly');
   });
 
-  it('closes the period dropdown on Escape without closing the drawer', async () => {
+  it('closes the period sheet on Escape without closing the drawer', async () => {
     await flushReady(element);
     feedPeriods(element, ['monthly', 'yearly']);
+    await element.updateComplete;
+
+    const burger = element.shadowRoot?.querySelector(
+      '.menu-btn'
+    ) as HTMLButtonElement;
+    burger.click();
     await element.updateComplete;
 
     const trigger = element.shadowRoot?.querySelector(
@@ -280,37 +286,13 @@ describe('dashboard-layout', () => {
     ) as HTMLButtonElement;
     trigger.click();
     await element.updateComplete;
-    expect(element.shadowRoot?.querySelector('.period-dropdown')).not.toBeNull();
-
-    const events: CustomEvent[] = [];
-    const handler = (e: Event): void => {
-      events.push(e as CustomEvent);
-    };
-    element.addEventListener('drawer-close', handler);
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await element.updateComplete;
 
-    expect(element.shadowRoot?.querySelector('.period-dropdown')).toBeNull();
-    expect(events).toHaveLength(0);
-    element.removeEventListener('drawer-close', handler);
-  });
-
-  it('dispatches drawer-close on Escape when the dropdown is closed but the drawer is open', async () => {
-    await flushReady(element);
-    element.drawerOpen = true;
-    await element.updateComplete;
-
-    const events: CustomEvent[] = [];
-    const handler = (e: Event): void => {
-      events.push(e as CustomEvent);
-    };
-    element.addEventListener('drawer-close', handler);
-
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    await element.updateComplete;
-
-    expect(events).toHaveLength(1);
-    element.removeEventListener('drawer-close', handler);
+    const sheet = element.shadowRoot?.querySelector('.period-sheet');
+    expect(sheet?.classList.contains('open')).toBe(false);
+    const layout = element.shadowRoot?.querySelector('.layout');
+    expect(layout?.classList.contains('drawer-open')).toBe(true);
   });
 });

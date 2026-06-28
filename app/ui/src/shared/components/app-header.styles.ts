@@ -43,28 +43,6 @@ export const appHeaderStyles = css`
     align-items: center;
   }
 
-  .menu-btn {
-    display: none;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 6px;
-    color: var(--theme-color-text-primary);
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.2s ease;
-  }
-
-  .menu-btn:hover {
-    background: var(--theme-color-background);
-  }
-
-  .menu-btn svg {
-    width: 24px;
-    height: 24px;
-  }
-
   .login-btn {
     padding: 0.5rem 1.25rem;
     font-size: 0.9375rem;
@@ -81,8 +59,11 @@ export const appHeaderStyles = css`
   .login-btn:active { background: var(--theme-color-primary-active); }
 
   @media (max-width: 768px) {
-    .menu-btn {
-      display: inline-flex;
+    :host {
+      position: sticky;
+      top: 0;
+      z-index: 1600;
+      align-self: flex-start;
     }
   }
 

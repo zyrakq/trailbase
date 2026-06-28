@@ -33,11 +33,19 @@ export const dashboardLayoutStyles = css`
     align-self: flex-start;
   }
 
-  .backdrop {
+  .mobile-toolbar {
     display: none;
   }
 
-  .mobile-period-bar {
+  .menu-btn {
+    display: none;
+  }
+
+  .period-overlay {
+    display: none;
+  }
+
+  .period-sheet {
     display: none;
   }
 
@@ -45,20 +53,54 @@ export const dashboardLayoutStyles = css`
     .layout {
       flex-direction: column;
       padding: 1rem;
+      padding-top: calc(125px + 1rem);
     }
 
-    .layout.bar-visible {
-      padding-bottom: 56px;
+    .mobile-toolbar {
+      display: flex;
+      position: sticky;
+      top: 73px;
+      z-index: 1550;
+      background: var(--theme-color-surface);
+      border-bottom: 1px solid var(--theme-color-border);
+      padding: 0 1rem;
+      height: 52px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .menu-btn {
+      display: inline-flex;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0.5rem;
+      border-radius: 6px;
+      color: var(--theme-color-text-primary);
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s ease;
+    }
+
+    .menu-btn:hover {
+      background: var(--theme-color-background);
+    }
+
+    .menu-btn svg {
+      width: 24px;
+      height: 24px;
     }
 
     dashboard-sidebar {
       position: fixed;
-      top: 0;
+      top: 125px;
       left: 0;
+      right: 0;
       bottom: 0;
-      width: 220px;
+      width: auto;
+      height: calc(100vh - 125px);
       transform: translateX(-100%);
-      transition: transform 0.25s ease;
+      transition: transform 0.3s ease;
       z-index: 1500;
       background: var(--theme-color-surface);
       box-shadow: var(--theme-shadow-lg, var(--theme-shadow-md));
@@ -69,33 +111,45 @@ export const dashboardLayoutStyles = css`
       transform: translateX(0);
     }
 
-    .layout.drawer-open .backdrop {
+    .period-overlay {
       display: block;
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.5);
-      z-index: 1400;
+      z-index: 950;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
     }
 
-    .mobile-period-bar {
+    .period-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .period-sheet {
       display: flex;
+      flex-direction: column;
       position: fixed;
+      top: 125px;
       left: 0;
       right: 0;
-      bottom: 0;
-      height: 56px;
       background: var(--theme-color-surface);
-      border-top: 1px solid var(--theme-color-border);
-      z-index: 900;
-      align-items: center;
-      padding: 0 1rem;
+      border-bottom: 1px solid var(--theme-color-border);
+      z-index: 960;
+      transform: translateY(-100%);
+      transition: transform 0.25s ease;
+      box-shadow: var(--theme-shadow-md);
+    }
+
+    .period-sheet.open {
+      transform: translateY(0);
     }
 
     .period-trigger {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      width: 100%;
       background: transparent;
       border: none;
       cursor: pointer;
@@ -115,24 +169,11 @@ export const dashboardLayoutStyles = css`
       transform: rotate(180deg);
     }
 
-    .period-dropdown {
-      position: absolute;
-      bottom: calc(100% + 4px);
-      left: 1rem;
-      right: 1rem;
-      background: var(--theme-color-surface-elevated, var(--theme-color-surface));
-      border: 1px solid var(--theme-color-border);
-      border-radius: 8px;
-      box-shadow: var(--theme-shadow-md);
-      z-index: 950;
-      overflow: hidden;
-    }
-
     .period-option {
       display: block;
       width: 100%;
       text-align: left;
-      padding: 0.625rem 1rem;
+      padding: 0.75rem 1rem;
       background: transparent;
       border: none;
       cursor: pointer;
@@ -150,6 +191,25 @@ export const dashboardLayoutStyles = css`
     .period-option.active {
       color: var(--theme-color-primary, #6366f1);
       font-weight: 600;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .layout {
+      padding-top: calc(117px + 1rem);
+    }
+
+    .mobile-toolbar {
+      top: 65px;
+    }
+
+    dashboard-sidebar {
+      top: 117px;
+      height: calc(100vh - 117px);
+    }
+
+    .period-sheet {
+      top: 117px;
     }
   }
 `;
