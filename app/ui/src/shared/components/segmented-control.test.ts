@@ -32,8 +32,6 @@ describe('segmented-control', () => {
     element.value = '';
     element.disabledValues = [];
     document.body.appendChild(element);
-    // happy-dom defers Lit's scheduled update via queueMicrotask; flush a
-    // macrotask so the shadow DOM is populated before each test runs.
     await new Promise(r => setTimeout(r, 0));
     await element.updateComplete;
   });
@@ -78,5 +76,59 @@ describe('segmented-control', () => {
     const pills = element.shadowRoot!.querySelectorAll('button.pill');
     (pills[2] as HTMLButtonElement).click();
     expect(received).toBe('yearly');
+  });
+
+  describe('variant="tabs"', () => {
+    let tabs: SegmentedControl;
+
+    beforeEach(async () => {
+      tabs = document.createElement('segmented-control') as SegmentedControl;
+      tabs.values = ['general', 'logo', 'pricing', 'details'];
+      tabs.labels = { general: 'General', logo: 'Logo', pricing: 'Pricing', details: 'Details' };
+      tabs.value = 'general';
+      tabs.variant = 'tabs';
+      document.body.appendChild(tabs);
+      await new Promise(r => setTimeout(r, 0));
+      await tabs.updateComplete;
+    });
+
+    afterEach(() => {
+      tabs?.remove();
+    });
+
+    it('reflects variant attribute on the host element', async () => {
+      expect(tabs.getAttribute('variant')).toBe('tabs');
+    });
+
+    it('defaults to pills variant when variant is not set', async () => {
+      expect(element.getAttribute('variant')).toBe('pills');
+    });
+
+    it('renders four tab pills', async () => {
+      const pills = tabs.shadowRoot!.querySelectorAll('button.pill');
+      expect(pills.length).toBe(4);
+    });
+
+    it('marks the active tab with class active', async () => {
+      const active = tabs.shadowRoot!.querySelector('button.pill.active');
+      expect(active?.textContent?.trim()).toBe('General');
+    });
+
+    it('emits select when a tab is clicked', async () => {
+      let received: string | null = null;
+      tabs.addEventListener('select', (e: Event) => {
+        received = (e as CustomEvent<{ value: string }>).detail.value;
+      });
+      const pills = tabs.shadowRoot!.querySelectorAll('button.pill');
+      (pills[2] as HTMLButtonElement).click();
+      expect(received).toBe('pricing');
+    });
+
+    it('updates active tab after value change', async () => {
+      tabs.value = 'logo';
+      await tabs.updateComplete;
+      const active = tabs.shadowRoot!.querySelector('button.pill.active');
+      expect(active?.textContent?.trim()).toBe('Logo');
+    });
   });
 });
