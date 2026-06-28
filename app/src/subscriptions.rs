@@ -612,6 +612,7 @@ pub async fn create_subscription_handler(
 pub async fn update_subscription_handler(
     State(state): State<AppState>,
     user: User,
+    Extension(cfg): Extension<UploadsOverlayConfig>,
     Path(id): Path<String>,
     Json(body): Json<SubscriptionInput>,
 ) -> Result<StatusCode, ApiError> {
@@ -621,6 +622,22 @@ pub async fn update_subscription_handler(
         .map_err(|_| ApiError::BadRequest("invalid id".into()))?;
     let sub_bytes = sub_uuid.as_bytes().to_vec();
     let pricing_inputs = body.pricing.clone();
+    let new_logo = body.logo_url.clone().unwrap_or_default();
+
+    let old_logo: String = {
+        let rows = state.user_conn()
+            .read_query_rows(
+                "SELECT logo_url FROM subscriptions WHERE id = $1",
+                trailbase_sqlite::params![sub_bytes.clone()],
+            )
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        if rows.is_empty() {
+            String::new()
+        } else {
+            rows[0].get::<Option<String>>(0).ok().flatten().unwrap_or_default()
+        }
+    };
 
     state
         .user_conn()
@@ -685,6 +702,10 @@ pub async fn update_subscription_handler(
             }
         })?;
 
+    if old_logo != new_logo {
+        delete_local_logo(&cfg, &old_logo);
+    }
+
     log::info!("admin {} updated subscription {}", user.id, id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -739,6 +760,7 @@ async fn set_subscription_status(
 pub async fn delete_subscription_handler(
     State(state): State<AppState>,
     user: User,
+    Extension(cfg): Extension<UploadsOverlayConfig>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     require_admin(&state, &user).await?;
@@ -746,6 +768,21 @@ pub async fn delete_subscription_handler(
     let sub_uuid = trailbase::util::b64_to_uuid(&id)
         .map_err(|_| ApiError::BadRequest("invalid id".into()))?;
     let sub_bytes = sub_uuid.as_bytes().to_vec();
+
+    let logo_url: String = {
+        let rows = state.user_conn()
+            .read_query_rows(
+                "SELECT logo_url FROM subscriptions WHERE id = $1",
+                trailbase_sqlite::params![sub_bytes.clone()],
+            )
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        if rows.is_empty() {
+            String::new()
+        } else {
+            rows[0].get::<Option<String>>(0).ok().flatten().unwrap_or_default()
+        }
+    };
 
     state
         .user_conn()
@@ -784,6 +821,8 @@ pub async fn delete_subscription_handler(
                 ApiError::Internal(msg)
             }
         })?;
+
+    delete_local_logo(&cfg, &logo_url);
 
     log::info!("admin {} deleted subscription {}", user.id, id);
     Ok(StatusCode::NO_CONTENT)
@@ -1065,6 +1104,25 @@ pub async fn subscriber_count_handler(
 const LOGO_MAX_BYTES: usize = 2 * 1024 * 1024;
 const LOGO_SUBDIR: &str = "subscription-logos";
 const ALLOWED_LOGO_TYPES: &[&str] = &["image/png", "image/jpeg", "image/webp"];
+
+fn delete_local_logo(cfg: &UploadsOverlayConfig, url: &str) {
+    let prefix = format!("/{LOGO_SUBDIR}/");
+    if !url.starts_with(&prefix) {
+        return;
+    }
+    let Some(dir) = cfg.dir.as_ref() else { return };
+    let rel = &url[1..];
+    let path = dir.join(rel);
+    let logos_dir = dir.join(LOGO_SUBDIR);
+    if !path.starts_with(&logos_dir) {
+        return;
+    }
+    if let Err(e) = std::fs::remove_file(&path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            log::warn!("failed to delete logo {:?}: {}", path, e);
+        }
+    }
+}
 
 #[derive(Debug, Serialize)]
 pub struct LogoUploadResponse {

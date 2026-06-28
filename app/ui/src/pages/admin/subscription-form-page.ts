@@ -278,13 +278,28 @@ export class SubscriptionFormPage extends LitElement {
       </div>
       <div class="logo-url-block" ?hidden=${this._logoMode !== 'url'}>
         <div class="logo-input-row">
-          <input
-            class="input"
-            type="url"
-            .value=${this._logoUrl}
-            @input=${(e: InputEvent) => { this._logoUrl = (e.target as HTMLInputElement).value; }}
-            placeholder="https://..."
-          />
+          <div class="input-with-clear">
+            <input
+              class="input"
+              type="url"
+              .value=${this._logoUrl}
+              @input=${(e: InputEvent) => { this._logoUrl = (e.target as HTMLInputElement).value; }}
+              placeholder="https://..."
+            />
+            ${this._logoUrl ? html`
+              <button
+                type="button"
+                class="btn-clear-url"
+                aria-label=${msg('Clear URL')}
+                @click=${() => { this._logoUrl = ''; }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            ` : null}
+          </div>
           <img class="logo-preview" src=${this._logoUrl || ''} alt=${msg('Logo preview')} ?hidden=${!this._logoUrl} />
         </div>
         <button

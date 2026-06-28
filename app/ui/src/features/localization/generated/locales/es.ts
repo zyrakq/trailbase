@@ -182,6 +182,7 @@
 's94db5740dd102b28': `Resource URL`,
 's707dd9c4afdc5d02': `Logo preview`,
 's04737f59bf7211b8': `Use a URL instead`,
+'sdf5f6a8d49f03877': `Clear URL`,
 's967e3b76e45c6e48': `Upload an image instead`,
 's4764a8bf140f0433': `No pricing tiers. Pick a period above.`,
 'sea4f08110bb8f15d': `Remove`,

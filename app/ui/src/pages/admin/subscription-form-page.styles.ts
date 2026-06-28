@@ -138,8 +138,42 @@ export const subscriptionFormPageStyles = css`
     align-items: center;
   }
 
-  .logo-input-row .input {
+  .input-with-clear {
+    position: relative;
     flex: 1;
+  }
+
+  .input-with-clear .input {
+    width: 100%;
+    box-sizing: border-box;
+    padding-right: 2.25rem;
+  }
+
+  .btn-clear-url {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--theme-color-text-secondary);
+    transition: color 0.15s ease;
+  }
+
+  .btn-clear-url:hover {
+    color: var(--theme-color-text-primary);
+  }
+
+  .btn-clear-url svg {
+    width: 14px;
+    height: 14px;
   }
 
   .logo-preview {
