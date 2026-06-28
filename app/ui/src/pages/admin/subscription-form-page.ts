@@ -1,5 +1,6 @@
 import { LitElement, html, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { msg } from '@lit/localize';
 import { localized } from '@/features/localization';
 import { authService } from '@/features/auth';
@@ -263,41 +264,36 @@ export class SubscriptionFormPage extends LitElement {
 
   private _renderLogoSection(): TemplateResult {
     return html`
-      ${this._logoMode === 'upload'
-        ? html`
-            <image-cropper
-              .file=${null}
-              ?uploading=${this._uploading}
-              @cropped=${this._handleCropped}
-            ></image-cropper>
-            ${this._logoUrl
-              ? html`<img class="logo-preview" src=${this._logoUrl} alt=${msg('Logo preview')} />`
-              : null}
-            <button
-              type="button"
-              class="btn-link"
-              @click=${() => { this._logoMode = 'url'; }}
-            >${msg('Use a URL instead')}</button>
-          `
-        : html`
-            <div class="logo-input-row">
-              <input
-                class="input"
-                type="url"
-                .value=${this._logoUrl}
-                @input=${(e: InputEvent) => { this._logoUrl = (e.target as HTMLInputElement).value; }}
-                placeholder="https://..."
-              />
-              ${this._logoUrl
-                ? html`<img class="logo-preview" src=${this._logoUrl} alt=${msg('Logo preview')} />`
-                : null}
-            </div>
-            <button
-              type="button"
-              class="btn-link"
-              @click=${() => { this._logoMode = 'upload'; }}
-            >${msg('Upload an image instead')}</button>
-          `}
+      <div class="logo-upload-block" ?hidden=${this._logoMode !== 'upload'}>
+        <image-cropper
+          .file=${null}
+          ?uploading=${this._uploading}
+          @cropped=${this._handleCropped}
+        ></image-cropper>
+        <img class="logo-preview" src=${this._logoUrl || ''} alt=${msg('Logo preview')} ?hidden=${!this._logoUrl} />
+        <button
+          type="button"
+          class="btn-link"
+          @click=${() => { this._logoMode = 'url'; }}
+        >${msg('Use a URL instead')}</button>
+      </div>
+      <div class="logo-url-block" ?hidden=${this._logoMode !== 'url'}>
+        <div class="logo-input-row">
+          <input
+            class="input"
+            type="url"
+            .value=${this._logoUrl}
+            @input=${(e: InputEvent) => { this._logoUrl = (e.target as HTMLInputElement).value; }}
+            placeholder="https://..."
+          />
+          <img class="logo-preview" src=${this._logoUrl || ''} alt=${msg('Logo preview')} ?hidden=${!this._logoUrl} />
+        </div>
+        <button
+          type="button"
+          class="btn-link"
+          @click=${() => { this._logoMode = 'upload'; }}
+        >${msg('Upload an image instead')}</button>
+      </div>
     `;
   }
 
@@ -319,10 +315,28 @@ export class SubscriptionFormPage extends LitElement {
           this._addPricingTier(e.detail.value as SubscriptionPeriod);
         }}
       ></segmented-control>
-      ${this._pricing.length === 0
-        ? html`<p class="pricing-empty">${msg('No pricing tiers. Pick a period above.')}</p>`
-        : null}
-      ${this._pricing.map((p, i) => html`
+      <p class="pricing-empty" ?hidden=${this._pricing.length > 0}>${msg('No pricing tiers. Pick a period above.')}</p>
+      <div class="pricing-tiers-host"></div>
+    `;
+  }
+
+  // happy-dom silently drops arrays of TemplateResults (map/repeat) at
+  // render depth ≥2. Using a standalone render() call breaks the depth.
+  protected override updated(): void {
+    this._syncPricingTiers();
+  }
+
+  private _syncPricingTiers(): void {
+    const host = this.shadowRoot?.querySelector<HTMLElement>('.pricing-tiers-host');
+    if (!host) return;
+    const periodLabels: Record<string, string> = {
+      monthly: msg('Monthly'),
+      quarterly: msg('Quarterly'),
+      yearly: msg('Yearly'),
+      onetime: msg('One-time'),
+    };
+    render(
+      html`${this._pricing.map((p, i) => html`
         <div class="pricing-tier">
           <span class="period-label">${periodLabels[p.period]}</span>
           <input
@@ -357,8 +371,9 @@ export class SubscriptionFormPage extends LitElement {
             </svg>
           </button>
         </div>
-      `)}
-    `;
+      `)}`,
+      host,
+    );
   }
 
   private _renderDetailsSection(): TemplateResult {
@@ -401,43 +416,47 @@ export class SubscriptionFormPage extends LitElement {
     return html`
       <div class="detail-card">
         <div class="logo-hero">
-          ${this._logoUrl
-            ? html`<img class="logo-img" src=${this._logoUrl} alt=${this._name || msg('Preview')} />`
-            : html`<div class="logo-letter">${(this._name || '?').charAt(0).toUpperCase()}</div>`}
+          <img
+            class="logo-img"
+            ?hidden=${!this._logoUrl}
+            src=${this._logoUrl}
+            alt=${this._name || msg('Preview')}
+          />
+          <div class="logo-letter" ?hidden=${this._logoUrl}>${(this._name || '?').charAt(0).toUpperCase()}</div>
         </div>
         <div class="detail-body">
           <div class="title-row">
-            <h1 class="title">${this._name || html`<em>${msg('Untitled')}</em>`}</h1>
+            <h1 class="title">
+              <span ?hidden=${!this._name}>${this._name}</span>
+              <em ?hidden=${Boolean(this._name)}>${msg('Untitled')}</em>
+            </h1>
           </div>
-          <p class="description">${this._description || html`<em>${msg('No description')}</em>`}</p>
+          <p class="description">
+            <span ?hidden=${!this._description}>${this._description}</span>
+            <em ?hidden=${Boolean(this._description)}>${msg('No description')}</em>
+          </p>
 
-          ${activePricing.length > 0 ? html`
-            <div class="section">
-              <h2 class="section-heading">${msg('Pricing')}</h2>
-              <div class="pricing-table">
-                ${activePricing.map(p => html`
-                  <div class="pricing-row">
-                    <span>${periodLabel(p.period)}</span>
-                    <span>${p.price} ${p.currency}${p.period !== 'onetime' ? `/${p.period.slice(0, 2)}` : ''}</span>
-                  </div>
-                `)}
-              </div>
+          <div class="section" ?hidden=${activePricing.length === 0}>
+            <h2 class="section-heading">${msg('Pricing')}</h2>
+            <div class="pricing-table">
+              ${activePricing.map(p => html`
+                <div class="pricing-row">
+                  <span>${periodLabel(p.period)}</span>
+                  <span>${p.price} ${p.currency}${p.period !== 'onetime' ? `/${p.period.slice(0, 2)}` : ''}</span>
+                </div>
+              `)}
             </div>
-          ` : null}
+          </div>
 
-          ${this._whatIncluded ? html`
-            <div class="section">
-              <h2 class="section-heading">${msg("What's included")}</h2>
-              <p class="section-text">${this._whatIncluded}</p>
-            </div>
-          ` : null}
+          <div class="section" ?hidden=${!this._whatIncluded}>
+            <h2 class="section-heading">${msg("What's included")}</h2>
+            <p class="section-text">${this._whatIncluded}</p>
+          </div>
 
-          ${this._terms ? html`
-            <div class="section">
-              <h2 class="section-heading">${msg('Terms')}</h2>
-              <p class="section-text">${this._terms}</p>
-            </div>
-          ` : null}
+          <div class="section" ?hidden=${!this._terms}>
+            <h2 class="section-heading">${msg('Terms')}</h2>
+            <p class="section-text">${this._terms}</p>
+          </div>
         </div>
       </div>
     `;

@@ -15,6 +15,16 @@ Primary docs: [ARCHITECTURE.md](./ARCHITECTURE.md) (stack, layout, flows) and
 **STOP** after presenting any design or plan. Wait for explicit "go" before the
 next phase. Never auto-chain design → plan → execute.
 
+## Tests — avoid by default
+
+**Do not write tests** unless the logic is genuinely complex and non-obvious (e.g. a
+tricky algorithm, a security-critical path, or stateful backend logic with multiple
+edge cases). If tests are warranted, write as few as needed — a couple targeted cases,
+not exhaustive suites.
+
+**Never write tests for:** UI components, styles, simple CRUD handlers, straightforward
+data transformations, or anything that is obviously correct by inspection.
+
 ## Comments
 
 Comment only non-obvious side-effects, counter-intuitive decisions, or invariants.
