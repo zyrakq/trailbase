@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         admin_router,
         tls,
     } = trailbase::Server::init(trailbase::ServerOptions {
-        data_dir: trailbase::DataDir(data_dir),
+        data_dir: trailbase::DataDir(data_dir.clone()),
         address: settings.server.address.clone(),
         ..Default::default()
     })
@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let branding_overlay_config = settings
         .branding
         .overlay_config(&settings.frontend, &manifest_dir);
-    let uploads_overlay_config = settings.uploads.overlay_config();
+    let uploads_overlay_config = settings.uploads.overlay_config(&data_dir);
 
     let interceptor = smtp::setup(&settings.mailcrab);
 

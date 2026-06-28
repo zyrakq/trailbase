@@ -52,16 +52,16 @@ branding_dir = ""
 # Root directory for user-uploaded files (subscription logos today, avatars
 # later). Files are written under `<dir>/subscription-logos/<uuid>.png`.
 #
-# Empty string -> upload endpoints return 501 and the external-URL fallback
-# remains the only logo option. Decoupled from branding so this directory can
-# be mounted on S3 later without touching branding config.
+# Defaults to traildepot/uploads when unset. Override to move uploaded files
+# to a custom path (e.g. an S3-mounted volume). Decoupled from branding so
+# this directory can be swapped independently.
 #
 # Environment overrides:
 #   APP_UPLOADS__DIR
 # ------------------------------------------------------------------------------
 
 [uploads]
-dir = ""
+# dir = ""  # default: traildepot/uploads
 
 # ------------------------------------------------------------------------------
 # Frontend

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
@@ -14,13 +14,13 @@ pub struct UploadsOverlayConfig {
 }
 
 impl UploadsSettings {
-    pub fn overlay_config(&self) -> UploadsOverlayConfig {
+    pub fn overlay_config(&self, data_dir: &Path) -> UploadsOverlayConfig {
         UploadsOverlayConfig {
-            dir: if self.dir.is_empty() {
-                None
+            dir: Some(if self.dir.is_empty() {
+                data_dir.join("uploads")
             } else {
-                Some(PathBuf::from(&self.dir))
-            },
+                PathBuf::from(&self.dir)
+            }),
         }
     }
 }
@@ -59,10 +59,14 @@ mod tests {
     }
 
     #[test]
-    fn empty_config_gives_none_dir() {
+    fn empty_config_defaults_to_data_dir_uploads() {
         let s = parse("");
         assert_eq!(s.dir, "");
-        assert!(s.overlay_config().dir.is_none());
+        let data_dir = PathBuf::from("/tmp/traildepot");
+        assert_eq!(
+            s.overlay_config(&data_dir).dir,
+            Some(PathBuf::from("/tmp/traildepot/uploads"))
+        );
     }
 
     #[test]
@@ -70,7 +74,11 @@ mod tests {
         let s = parse(r#"[uploads]
 dir = "var/uploads""#);
         assert_eq!(s.dir, "var/uploads");
-        assert_eq!(s.overlay_config().dir, Some(PathBuf::from("var/uploads")));
+        let data_dir = PathBuf::from("/tmp/traildepot");
+        assert_eq!(
+            s.overlay_config(&data_dir).dir,
+            Some(PathBuf::from("var/uploads"))
+        );
     }
 
     #[test]
