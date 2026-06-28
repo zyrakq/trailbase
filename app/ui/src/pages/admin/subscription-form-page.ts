@@ -185,7 +185,7 @@ export class SubscriptionFormPage extends LitElement {
           ${isEdit ? msg('Edit Subscription') : msg('New Subscription')}
         </h1>
 
-        <form class="form" @submit=${(e: Event) => { e.preventDefault(); void this._save(); }}>
+        <form class="form" novalidate @submit=${(e: Event) => { e.preventDefault(); void this._save(); }}>
           <div class="edit-layout">
             <div class="form-col">
               <segmented-control
@@ -235,7 +235,6 @@ export class SubscriptionFormPage extends LitElement {
           type="text"
           .value=${this._name}
           @input=${(e: InputEvent) => { this._name = (e.target as HTMLInputElement).value; }}
-          required
         />
       </div>
       <div class="field">
