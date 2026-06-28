@@ -14,6 +14,7 @@ export class SegmentedControl extends LitElement {
   @property({ type: Object }) labels: Record<string, string> = {};
   @property({ type: String }) value = '';
   @property({ type: Array }) disabledValues: string[] = [];
+  @property({ type: String, reflect: true }) variant: 'pills' | 'tabs' = 'pills';
 
   private _handleClick(value: string, disabled: boolean): void {
     if (disabled) return;
