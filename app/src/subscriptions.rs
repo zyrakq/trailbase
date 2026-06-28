@@ -402,6 +402,9 @@ pub async fn catalog_handler(
     for r in sub_rows.iter() {
         let id_bytes: Vec<u8> = r.get::<Vec<u8>>(0).unwrap_or_default();
         let period_list = pricing_by_sub.remove(&id_bytes).unwrap_or_default();
+        if period_list.is_empty() {
+            continue;
+        }
         subs.push(SubscriptionDto {
             id: blob_to_b64(&id_bytes)?,
             name: r.get::<String>(1).unwrap_or_default(),
