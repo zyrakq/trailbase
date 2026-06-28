@@ -74,6 +74,7 @@ export const subscriptionDetailPageStyles = css`
     border: 1px solid var(--theme-color-border);
     border-radius: 16px;
     overflow: hidden;
+    box-shadow: var(--theme-shadow-sm);
   }
 
   .logo-hero {
