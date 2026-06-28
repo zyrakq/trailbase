@@ -20,6 +20,7 @@ use crate::settings::branding::{
     resolve_branding_path, sanitize_branding_rel, BrandingOverlayConfig, BrandingSource,
 };
 use crate::settings::frontend::{FrontendSettings, PublicConfig};
+use crate::settings::uploads::{sanitize_logo_rel, UploadsOverlayConfig};
 
 pub fn build(state: AppState) -> Router {
     Router::new()
@@ -27,6 +28,14 @@ pub fn build(state: AppState) -> Router {
         .route("/api/hello", get(hello_handler))
         .route("/api/config/public", get(public_config_handler))
         .route("/branding/{*path}", get(branding_handler))
+        .route(
+            "/subscription-logos/{*path}",
+            get(logo_file_handler),
+        )
+        .route(
+            "/api/admin/subscriptions/logo",
+            axum::routing::post(crate::subscriptions::logo_upload_handler),
+        )
         .route(
             "/api/subscriptions/subscribe",
             axum::routing::post(crate::subscriptions::subscribe_handler),
@@ -195,4 +204,89 @@ fn branding_file_response(rel: &str, data: Vec<u8>) -> Response {
         .header(header::CACHE_CONTROL, "no-cache")
         .body(Body::from(data))
         .unwrap()
+}
+
+pub async fn logo_file_handler(
+    uri: Uri,
+    axum::Extension(cfg): axum::Extension<UploadsOverlayConfig>,
+) -> Response {
+    let path = uri.path().trim_start_matches('/');
+    let Some(rel) = path.strip_prefix("subscription-logos/") else {
+        return not_found().await;
+    };
+    let Some(rel) = sanitize_logo_rel(rel) else {
+        return not_found().await;
+    };
+    let Some(dir) = cfg.dir.as_ref() else {
+        return not_found().await;
+    };
+    let base = dir.join("subscription-logos");
+    let file_path = base.join(rel);
+    // Defense in depth: confirm the resolved path stays inside the logos dir.
+    if !file_path.starts_with(&base) {
+        return not_found().await;
+    }
+    match std::fs::read(&file_path) {
+        Ok(bytes) => logo_file_response(rel, bytes),
+        Err(_) => not_found().await,
+    }
+}
+
+fn logo_file_response(rel: &str, data: Vec<u8>) -> Response {
+    let mime = mime_guess::from_path(rel).first_or_octet_stream();
+    Response::builder()
+        .header(header::CONTENT_TYPE, mime.as_ref())
+        .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+        .body(Body::from(data))
+        .unwrap()
+}
+
+#[cfg(test)]
+mod logo_tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn write_logo(dir: &TempDir, name: &str, bytes: &[u8]) {
+        let logos = dir.path().join("subscription-logos");
+        fs::create_dir_all(&logos).unwrap();
+        fs::write(logos.join(name), bytes).unwrap();
+    }
+
+    #[tokio::test]
+    async fn serves_existing_logo_with_png_content_type() {
+        let dir = TempDir::new().unwrap();
+        write_logo(&dir, "abc.png", &[0x89, 0x50, 0x4e, 0x47]);
+        let cfg = UploadsOverlayConfig { dir: Some(dir.path().to_path_buf()) };
+        let uri = Uri::from_static("/subscription-logos/abc.png");
+        let res = logo_file_handler(uri, axum::Extension(cfg)).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            res.headers().get(header::CONTENT_TYPE).unwrap(),
+            "image/png"
+        );
+    }
+
+    #[tokio::test]
+    async fn returns_404_for_missing_logo() {
+        let dir = TempDir::new().unwrap();
+        let cfg = UploadsOverlayConfig { dir: Some(dir.path().to_path_buf()) };
+        let res = logo_file_handler(
+            Uri::from_static("/subscription-logos/nope.png"),
+            axum::Extension(cfg),
+        )
+        .await;
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn returns_404_when_uploads_dir_unset() {
+        let cfg = UploadsOverlayConfig { dir: None };
+        let res = logo_file_handler(
+            Uri::from_static("/subscription-logos/abc.png"),
+            axum::Extension(cfg),
+        )
+        .await;
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    }
 }
