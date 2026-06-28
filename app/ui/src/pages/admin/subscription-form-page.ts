@@ -185,33 +185,33 @@ export class SubscriptionFormPage extends LitElement {
           ${isEdit ? msg('Edit Subscription') : msg('New Subscription')}
         </h1>
 
-        <div class="edit-layout">
-          <div class="form-col">
-            <segmented-control
-              variant="tabs"
-              .values=${(['general', 'logo', 'pricing', 'details'] as FormTab[])}
-              .labels=${tabLabels}
-              .value=${this._activeTab}
-              @select=${(e: CustomEvent<SegmentedSelectEventDetail>) => {
-                this._activeTab = e.detail.value as FormTab;
-              }}
-            ></segmented-control>
-            <form class="form" @submit=${(e: Event) => { e.preventDefault(); void this._save(); }}>
+        <form class="form" @submit=${(e: Event) => { e.preventDefault(); void this._save(); }}>
+          <div class="edit-layout">
+            <div class="form-col">
+              <segmented-control
+                variant="tabs"
+                .values=${(['general', 'logo', 'pricing', 'details'] as FormTab[])}
+                .labels=${tabLabels}
+                .value=${this._activeTab}
+                @select=${(e: CustomEvent<SegmentedSelectEventDetail>) => {
+                  this._activeTab = e.detail.value as FormTab;
+                }}
+              ></segmented-control>
               ${this._renderActiveTab()}
-              <div class="form-actions">
-                <button type="button" class="btn-secondary" @click=${this._goBack}>
-                  ${msg('Cancel')}
-                </button>
-                <button type="submit" class="btn-primary" ?disabled=${this._saving}>
-                  ${this._saving ? msg('Saving…') : msg('Save')}
-                </button>
-              </div>
-            </form>
+            </div>
+            <div class="preview-col">
+              ${this._renderPreview()}
+            </div>
           </div>
-          <div class="preview-col">
-            ${this._renderPreview()}
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" @click=${this._goBack}>
+              ${msg('Cancel')}
+            </button>
+            <button type="submit" class="btn-primary" ?disabled=${this._saving}>
+              ${this._saving ? msg('Saving…') : msg('Save')}
+            </button>
           </div>
-        </div>
+        </form>
       </div>
     `;
   }

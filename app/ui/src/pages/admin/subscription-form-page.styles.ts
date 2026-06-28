@@ -92,7 +92,6 @@ export const subscriptionFormPageStyles = css`
   .form {
     display: flex;
     flex-direction: column;
-    gap: 0.875rem;
   }
 
   /* ── Fields ──────────────────────────────────────────────────────── */
@@ -240,7 +239,9 @@ export const subscriptionFormPageStyles = css`
     display: flex;
     gap: 0.75rem;
     justify-content: flex-end;
+    margin-top: 1.5rem;
     padding-top: 1.25rem;
+    border-top: 1px solid var(--theme-color-border);
   }
 
   .btn-primary,
