@@ -16,9 +16,9 @@ import '@/shared/components/image-cropper';
 import '@/shared';
 import { subscriptionFormPageStyles } from './subscription-form-page.styles';
 
-type ViewMode = 'edit' | 'preview';
-
 const PERIODS: SubscriptionPeriod[] = ['monthly', 'quarterly', 'yearly', 'onetime'];
+
+type FormTab = 'general' | 'logo' | 'pricing' | 'details';
 
 function periodLabel(period: SubscriptionPeriod): string {
   switch (period) {
@@ -41,9 +41,9 @@ interface PricingEntry {
 @localized()
 export class SubscriptionFormPage extends LitElement {
   @property() subscriptionId = '';
-  @state() private _viewMode: ViewMode = 'edit';
   @state() private _loading = true;
   @state() private _saving = false;
+  @state() private _activeTab: FormTab = 'general';
 
   @state() private _name = '';
   @state() private _description = '';
@@ -163,6 +163,12 @@ export class SubscriptionFormPage extends LitElement {
 
   private _renderForm(): TemplateResult {
     const isEdit = Boolean(this.subscriptionId);
+    const tabLabels: Record<string, string> = {
+      general: msg('General'),
+      logo: msg('Logo'),
+      pricing: msg('Pricing'),
+      details: msg('Details'),
+    };
     return html`
       <div class="form-wrapper">
         <div class="top-bar">
@@ -172,125 +178,126 @@ export class SubscriptionFormPage extends LitElement {
             </svg>
             ${msg('Back to Admin')}
           </button>
-          <div class="mode-toggle">
-            <button
-              class="mode-btn ${this._viewMode === 'edit' ? 'active' : ''}"
-              @click=${() => { this._viewMode = 'edit'; }}
-            >${msg('Edit')}</button>
-            <button
-              class="mode-btn ${this._viewMode === 'preview' ? 'active' : ''}"
-              @click=${() => { this._viewMode = 'preview'; }}
-            >${msg('Preview')}</button>
-          </div>
         </div>
 
         <h1 class="page-title">
           ${isEdit ? msg('Edit Subscription') : msg('New Subscription')}
         </h1>
 
-        ${this._viewMode === 'edit' ? this._renderEditForm() : this._renderPreview()}
+        <div class="edit-layout">
+          <div class="form-col">
+            <segmented-control
+              variant="tabs"
+              .values=${(['general', 'logo', 'pricing', 'details'] as FormTab[])}
+              .labels=${tabLabels}
+              .value=${this._activeTab}
+              @select=${(e: CustomEvent<SegmentedSelectEventDetail>) => {
+                this._activeTab = e.detail.value as FormTab;
+              }}
+            ></segmented-control>
+            <form class="form" @submit=${(e: Event) => { e.preventDefault(); void this._save(); }}>
+              ${this._renderActiveTab()}
+              <div class="form-actions">
+                <button type="button" class="btn-secondary" @click=${this._goBack}>
+                  ${msg('Cancel')}
+                </button>
+                <button type="submit" class="btn-primary" ?disabled=${this._saving}>
+                  ${this._saving ? msg('Saving…') : msg('Save')}
+                </button>
+              </div>
+            </form>
+          </div>
+          <div class="preview-col">
+            ${this._renderPreview()}
+          </div>
+        </div>
       </div>
     `;
   }
 
-  private _renderEditForm(): TemplateResult {
-    return html`
-      <form class="form" @submit=${(e: Event) => { e.preventDefault(); void this._save(); }}>
-        ${this._renderGeneralSection()}
-        ${this._renderLogoSection()}
-        ${this._renderPricingSection()}
-        ${this._renderDetailsSection()}
-        <div class="form-actions">
-          <button type="button" class="btn-secondary" @click=${this._goBack}>
-            ${msg('Cancel')}
-          </button>
-          <button type="submit" class="btn-primary" ?disabled=${this._saving}>
-            ${this._saving ? msg('Saving…') : msg('Save')}
-          </button>
-        </div>
-      </form>
-    `;
+  private _renderActiveTab(): TemplateResult {
+    switch (this._activeTab) {
+      case 'general': return this._renderGeneralSection();
+      case 'logo': return this._renderLogoSection();
+      case 'pricing': return this._renderPricingSection();
+      case 'details': return this._renderDetailsSection();
+    }
   }
 
   private _renderGeneralSection(): TemplateResult {
     return html`
-      <section class="form-section">
-        <h2 class="section-heading">${msg('General')}</h2>
-        <div class="field">
-          <label class="label" for="name">${msg('Name')} *</label>
-          <input
-            id="name"
-            class="input"
-            type="text"
-            .value=${this._name}
-            @input=${(e: InputEvent) => { this._name = (e.target as HTMLInputElement).value; }}
-            required
-          />
-        </div>
-        <div class="field">
-          <label class="label" for="description">${msg('Description')}</label>
-          <textarea
-            id="description"
-            class="input textarea"
-            rows="3"
-            .value=${this._description}
-            @input=${(e: InputEvent) => { this._description = (e.target as HTMLTextAreaElement).value; }}
-          ></textarea>
-        </div>
-        <div class="field">
-          <label class="label" for="resource_url">${msg('Resource URL')}</label>
-          <input
-            id="resource_url"
-            class="input"
-            type="url"
-            .value=${this._resourceUrl}
-            @input=${(e: InputEvent) => { this._resourceUrl = (e.target as HTMLInputElement).value; }}
-            placeholder="https://..."
-          />
-        </div>
-      </section>
+      <div class="field">
+        <label class="label" for="name">${msg('Name')} *</label>
+        <input
+          id="name"
+          class="input"
+          type="text"
+          .value=${this._name}
+          @input=${(e: InputEvent) => { this._name = (e.target as HTMLInputElement).value; }}
+          required
+        />
+      </div>
+      <div class="field">
+        <label class="label" for="description">${msg('Description')}</label>
+        <textarea
+          id="description"
+          class="input textarea"
+          rows="3"
+          .value=${this._description}
+          @input=${(e: InputEvent) => { this._description = (e.target as HTMLTextAreaElement).value; }}
+        ></textarea>
+      </div>
+      <div class="field">
+        <label class="label" for="resource_url">${msg('Resource URL')}</label>
+        <input
+          id="resource_url"
+          class="input"
+          type="url"
+          .value=${this._resourceUrl}
+          @input=${(e: InputEvent) => { this._resourceUrl = (e.target as HTMLInputElement).value; }}
+          placeholder="https://..."
+        />
+      </div>
     `;
   }
 
   private _renderLogoSection(): TemplateResult {
     return html`
-      <section class="form-section">
-        <h2 class="section-heading">${msg('Logo')}</h2>
-        ${this._logoMode === 'upload'
-          ? html`
-              <image-cropper
-                .file=${null}
-                @cropped=${this._handleCropped}
-              ></image-cropper>
+      ${this._logoMode === 'upload'
+        ? html`
+            <image-cropper
+              .file=${null}
+              ?uploading=${this._uploading}
+              @cropped=${this._handleCropped}
+            ></image-cropper>
+            ${this._logoUrl
+              ? html`<img class="logo-preview" src=${this._logoUrl} alt=${msg('Logo preview')} />`
+              : null}
+            <button
+              type="button"
+              class="btn-link"
+              @click=${() => { this._logoMode = 'url'; }}
+            >${msg('Use a URL instead')}</button>
+          `
+        : html`
+            <div class="logo-input-row">
+              <input
+                class="input"
+                type="url"
+                .value=${this._logoUrl}
+                @input=${(e: InputEvent) => { this._logoUrl = (e.target as HTMLInputElement).value; }}
+                placeholder="https://..."
+              />
               ${this._logoUrl
                 ? html`<img class="logo-preview" src=${this._logoUrl} alt=${msg('Logo preview')} />`
                 : null}
-              <button
-                type="button"
-                class="btn-link"
-                @click=${() => { this._logoMode = 'url'; }}
-              >${msg('Use a URL instead')}</button>
-            `
-          : html`
-              <div class="logo-input-row">
-                <input
-                  class="input"
-                  type="url"
-                  .value=${this._logoUrl}
-                  @input=${(e: InputEvent) => { this._logoUrl = (e.target as HTMLInputElement).value; }}
-                  placeholder="https://..."
-                />
-                ${this._logoUrl
-                  ? html`<img class="logo-preview" src=${this._logoUrl} alt=${msg('Logo preview')} />`
-                  : null}
-              </div>
-              <button
-                type="button"
-                class="btn-link"
-                @click=${() => { this._logoMode = 'upload'; }}
-              >${msg('Upload an image instead')}</button>
-            `}
-      </section>
+            </div>
+            <button
+              type="button"
+              class="btn-link"
+              @click=${() => { this._logoMode = 'upload'; }}
+            >${msg('Upload an image instead')}</button>
+          `}
     `;
   }
 
@@ -303,135 +310,134 @@ export class SubscriptionFormPage extends LitElement {
       onetime: msg('One-time'),
     };
     return html`
-      <section class="form-section">
-        <h2 class="section-heading">${msg('Pricing')}</h2>
-        <segmented-control
-          .values=${PERIODS}
-          .labels=${periodLabels}
-          .value=${''}
-          .disabledValues=${[...usedPeriods]}
-          @select=${(e: CustomEvent<SegmentedSelectEventDetail>) => {
-            this._addPricingTier(e.detail.value as SubscriptionPeriod);
-          }}
-        ></segmented-control>
-        ${this._pricing.length === 0
-          ? html`<p class="pricing-empty">${msg('No pricing tiers. Pick a period above.')}</p>`
-          : null}
-        ${this._pricing.map((p, i) => html`
-          <div class="pricing-tier">
-            <span class="period-label">${periodLabels[p.period]}</span>
-            <input
-              class="input price-input"
-              type="number"
-              min="0"
-              .value=${String(p.price)}
-              @input=${(e: InputEvent) => {
-                this._updatePricingTier(i, 'price', Number((e.target as HTMLInputElement).value));
-              }}
-            />
-            <input
-              class="input currency-input"
-              type="text"
-              maxlength="3"
-              .value=${p.currency}
-              @input=${(e: InputEvent) => {
-                this._updatePricingTier(i, 'currency', (e.target as HTMLInputElement).value.toUpperCase());
-              }}
-            />
-            <button
-              type="button"
-              class="btn-remove-tier"
-              title=${msg('Remove')}
-              aria-label=${msg('Remove pricing tier')}
-              @click=${() => this._removePricingTier(i)}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-                <path d="M10 11v6M14 11v6"></path>
-              </svg>
-            </button>
-          </div>
-        `)}
-      </section>
+      <segmented-control
+        .values=${PERIODS}
+        .labels=${periodLabels}
+        .value=${''}
+        .disabledValues=${[...usedPeriods]}
+        @select=${(e: CustomEvent<SegmentedSelectEventDetail>) => {
+          this._addPricingTier(e.detail.value as SubscriptionPeriod);
+        }}
+      ></segmented-control>
+      ${this._pricing.length === 0
+        ? html`<p class="pricing-empty">${msg('No pricing tiers. Pick a period above.')}</p>`
+        : null}
+      ${this._pricing.map((p, i) => html`
+        <div class="pricing-tier">
+          <span class="period-label">${periodLabels[p.period]}</span>
+          <input
+            class="input price-input"
+            type="number"
+            min="0"
+            .value=${String(p.price)}
+            @input=${(e: InputEvent) => {
+              this._updatePricingTier(i, 'price', Number((e.target as HTMLInputElement).value));
+            }}
+          />
+          <input
+            class="input currency-input"
+            type="text"
+            maxlength="3"
+            .value=${p.currency}
+            @input=${(e: InputEvent) => {
+              this._updatePricingTier(i, 'currency', (e.target as HTMLInputElement).value.toUpperCase());
+            }}
+          />
+          <button
+            type="button"
+            class="btn-remove-tier"
+            title=${msg('Remove')}
+            aria-label=${msg('Remove pricing tier')}
+            @click=${() => this._removePricingTier(i)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+              <path d="M10 11v6M14 11v6"></path>
+            </svg>
+          </button>
+        </div>
+      `)}
     `;
   }
 
   private _renderDetailsSection(): TemplateResult {
     return html`
-      <section class="form-section">
-        <h2 class="section-heading">${msg('Details')}</h2>
-        <div class="field">
-          <label class="label" for="what_included">${msg("What's included")}</label>
-          <textarea
-            id="what_included"
-            class="input textarea"
-            rows="4"
-            .value=${this._whatIncluded}
-            @input=${(e: InputEvent) => { this._whatIncluded = (e.target as HTMLTextAreaElement).value; }}
-          ></textarea>
-        </div>
-        <div class="field">
-          <label class="label" for="terms">${msg('Terms')}</label>
-          <textarea
-            id="terms"
-            class="input textarea"
-            rows="3"
-            .value=${this._terms}
-            @input=${(e: InputEvent) => { this._terms = (e.target as HTMLTextAreaElement).value; }}
-          ></textarea>
-        </div>
-      </section>
+      <div class="field">
+        <label class="label" for="what_included">${msg("What's included")}</label>
+        <textarea
+          id="what_included"
+          class="input textarea"
+          rows="4"
+          .value=${this._whatIncluded}
+          @input=${(e: InputEvent) => { this._whatIncluded = (e.target as HTMLTextAreaElement).value; }}
+        ></textarea>
+      </div>
+      <div class="field">
+        <label class="label" for="terms">${msg('Terms')}</label>
+        <textarea
+          id="terms"
+          class="input textarea"
+          rows="3"
+          .value=${this._terms}
+          @input=${(e: InputEvent) => { this._terms = (e.target as HTMLTextAreaElement).value; }}
+        ></textarea>
+      </div>
     `;
   }
 
   private _renderPreview(): TemplateResult {
     const activePricing: SubscriptionPricing[] = this._pricing
       .filter(p => p.price > 0)
-      .map((p, i) => ({ id: p.id ?? `preview-${i}`, subscription_id: 'preview', period: p.period, price: p.price, currency: p.currency, is_archived: false }));
+      .map((p, i) => ({
+        id: p.id ?? `preview-${i}`,
+        subscription_id: 'preview',
+        period: p.period,
+        price: p.price,
+        currency: p.currency,
+        is_archived: false,
+      }));
 
     return html`
-      <div class="preview-wrapper">
-        <div class="detail-card">
-          <div class="logo-hero">
-            ${this._logoUrl
-              ? html`<img class="logo-img" src=${this._logoUrl} alt=${this._name || msg('Preview')} />`
-              : html`<div class="logo-letter">${(this._name || '?').charAt(0).toUpperCase()}</div>`}
+      <div class="detail-card">
+        <div class="logo-hero">
+          ${this._logoUrl
+            ? html`<img class="logo-img" src=${this._logoUrl} alt=${this._name || msg('Preview')} />`
+            : html`<div class="logo-letter">${(this._name || '?').charAt(0).toUpperCase()}</div>`}
+        </div>
+        <div class="detail-body">
+          <div class="title-row">
+            <h1 class="title">${this._name || html`<em>${msg('Untitled')}</em>`}</h1>
           </div>
-          <div class="detail-body">
-            <div class="title-row">
-              <h1 class="title">${this._name || html`<em>${msg('Untitled')}</em>`}</h1>
+          <p class="description">${this._description || html`<em>${msg('No description')}</em>`}</p>
+
+          ${activePricing.length > 0 ? html`
+            <div class="section">
+              <h2 class="section-heading">${msg('Pricing')}</h2>
+              <div class="pricing-table">
+                ${activePricing.map(p => html`
+                  <div class="pricing-row">
+                    <span>${periodLabel(p.period)}</span>
+                    <span>${p.price} ${p.currency}${p.period !== 'onetime' ? `/${p.period.slice(0, 2)}` : ''}</span>
+                  </div>
+                `)}
+              </div>
             </div>
-            <p class="description">${this._description || html`<em>${msg('No description')}</em>`}</p>
+          ` : null}
 
-            ${activePricing.length > 0 ? html`
-              <div class="section">
-                <h2 class="section-heading">${msg('Pricing')}</h2>
-                <div class="pricing-table">
-                  ${activePricing.map(p => html`
-                    <div class="pricing-row">
-                      <span>${periodLabel(p.period)}</span>
-                      <span>${p.price} ${p.currency}${p.period !== 'onetime' ? `/${p.period.slice(0, 2)}` : ''}</span>
-                    </div>
-                  `)}
-                </div>
-              </div>
-            ` : null}
+          ${this._whatIncluded ? html`
+            <div class="section">
+              <h2 class="section-heading">${msg("What's included")}</h2>
+              <p class="section-text">${this._whatIncluded}</p>
+            </div>
+          ` : null}
 
-            ${this._whatIncluded ? html`
-              <div class="section">
-                <h2 class="section-heading">${msg("What's included")}</h2>
-                <p class="section-text">${this._whatIncluded}</p>
-              </div>
-            ` : null}
-
-            ${this._terms ? html`
-              <div class="section">
-                <h2 class="section-heading">${msg('Terms')}</h2>
-                <p class="section-text">${this._terms}</p>
-              </div>
-            ` : null}
-          </div>
+          ${this._terms ? html`
+            <div class="section">
+              <h2 class="section-heading">${msg('Terms')}</h2>
+              <p class="section-text">${this._terms}</p>
+            </div>
+          ` : null}
         </div>
       </div>
     `;
