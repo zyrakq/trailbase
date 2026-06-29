@@ -40,3 +40,8 @@ refetch = false
 name = "wcauth"
 wasm = "wcauth.wasm"
 source = { build = "wcauth-tb-component" }
+
+[[components.items]]
+name = "sub-mock"
+wasm = "sub-mock.wasm"
+source = { build = "trailbase-sub-mock-component" }
