@@ -1,8 +1,13 @@
 export type SubscriptionPeriod = 'monthly' | 'quarterly' | 'yearly' | 'onetime';
 
 export type SubscriptionStatus = 'active' | 'archived';
-export type UserSubscriptionStatus = 'active' | 'cancelled' | 'expired';
-export type SubscriptionEventType = 'subscribed' | 'cancelled' | 'expired' | 'renewed';
+export type UserSubscriptionStatus =
+  | 'activating'
+  | 'activation_failed'
+  | 'active'
+  | 'cancelled'
+  | 'expired';
+export type SubscriptionEventType = 'subscribed' | 'activated' | 'cancelled' | 'expired' | 'renewed';
 
 export interface SubscriptionPricing {
   id: string;
@@ -37,6 +42,8 @@ export interface UserSubscription {
   subscribed_at: number;
   expires_at?: number;
   cancelled_at?: number;
+  activated_at?: number;
+  activation_attempts?: number;
 }
 
 export interface SubscriptionEvent {

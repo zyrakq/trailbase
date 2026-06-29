@@ -36,6 +36,8 @@ export class EventHistory extends LitElement {
     switch (type) {
       case 'subscribed':
         return msg('Subscribed');
+      case 'activated':
+        return msg('Activated');
       case 'renewed':
         return msg('Renewed');
       case 'cancelled':
@@ -48,6 +50,8 @@ export class EventHistory extends LitElement {
   private _icon(type: SubscriptionEventType): string {
     switch (type) {
       case 'subscribed':
+        return '✓';
+      case 'activated':
         return '✓';
       case 'renewed':
         return '↻';
