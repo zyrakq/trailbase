@@ -23,13 +23,13 @@ export class WelcomePage extends LitElement {
   static styles = css`
     :host {
       display: block;
-      min-height: 100vh;
+      min-height: var(--full-vh, 100vh);
     }
 
     .page {
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
+      min-height: var(--full-vh, 100vh);
       background: var(--theme-color-background);
       transition: background-color 0.2s ease;
     }

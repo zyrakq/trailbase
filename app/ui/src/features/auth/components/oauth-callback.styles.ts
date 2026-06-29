@@ -3,7 +3,7 @@ import { css } from 'lit';
 export const oauthCallbackStyles = css`
   :host {
     display: block;
-    min-height: 100vh;
+    min-height: var(--full-vh, 100vh);
     background: var(--theme-color-background);
     transition: background-color 0.2s ease;
   }
@@ -12,7 +12,7 @@ export const oauthCallbackStyles = css`
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100vh;
+    min-height: var(--full-vh, 100vh);
     padding: 2rem 1rem;
   }
 

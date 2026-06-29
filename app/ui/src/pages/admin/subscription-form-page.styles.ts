@@ -3,7 +3,7 @@ import { css } from 'lit';
 export const subscriptionFormPageStyles = css`
   :host {
     display: block;
-    min-height: 100vh;
+    min-height: var(--full-vh, 100vh);
     background: var(--theme-color-background);
   }
 

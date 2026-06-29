@@ -89,12 +89,13 @@ export const appHeaderStyles = css`
     position: fixed;
     top: 73px;
     left: 0;
-    width: 100vw;
+    right: 0;
     bottom: 0;
     background: var(--theme-color-surface);
     z-index: 1585;
     transform: translateX(100%);
-    transition: transform 0.3s ease;
+    visibility: hidden;
+    transition: transform 0.3s ease, visibility 0s linear 0.3s;
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
@@ -103,6 +104,8 @@ export const appHeaderStyles = css`
   }
   .mobile-drawer.open {
     transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.3s ease;
   }
 
   .drawer-profile {

@@ -15,6 +15,8 @@ import '@/pages/reset-password/index.ts';
 import '@/pages/verify-email/index.ts';
 import '@/features/notifications/components/toast-container';
 
+const MIN_WIDTH = 390;
+
 @customElement('app-component')
 export class AppComponent extends LitElement {
   constructor() {
@@ -22,6 +24,8 @@ export class AppComponent extends LitElement {
     localizationService.init();
     void configService.init();
   }
+
+  private _onResize = () => this._applyScale(window.innerWidth);
 
   private _router = new Router(this, [
     {
@@ -131,6 +135,27 @@ export class AppComponent extends LitElement {
     },
   ]);
 
+  firstUpdated() {
+    window.addEventListener('resize', this._onResize);
+    this._applyScale(window.innerWidth);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener('resize', this._onResize);
+  }
+
+  private _applyScale(width: number) {
+    if (width < MIN_WIDTH) {
+      const scale = width / MIN_WIDTH;
+      document.documentElement.style.zoom = String(scale);
+      document.documentElement.style.setProperty('--full-vh', `${(100 / scale).toFixed(4)}vh`);
+    } else {
+      document.documentElement.style.zoom = '';
+      document.documentElement.style.removeProperty('--full-vh');
+    }
+  }
+
   render() {
     return html`${this._router.outlet()}`;
   }
@@ -138,7 +163,7 @@ export class AppComponent extends LitElement {
   static styles = css`
     :host {
       display: block;
-      min-height: 100vh;
+      min-height: var(--full-vh, 100vh);
     }
   `;
 }

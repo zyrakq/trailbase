@@ -4,6 +4,8 @@
 @import './features/theme/styles/theme-variables.css';
 
 :root {
+  --full-vh: 100vh;
+
   font-family:
     'Inter',
     system-ui,
@@ -30,7 +32,7 @@
 body {
   margin: 0;
   padding: 0;
-  min-height: 100vh;
+  min-height: var(--full-vh, 100vh);
   background-color: var(--theme-color-background);
   color: var(--theme-color-text-primary);
   transition: background-color 0.2s ease, color 0.2s ease;

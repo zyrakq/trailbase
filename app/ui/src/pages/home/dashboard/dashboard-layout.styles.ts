@@ -98,8 +98,9 @@ export const dashboardLayoutStyles = css`
       right: 0;
       bottom: 0;
       width: auto;
-      height: calc(100vh - 125px);
+      height: calc(var(--full-vh, 100vh) - 125px);
       transform: translateX(-100%);
+      visibility: hidden;
       z-index: 1500;
       background: var(--theme-color-surface);
       box-shadow: var(--theme-shadow-lg, var(--theme-shadow-md));
@@ -108,9 +109,14 @@ export const dashboardLayoutStyles = css`
 
     .layout.drawer-open dashboard-sidebar {
       transform: translateX(0);
+      visibility: visible;
     }
 
     .layout.drawer-animated dashboard-sidebar {
+      transition: transform 0.3s ease, visibility 0s linear 0.3s;
+    }
+
+    .layout.drawer-animated.drawer-open dashboard-sidebar {
       transition: transform 0.3s ease;
     }
 
@@ -208,7 +214,7 @@ export const dashboardLayoutStyles = css`
 
     dashboard-sidebar {
       top: 117px;
-      height: calc(100vh - 117px);
+      height: calc(var(--full-vh, 100vh) - 117px);
     }
 
     .period-sheet {
