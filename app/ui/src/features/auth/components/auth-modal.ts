@@ -130,8 +130,8 @@ export class AuthModal extends LitElement {
       <div
         class="modal-overlay"
         @click=${this.handleOverlayClick}
-        @wcauth-section-success=${this.handleAuthSuccess}
-        @wcauth-section-close=${this.handleClose}
+        @wcauth-success=${this.handleAuthSuccess}
+        @wcauth-close=${this.handleClose}
       >
         <div class="modal-card">
           <div class="modal-header">
