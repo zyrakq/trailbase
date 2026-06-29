@@ -7,6 +7,12 @@ export const subscriptionFormPageStyles = css`
     background: var(--theme-color-background);
   }
 
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   .page-content {
     max-width: 1200px;
     margin: 0 auto;
@@ -504,6 +510,26 @@ export const subscriptionFormPageStyles = css`
     .pricing-tier {
       grid-template-columns: 100px 1fr 60px auto;
       gap: 0.375rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .pricing-tier {
+      grid-template-columns: 1fr 56px auto;
+    }
+
+    .period-label-wrap {
+      grid-column: 1 / -1;
+    }
+
+    .form-actions {
+      flex-wrap: wrap;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      flex: 1;
+      text-align: center;
     }
   }
 `;

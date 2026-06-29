@@ -8,6 +8,12 @@ export const adminPageStyles = css`
     transition: background-color 0.2s ease;
   }
 
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   .page {
     display: flex;
     flex-direction: column;
@@ -92,7 +98,16 @@ export const adminPageStyles = css`
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    min-width: 0;
+    flex-wrap: wrap;
     transition: color 0.2s ease;
+  }
+
+  .name > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
 
   .badge {
@@ -161,6 +176,9 @@ export const adminPageStyles = css`
     background: var(--theme-color-primary);
     color: white;
     border-color: transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
   }
 
   .btn-primary:hover:not(:disabled) {
@@ -169,6 +187,26 @@ export const adminPageStyles = css`
 
   .btn-primary:active:not(:disabled) {
     background: var(--theme-color-primary-active);
+  }
+
+  .btn-primary svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .btn-icon {
+    padding: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .btn-icon svg {
+    width: 16px;
+    height: 16px;
+    display: block;
   }
 
   .btn-danger {
@@ -219,12 +257,26 @@ export const adminPageStyles = css`
 
   @media (max-width: 720px) {
     .row {
-      grid-template-columns: 40px 1fr;
+      grid-template-columns: 40px 1fr auto;
     }
 
-    .count,
-    .actions {
-      grid-column: 2;
+    .count {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .main {
+      padding: 1rem;
+    }
+
+    .header h1 {
+      font-size: 1.375rem;
+    }
+
+    .row {
+      padding: 0.625rem 0.75rem;
+      gap: 0.625rem;
     }
   }
 `;

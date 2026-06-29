@@ -103,22 +103,68 @@ export class AdminPage extends LitElement {
         </div>
         <div class="count">${msg(str`Subscribers: ${count}`)}</div>
         <div class="actions">
-          <button class="btn" @click=${() => { window.location.href = `/subscription/${sub.id}`; }}>
-            ${msg('Details')}
+          <button
+            class="btn btn-icon"
+            title=${msg('Details')}
+            aria-label=${msg('Details')}
+            @click=${() => { window.location.href = `/subscription/${sub.id}`; }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
           </button>
-          <button class="btn" @click=${() => { window.location.href = `/admin/subscription/${sub.id}/edit`; }}>
-            ${msg('Edit')}
+          <button
+            class="btn btn-icon"
+            title=${msg('Edit')}
+            aria-label=${msg('Edit')}
+            @click=${() => { window.location.href = `/admin/subscription/${sub.id}/edit`; }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
           </button>
           ${sub.status === 'active'
-            ? html`<button class="btn" @click=${() => this._archive(sub)}>${msg('Archive')}</button>`
-            : html`<button class="btn" @click=${() => this._restore(sub)}>${msg('Restore')}</button>`}
+            ? html`
+              <button
+                class="btn btn-icon"
+                title=${msg('Archive')}
+                aria-label=${msg('Archive')}
+                @click=${() => this._archive(sub)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="21 8 21 21 3 21 3 8"/>
+                  <rect x="1" y="3" width="22" height="5"/>
+                  <line x1="10" y1="12" x2="14" y2="12"/>
+                </svg>
+              </button>`
+            : html`
+              <button
+                class="btn btn-icon"
+                title=${msg('Restore')}
+                aria-label=${msg('Restore')}
+                @click=${() => this._restore(sub)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="1 4 1 10 7 10"/>
+                  <path d="M3.51 15a9 9 0 1 0 .49-3.84"/>
+                </svg>
+              </button>`}
           <button
-            class="btn btn-danger"
+            class="btn btn-icon btn-danger"
             ?disabled=${hasSubscribers}
-            title=${hasSubscribers ? msg('Has active subscribers') : ''}
+            title=${hasSubscribers ? msg('Has active subscribers') : msg('Delete')}
+            aria-label=${msg('Delete')}
             @click=${() => this._remove(sub)}
           >
-            ${msg('Delete')}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/>
+              <path d="M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -153,6 +199,10 @@ export class AdminPage extends LitElement {
             <h1>${msg('Subscription Catalog')}</h1>
             <div class="toolbar">
               <button class="btn btn-primary" @click=${() => { window.location.href = '/admin/subscription/new'; }}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
                 ${msg('Add Subscription')}
               </button>
             </div>
