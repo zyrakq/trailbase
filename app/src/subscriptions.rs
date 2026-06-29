@@ -82,18 +82,17 @@ pub async fn subscribe_handler(
         _ => None,
     };
 
-    state
+    let activator: String = state
         .user_conn()
-        .transaction(move |mut tx| -> Result<(), trailbase_sqlite::Error> {
-            let active = tx
+        .transaction(move |mut tx| -> Result<String, trailbase_sqlite::Error> {
+            let activator = tx
                 .query_row(
-                    "SELECT 1 FROM subscriptions WHERE id = ? AND status = 'active'",
+                    "SELECT activator FROM subscriptions WHERE id = ? AND status = 'active'",
                     trailbase_sqlite::params![sub_bytes.clone()],
                 )?
-                .is_some();
-            if !active {
-                return Err(trailbase_sqlite::Error::Other("subscription not found or archived".into()));
-            }
+                .ok_or_else(|| trailbase_sqlite::Error::Other("subscription not found or archived".into()))?
+                .get::<String>(0)
+                .unwrap_or_else(|_| "sub-mock".to_string());
 
             let tier_ok = tx
                 .query_row(
@@ -109,7 +108,8 @@ pub async fn subscribe_handler(
 
             let already = tx
                 .query_row(
-                    "SELECT 1 FROM user_subscriptions WHERE user_id = ? AND subscription_id = ? AND status = 'active'",
+                    "SELECT 1 FROM user_subscriptions \
+                     WHERE user_id = ? AND subscription_id = ? AND status IN ('active', 'activating')",
                     trailbase_sqlite::params![user_bytes.clone(), sub_bytes.clone()],
                 )?
                 .is_some();
@@ -118,7 +118,9 @@ pub async fn subscribe_handler(
             }
 
             tx.execute(
-                "INSERT INTO user_subscriptions (id, user_id, subscription_id, period, status, expires_at) VALUES (?, ?, ?, ?, 'active', ?)",
+                "INSERT INTO user_subscriptions \
+                 (id, user_id, subscription_id, period, status, expires_at, activation_attempts) \
+                 VALUES (?, ?, ?, ?, 'activating', ?, 0)",
                 trailbase_sqlite::params![new_id_bytes.clone(), user_bytes.clone(), sub_bytes.clone(), period_tx.clone(), expires_at],
             )?;
 
@@ -128,7 +130,7 @@ pub async fn subscribe_handler(
             )?;
 
             tx.commit()?;
-            Ok(())
+            Ok(activator)
         })
         .await
         .map_err(|err| {
@@ -143,16 +145,25 @@ pub async fn subscribe_handler(
         })?;
 
     log::info!(
-        "user {} subscribed to {} period={} ({})",
-        user_id_b64, subscription_id_b64, period, new_id_b64
+        "user {} subscribed to {} period={} ({}) activator={}",
+        user_id_b64, subscription_id_b64, period, new_id_b64, activator
     );
+
+    let jobs = state.jobs();
+    tokio::spawn(async move {
+        match jobs.run_job_by_name("activate-subscriptions").await {
+            Some(Err(e)) => log::warn!("activate-subscriptions job error: {e}"),
+            None => log::warn!("activate-subscriptions job not registered; cron will retry"),
+            Some(Ok(())) => {}
+        }
+    });
 
     Ok(Json(UserSubscriptionRecord {
         id: new_id_b64,
         user_id: user_id_b64,
         subscription_id: subscription_id_b64,
         period,
-        status: "active".to_string(),
+        status: "activating".to_string(),
         expires_at,
     }))
 }
@@ -1011,8 +1022,9 @@ pub async fn user_subs_handler(
             r#"SELECT id, user_id, subscription_id, period, status,
                       subscribed_at, expires_at, cancelled_at
                FROM user_subscriptions
-               WHERE user_id = $1 AND status = 'active'
-                 AND (expires_at IS NULL OR expires_at > unixepoch())"#,
+               WHERE user_id = $1
+                 AND status IN ('activating', 'activation_failed', 'active')
+                 AND (status != 'active' OR expires_at IS NULL OR expires_at > unixepoch())"#,
             trailbase_sqlite::params![user_bytes],
         )
         .await
