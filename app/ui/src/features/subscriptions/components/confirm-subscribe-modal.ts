@@ -33,6 +33,9 @@ export class ConfirmSubscribeModal extends LitElement {
   @state() private _subscription: Subscription | null = null;
   @state() private _selectedPeriod: SubscriptionPeriod | null = null;
   @state() private _loading = false;
+  @state() private _activating = false;
+  private _pollInterval: ReturnType<typeof setInterval> | null = null;
+  private _pollTimeout: ReturnType<typeof setTimeout> | null = null;
 
   show(subscription: Subscription, preselectedPeriod?: SubscriptionPeriod): void {
     this._subscription = subscription;
@@ -44,23 +47,44 @@ export class ConfirmSubscribeModal extends LitElement {
     }
     this._open = true;
     this._loading = false;
+    this._activating = false;
+    this._clearPoll();
   }
 
   private _close(): void {
+    this._clearPoll();
     this._open = false;
+    this._activating = false;
+  }
+
+  private _clearPoll(): void {
+    if (this._pollInterval !== null) {
+      clearInterval(this._pollInterval);
+      this._pollInterval = null;
+    }
+    if (this._pollTimeout !== null) {
+      clearTimeout(this._pollTimeout);
+      this._pollTimeout = null;
+    }
   }
 
   private async _confirm(): Promise<void> {
     if (!this._subscription || !this._selectedPeriod) return;
     this._loading = true;
     try {
-      await subscriptionsService.subscribe(this._subscription.id, this._selectedPeriod);
-      notificationService.success(msg(str`Subscribed to ${this._subscription.name}`));
-      this.dispatchEvent(new CustomEvent('subscription-subscribed', {
-        detail: { subscriptionId: this._subscription.id, period: this._selectedPeriod },
-        bubbles: true,
-        composed: true,
-      }));
+      const result = await subscriptionsService.subscribe(
+        this._subscription.id,
+        this._selectedPeriod,
+      );
+
+      if (result.status === 'activating') {
+        this._loading = false;
+        this._activating = true;
+        this._startActivatingPoll();
+        return;
+      }
+
+      this._emitSubscribed();
       this._close();
     } catch {
       notificationService.error(msg('Could not subscribe. Please try again.'));
@@ -69,8 +93,56 @@ export class ConfirmSubscribeModal extends LitElement {
     }
   }
 
+  private _emitSubscribed(): void {
+    if (!this._subscription || !this._selectedPeriod) return;
+    notificationService.success(msg(str`Subscribed to ${this._subscription.name}`));
+    this.dispatchEvent(new CustomEvent('subscription-subscribed', {
+      detail: { subscriptionId: this._subscription.id, period: this._selectedPeriod },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  private _startActivatingPoll(): void {
+    const subId = this._subscription?.id;
+    if (!subId) return;
+
+    this._pollInterval = setInterval(async () => {
+      try {
+        const subs = await subscriptionsService.getUserSubscriptions();
+        const match = subs.find(u => u.subscription_id === subId);
+        if (match?.status === 'active') {
+          this._clearPoll();
+          this._emitSubscribed();
+          this._close();
+        }
+      } catch {
+        // Ignore poll errors; timeout handles the failure case.
+      }
+    }, 2000);
+
+    this._pollTimeout = setTimeout(() => {
+      this._clearPoll();
+      notificationService.error(msg('Activation timed out. Please check your subscription status.'));
+      this._close();
+    }, 90_000);
+  }
+
   render() {
     if (!this._open || !this._subscription) return html``;
+
+    if (this._activating) {
+      return html`
+        <div class="overlay">
+          <div class="modal" role="dialog" aria-modal="true" aria-live="polite">
+            <h2 class="title">${msg('Activating…')}</h2>
+            <div class="spinner" aria-hidden="true"></div>
+            <p class="activating-hint">${msg('Your subscription is being activated. This may take a moment.')}</p>
+          </div>
+        </div>
+      `;
+    }
+
     const sub = this._subscription;
     const activePricing = sub.pricing.filter(p => !p.is_archived);
     const selectedPricing = activePricing.find(p => p.period === this._selectedPeriod);

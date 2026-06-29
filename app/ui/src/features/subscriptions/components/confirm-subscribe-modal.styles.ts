@@ -129,4 +129,27 @@ export const confirmSubscribeModalStyles = css`
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  .activating-hint {
+    margin: 0 0 0.5rem;
+    color: var(--theme-color-text-secondary);
+    font-size: 0.9375rem;
+    text-align: center;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--theme-color-border);
+    border-top-color: var(--theme-color-primary, #6366f1);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 1rem auto;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
 `;
