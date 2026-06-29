@@ -66,6 +66,7 @@ export class AppHeader extends LitElement {
     window.removeEventListener('auth-state-updated', this._handleAuthStateUpdated);
     document.removeEventListener('keydown', this._handleKeyDown);
     this._mq.removeEventListener('change', this._handleBreakpointChange);
+    document.body.style.overflow = '';
   }
 
   private _handleBreakpointChange = (e: MediaQueryListEvent): void => {
@@ -97,11 +98,13 @@ export class AppHeader extends LitElement {
 
   private _toggleMenu(): void {
     this._menuOpen = !this._menuOpen;
+    document.body.style.overflow = this._menuOpen ? 'hidden' : '';
   }
 
   private _closeMenu(): void {
     this._menuOpen = false;
     this._localeSheetOpen = false;
+    document.body.style.overflow = '';
   }
 
   private _toggleLocaleSheet(): void {

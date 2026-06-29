@@ -48,11 +48,12 @@ export class DashboardLayout extends LitElement {
     super.disconnectedCallback();
     document.removeEventListener('keydown', this._handleKeyDown);
     this._mq.removeEventListener('change', this._handleBreakpointChange);
+    document.body.style.overflow = '';
   }
 
   private _handleBreakpointChange = (e: MediaQueryListEvent): void => {
     if (!e.matches) {
-      this._drawerOpen = false;
+      this._closeDrawer();
       this._drawerAnimated = false;
       this._periodDropdownOpen = false;
     }
@@ -63,13 +64,19 @@ export class DashboardLayout extends LitElement {
     if (this._periodDropdownOpen) {
       this._periodDropdownOpen = false;
     } else {
-      this._drawerOpen = false;
+      this._closeDrawer();
     }
   };
+
+  private _closeDrawer(): void {
+    this._drawerOpen = false;
+    document.body.style.overflow = '';
+  }
 
   private _toggleDrawer = (): void => {
     this._drawerAnimated = true;
     this._drawerOpen = !this._drawerOpen;
+    document.body.style.overflow = this._drawerOpen ? 'hidden' : '';
   };
 
   private _handleOverlayClick = (): void => {
@@ -81,7 +88,7 @@ export class DashboardLayout extends LitElement {
     if (next === this._activeSection) return;
     this._activeSection = next;
     this._selectedPeriod = 'all';
-    this._drawerOpen = false;
+    this._closeDrawer();
   }
 
   private _setPeriod(period: FilterPeriod): void {
