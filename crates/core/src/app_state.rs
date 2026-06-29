@@ -319,7 +319,7 @@ impl AppState {
     return &self.state.object_store;
   }
 
-  pub(crate) fn jobs(&self) -> Arc<JobRegistry> {
+  pub fn jobs(&self) -> Arc<JobRegistry> {
     return self.state.jobs.value();
   }
 

@@ -170,12 +170,14 @@ impl Job {
 
 pub struct JobRegistry {
   pub(crate) jobs: Mutex<HashMap<i32, Job>>,
+  by_name: Mutex<HashMap<String, i32>>,
 }
 
 impl JobRegistry {
   pub fn new() -> Self {
     return JobRegistry {
       jobs: Mutex::new(HashMap::new()),
+      by_name: Mutex::new(HashMap::new()),
     };
   }
 
@@ -189,11 +191,14 @@ impl JobRegistry {
     let id = id.unwrap_or_else(|| JOB_ID_COUNTER.fetch_add(1, Ordering::SeqCst));
     return match self.jobs.lock().entry(id) {
       Entry::Occupied(_) => None,
-      Entry::Vacant(entry) => Some(
-        entry
-          .insert(Job::new(id, name.into(), schedule, callback))
-          .clone(),
-      ),
+      Entry::Vacant(entry) => {
+        let name_str: String = name.into();
+        let job = entry
+          .insert(Job::new(id, name_str.clone(), schedule, callback))
+          .clone();
+        self.by_name.lock().insert(name_str, id);
+        Some(job)
+      }
     };
   }
 
@@ -205,6 +210,14 @@ impl JobRegistry {
 
     debug!("Running job {id}: {}", job.name());
     return Some(job.run_now().await);
+  }
+
+  pub async fn run_job_by_name(&self, name: &str) -> Option<Result<(), String>> {
+    let id = {
+      let by_name = self.by_name.lock();
+      *by_name.get(name)?
+    };
+    return self.run_job(id).await;
   }
 }
 
