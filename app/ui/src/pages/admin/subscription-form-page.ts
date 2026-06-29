@@ -54,6 +54,7 @@ export class SubscriptionFormPage extends LitElement {
   @state() private _terms = '';
   @state() private _pricing: PricingEntry[] = [];
 
+  @state() private _mobilePreview = false;
   @state() private _logoMode: 'upload' | 'url' = 'upload';
   @state() private _uploading = false;
   @state() private _logoPreviewFailed = false;
@@ -216,12 +217,23 @@ export class SubscriptionFormPage extends LitElement {
           </button>
         </div>
 
-        <h1 class="page-title">
-          ${isEdit ? msg('Edit Subscription') : msg('New Subscription')}
-        </h1>
+        <div class="page-title-row">
+          <h1 class="page-title">
+            ${isEdit ? msg('Edit Subscription') : msg('New Subscription')}
+          </h1>
+          <button
+            type="button"
+            class="btn-preview-toggle"
+            @click=${() => { this._mobilePreview = !this._mobilePreview; }}
+          >
+            ${this._mobilePreview
+              ? html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>${msg('Edit')}`
+              : html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>${msg('Preview')}`}
+          </button>
+        </div>
 
         <form class="form" novalidate @submit=${(e: Event) => { e.preventDefault(); void this._save(); }}>
-          <div class="edit-layout">
+          <div class="edit-layout${this._mobilePreview ? ' mobile-preview' : ''}">
             <div class="form-col">
               <segmented-control
                 variant="tabs"

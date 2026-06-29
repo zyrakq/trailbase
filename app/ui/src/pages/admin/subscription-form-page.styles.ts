@@ -54,11 +54,45 @@ export const subscriptionFormPageStyles = css`
 
   /* ── Page title ──────────────────────────────────────────────────── */
 
+  .page-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
   .page-title {
-    margin: 0 0 1.5rem;
+    margin: 0;
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--theme-color-text-primary);
+  }
+
+  .btn-preview-toggle {
+    display: none;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+    background: var(--theme-color-surface);
+    border: 1px solid var(--theme-color-border);
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--theme-color-text-primary);
+    font-size: 0.875rem;
+    font-family: inherit;
+    font-weight: 500;
+    padding: 0.375rem 0.75rem;
+    transition: background-color 0.15s ease;
+  }
+
+  .btn-preview-toggle:hover {
+    background: var(--theme-color-background);
+  }
+
+  .btn-preview-toggle svg {
+    width: 16px;
+    height: 16px;
   }
 
   /* ── Two-column layout ───────────────────────────────────────────── */
@@ -447,6 +481,18 @@ export const subscriptionFormPageStyles = css`
 
     .preview-col {
       position: static;
+    }
+
+    .btn-preview-toggle {
+      display: inline-flex;
+    }
+
+    .edit-layout.mobile-preview .form-col {
+      display: none;
+    }
+
+    .edit-layout:not(.mobile-preview) .preview-col {
+      display: none;
     }
   }
 
