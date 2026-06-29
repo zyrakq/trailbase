@@ -1,5 +1,5 @@
 [workspace]
-members = ["app", "vendor/trailbase/crates/auth-ui", "components/wcauth"]
+members = ["app", "vendor/trailbase/crates/auth-ui", "components/wcauth", "components/onsubscribe/sub-mock"]
 default-members = ["app"]
 exclude = ["vendor/trailbase", "vendor/mailcrab", "vendor/kanidm"]
 resolver = "2"

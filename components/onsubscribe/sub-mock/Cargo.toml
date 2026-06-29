@@ -1,0 +1,13 @@
+[package]
+name = "trailbase-sub-mock-component"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+trailbase-wasm = { workspace = true }
+log = "0.4"

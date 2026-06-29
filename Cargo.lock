@@ -6471,6 +6471,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "trailbase-sub-mock-component"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "trailbase-wasm",
+]
+
+[[package]]
 name = "trailbase-wasi-keyvalue"
 version = "0.1.0"
 dependencies = [
