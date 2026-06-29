@@ -134,14 +134,40 @@ export class AccountMenu extends LitElement {
       <div class="dropdown" @click=${(e: Event) => e.stopPropagation()}>
         ${this._isAuthenticated
           ? html`
-              <button class="dropdown-item" @click=${this._handleProfile}>${msg('Profile')}</button>
+              <button class="dropdown-item" @click=${this._handleProfile}>
+                <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                ${msg('Profile')}
+              </button>
               ${this._isAdmin
-                ? html`<a class="dropdown-item" href="/admin">${msg('Manage subscriptions')}</a>`
+                ? html`<a class="dropdown-item" href="/admin">
+                    <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      <line x1="2" y1="10" x2="22" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    ${msg('Manage subscriptions')}
+                  </a>`
                 : null}
-              <button class="dropdown-item danger" @click=${this._handleSignOut}>${msg('Sign out')}</button>
+              <button class="dropdown-item danger" @click=${this._handleSignOut}>
+                <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <polyline points="16 17 21 12 16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                ${msg('Sign out')}
+              </button>
             `
           : html`
-              <button class="dropdown-item" @click=${this._handleSignIn}>${msg('Sign in')}</button>
+              <button class="dropdown-item" @click=${this._handleSignIn}>
+                <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <polyline points="10 17 15 12 10 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <line x1="15" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                ${msg('Sign in')}
+              </button>
             `}
       </div>
     `;
