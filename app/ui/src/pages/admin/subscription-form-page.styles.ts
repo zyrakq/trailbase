@@ -218,6 +218,13 @@ export const subscriptionFormPageStyles = css`
     align-items: center;
   }
 
+  .period-label-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
   .period-label {
     font-size: 0.9375rem;
     font-weight: 600;
@@ -225,6 +232,22 @@ export const subscriptionFormPageStyles = css`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .subscriber-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    padding: 0 0.3125rem;
+    height: 1.25rem;
+    border-radius: 999px;
+    background: var(--theme-color-warning, #f59e0b);
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
   }
 
   .price-input {
@@ -244,7 +267,8 @@ export const subscriptionFormPageStyles = css`
     letter-spacing: 0.04em;
   }
 
-  .btn-remove-tier {
+  .btn-remove-tier,
+  .btn-archive-tier {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -254,15 +278,27 @@ export const subscriptionFormPageStyles = css`
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    color: var(--theme-color-error, #ef4444);
     transition: background-color 0.15s ease;
+  }
+
+  .btn-remove-tier {
+    color: var(--theme-color-error, #ef4444);
   }
 
   .btn-remove-tier:hover {
     background: rgba(239, 68, 68, 0.1);
   }
 
-  .btn-remove-tier svg {
+  .btn-archive-tier {
+    color: var(--theme-color-warning, #f59e0b);
+  }
+
+  .btn-archive-tier:hover {
+    background: rgba(245, 158, 11, 0.1);
+  }
+
+  .btn-remove-tier svg,
+  .btn-archive-tier svg {
     width: 16px;
     height: 16px;
   }

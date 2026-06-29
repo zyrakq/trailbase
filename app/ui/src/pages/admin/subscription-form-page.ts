@@ -57,6 +57,7 @@ export class SubscriptionFormPage extends LitElement {
   @state() private _logoMode: 'upload' | 'url' = 'upload';
   @state() private _uploading = false;
   @state() private _logoPreviewFailed = false;
+  @state() private _periodCounts: Partial<Record<SubscriptionPeriod, number>> = {};
   // Increments on every local-logo URL change to force a fresh fetch, bypassing
   // the immutable HTTP cache for files that may have been deleted server-side.
   private _logoUrlVersion = 0;
@@ -100,8 +101,16 @@ export class SubscriptionFormPage extends LitElement {
           this._resourceUrl = sub.resource_url;
           this._whatIncluded = sub.what_included ?? '';
           this._terms = sub.terms ?? '';
-          this._pricing = sub.pricing.filter(p => !p.is_archived).map(p => ({ ...p }));
+          const activePricing = sub.pricing.filter(p => !p.is_archived);
+          this._pricing = activePricing.map(p => ({ ...p }));
           if (sub.logo_url) this._logoMode = 'url';
+
+          const counts = await Promise.all(
+            activePricing.map(p => subscriptionsService.getPricingSubscriberCount(p.period, this.subscriptionId))
+          );
+          const periodCounts: Partial<Record<SubscriptionPeriod, number>> = {};
+          activePricing.forEach((p, i) => { periodCounts[p.period] = counts[i] ?? 0; });
+          this._periodCounts = periodCounts;
         }
       } catch {
         notificationService.error(msg('Failed to load subscription.'));
@@ -356,9 +365,15 @@ export class SubscriptionFormPage extends LitElement {
         }}
       ></segmented-control>
       <p class="pricing-empty" ?hidden=${this._pricing.length > 0}>${msg('No pricing tiers. Pick a period above.')}</p>
-      ${repeat(this._pricing, (p) => p.period, (p, i) => html`
+      ${repeat(this._pricing, (p) => p.period, (p, i) => {
+        const periodCount = this._periodCounts[p.period] ?? 0;
+        const hasSubscribers = periodCount > 0;
+        return html`
         <div class="pricing-tier">
-          <span class="period-label">${periodLabels[p.period]}</span>
+          <div class="period-label-wrap">
+            <span class="period-label">${periodLabels[p.period]}</span>
+            ${hasSubscribers ? html`<span class="subscriber-count">${periodCount}</span>` : ''}
+          </div>
           <input
             class="input price-input"
             type="number"
@@ -377,21 +392,37 @@ export class SubscriptionFormPage extends LitElement {
               this._updatePricingTier(i, 'currency', (e.target as HTMLInputElement).value.toUpperCase());
             }}
           />
-          <button
-            type="button"
-            class="btn-remove-tier"
-            title=${msg('Remove')}
-            aria-label=${msg('Remove pricing tier')}
-            @click=${() => this._removePricingTier(i)}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-              <path d="M10 11v6M14 11v6"></path>
-            </svg>
-          </button>
+          ${hasSubscribers ? html`
+            <button
+              type="button"
+              class="btn-archive-tier"
+              title=${msg('Archive period')}
+              aria-label=${msg('Archive pricing period')}
+              @click=${() => this._removePricingTier(i)}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                <rect x="1" y="3" width="22" height="5"></rect>
+                <line x1="10" y1="12" x2="14" y2="12"></line>
+              </svg>
+            </button>
+          ` : html`
+            <button
+              type="button"
+              class="btn-remove-tier"
+              title=${msg('Delete period')}
+              aria-label=${msg('Delete pricing period')}
+              @click=${() => this._removePricingTier(i)}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                <path d="M10 11v6M14 11v6"></path>
+              </svg>
+            </button>
+          `}
         </div>
-      `)}
+      `; })}
     `;
   }
 

@@ -114,6 +114,11 @@ export const adminPageStyles = css`
     color: white;
   }
 
+  .badge.no-pricing {
+    background: var(--theme-color-warning, #f59e0b);
+    color: white;
+  }
+
   .count {
     color: var(--theme-color-text-secondary);
     font-size: 0.875rem;

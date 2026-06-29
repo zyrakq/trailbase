@@ -239,6 +239,7 @@ pub struct SubscriptionDto {
     pub logo_url: String,
     pub resource_url: String,
     pub status: String,
+    pub is_active: bool,
     pub created_at: i64,
     pub updated_at: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -414,6 +415,7 @@ pub async fn catalog_handler(
             what_included: r.get::<Option<String>>(5).ok().flatten(),
             terms: r.get::<Option<String>>(6).ok().flatten(),
             status: r.get::<String>(7).unwrap_or_else(|_| "active".into()),
+            is_active: true,
             created_at: r.get::<i64>(8).unwrap_or(0),
             updated_at: r.get::<i64>(9).unwrap_or(0),
             pricing: period_list,
@@ -529,6 +531,7 @@ pub async fn mine_handler(
             what_included: r.get::<Option<String>>(5).ok().flatten(),
             terms: r.get::<Option<String>>(6).ok().flatten(),
             status: r.get::<String>(7).unwrap_or_else(|_| "active".into()),
+            is_active: true,
             created_at: r.get::<i64>(8).unwrap_or(0),
             updated_at: r.get::<i64>(9).unwrap_or(0),
             pricing,
@@ -911,6 +914,8 @@ pub async fn admin_list_handler(
     for r in sub_rows.iter() {
         let id_bytes: Vec<u8> = r.get::<Vec<u8>>(0).unwrap_or_default();
         let pricing = pricing_by_sub.remove(&id_bytes).unwrap_or_default();
+        let status = r.get::<String>(7).unwrap_or_else(|_| "active".into());
+        let is_active = status == "active" && pricing.iter().any(|p| !p.is_archived);
         subs.push(SubscriptionDto {
             id: blob_to_b64(&id_bytes)?,
             name: r.get::<String>(1).unwrap_or_default(),
@@ -919,7 +924,8 @@ pub async fn admin_list_handler(
             resource_url: r.get::<String>(4).unwrap_or_default(),
             what_included: r.get::<Option<String>>(5).ok().flatten(),
             terms: r.get::<Option<String>>(6).ok().flatten(),
-            status: r.get::<String>(7).unwrap_or_else(|_| "active".into()),
+            status,
+            is_active,
             created_at: r.get::<i64>(8).unwrap_or(0),
             updated_at: r.get::<i64>(9).unwrap_or(0),
             pricing,
@@ -975,6 +981,8 @@ pub async fn get_by_id_handler(
         });
     }
 
+    let status = r.get::<String>(7).unwrap_or_else(|_| "active".into());
+    let is_active = status == "active" && pricing.iter().any(|p| !p.is_archived);
     Ok(Json(SubscriptionDto {
         id: blob_to_b64(&sub_bytes)?,
         name: r.get::<String>(1).unwrap_or_default(),
@@ -983,7 +991,8 @@ pub async fn get_by_id_handler(
         resource_url: r.get::<String>(4).unwrap_or_default(),
         what_included: r.get::<Option<String>>(5).ok().flatten(),
         terms: r.get::<Option<String>>(6).ok().flatten(),
-        status: r.get::<String>(7).unwrap_or_else(|_| "active".into()),
+        status,
+        is_active,
         created_at: r.get::<i64>(8).unwrap_or(0),
         updated_at: r.get::<i64>(9).unwrap_or(0),
         pricing,

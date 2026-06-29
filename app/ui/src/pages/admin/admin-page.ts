@@ -89,15 +89,16 @@ export class AdminPage extends LitElement {
 
   private _renderRow(sub: Subscription): TemplateResult {
     const count = this._counts[sub.id] ?? 0;
-    const isActive = sub.status === 'active';
+    const isActive = sub.is_active;
+    const isNoPricing = sub.status === 'active' && !sub.is_active;
     const hasSubscribers = count > 0;
     return html`
       <div class="row">
         ${this._renderLogo(sub)}
         <div class="name">
           <span>${sub.name}</span>
-          <span class="badge ${sub.status}">
-            ${isActive ? msg('Active') : msg('Archived')}
+          <span class="badge ${isActive ? 'active' : isNoPricing ? 'no-pricing' : 'archived'}">
+            ${isActive ? msg('Active') : isNoPricing ? msg('No pricing') : msg('Archived')}
           </span>
         </div>
         <div class="count">${msg(str`Subscribers: ${count}`)}</div>
@@ -108,7 +109,7 @@ export class AdminPage extends LitElement {
           <button class="btn" @click=${() => { window.location.href = `/admin/subscription/${sub.id}/edit`; }}>
             ${msg('Edit')}
           </button>
-          ${isActive
+          ${sub.status === 'active'
             ? html`<button class="btn" @click=${() => this._archive(sub)}>${msg('Archive')}</button>`
             : html`<button class="btn" @click=${() => this._restore(sub)}>${msg('Restore')}</button>`}
           <button

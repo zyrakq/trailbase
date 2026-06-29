@@ -35,6 +35,7 @@ function mapSubscription(
     logo_url: raw['logo_url'] as string,
     resource_url: raw['resource_url'] as string,
     status: raw['status'] as Subscription['status'],
+    is_active: raw['is_active'] as boolean,
     created_at: secToMs(raw['created_at']),
     updated_at: secToMs(raw['updated_at']),
     what_included: raw['what_included'] as string | undefined,

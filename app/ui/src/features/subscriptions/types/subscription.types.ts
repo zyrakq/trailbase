@@ -20,6 +20,7 @@ export interface Subscription {
   logo_url: string;
   resource_url: string;
   status: SubscriptionStatus;
+  is_active: boolean;
   created_at: number;
   updated_at: number;
   what_included?: string;
