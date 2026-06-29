@@ -81,11 +81,26 @@ export class SubscriptionCard extends LitElement {
   private _renderActions(): TemplateResult {
     const sub = this.subscription;
     const hasActive = this.userSubscription?.status === 'active';
+    const hasActivating = this.userSubscription?.status === 'activating';
+    const hasFailed = this.userSubscription?.status === 'activation_failed';
     const isUserMode = this.mode === 'user';
 
     return html`
       <div class="actions">
-        ${isUserMode && hasActive
+        ${isUserMode && hasActivating
+          ? html`
+            <button
+              class="icon-btn"
+              title=${msg('Activating…')}
+              aria-label=${msg('Activating…')}
+              disabled
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+              </svg>
+            </button>
+          `
+          : isUserMode && hasActive
           ? html`
             <button
               class="icon-btn danger"
@@ -101,7 +116,8 @@ export class SubscriptionCard extends LitElement {
               </svg>
             </button>
           `
-          : html`
+          : !isUserMode || !hasFailed
+          ? html`
             <button
               class="icon-btn primary"
               title=${msg('Subscribe')}
@@ -115,7 +131,8 @@ export class SubscriptionCard extends LitElement {
                 <line x1="8" y1="12" x2="16" y2="12"></line>
               </svg>
             </button>
-          `}
+          `
+          : null}
         ${sub.resource_url
           ? html`
             <button
@@ -153,6 +170,8 @@ export class SubscriptionCard extends LitElement {
     const sub = this.subscription;
     if (!sub) return html``;
     const hasActive = this.userSubscription?.status === 'active';
+    const hasActivating = this.userSubscription?.status === 'activating';
+    const hasFailed = this.userSubscription?.status === 'activation_failed';
     const displayPricing = getDisplayPricing(sub.pricing, this.selectedPeriod);
 
     return html`
@@ -166,6 +185,8 @@ ${sub.logo_url
           <div class="name-row">
             <span class="name">${sub.name}</span>
             ${hasActive ? html`<span class="badge-active">${msg('Active')}</span>` : null}
+            ${hasActivating ? html`<span class="badge-activating">${msg('Activating')}</span>` : null}
+            ${hasFailed ? html`<span class="badge-failed">${msg('Activation failed')}</span>` : null}
           </div>
           ${displayPricing
             ? html`<span class="price-chip">${formatPrice(displayPricing)}</span>`

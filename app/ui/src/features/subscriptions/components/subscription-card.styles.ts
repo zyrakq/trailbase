@@ -78,6 +78,26 @@ export const subscriptionCardStyles = css`
     white-space: nowrap;
   }
 
+  .badge-activating {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--theme-color-warning-subtle, rgba(234, 179, 8, 0.15));
+    color: var(--theme-color-warning, #ca8a04);
+    white-space: nowrap;
+  }
+
+  .badge-failed {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--theme-color-error-subtle, rgba(239, 68, 68, 0.15));
+    color: var(--theme-color-error, #ef4444);
+    white-space: nowrap;
+  }
+
   .price-chip {
     font-size: 0.875rem;
     font-weight: 700;

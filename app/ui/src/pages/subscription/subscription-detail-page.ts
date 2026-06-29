@@ -39,6 +39,7 @@ export class SubscriptionDetailPage extends LitElement {
   @state() private _notFound = false;
   @state() private _cancelling = false;
   @state() private _selectedPeriod: SubscriptionPeriod | null = null;
+  private _activatingPoll: ReturnType<typeof setInterval> | null = null;
 
   async connectedCallback(): Promise<void> {
     super.connectedCallback();
@@ -63,6 +64,38 @@ export class SubscriptionDetailPage extends LitElement {
     } finally {
       this._loading = false;
     }
+
+    this._maybeStartActivatingPoll();
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    if (this._activatingPoll !== null) {
+      clearInterval(this._activatingPoll);
+      this._activatingPoll = null;
+    }
+  }
+
+  private _maybeStartActivatingPoll(): void {
+    if (this._userSubscription?.status !== 'activating') return;
+    if (this._activatingPoll !== null) return;
+
+    this._activatingPoll = setInterval(async () => {
+      if (!this._subscription) return;
+      try {
+        const subs = await subscriptionsService.getUserSubscriptions();
+        const match = subs.find(u => u.subscription_id === this._subscription!.id);
+        if (match) {
+          this._userSubscription = match;
+        }
+        if (match?.status !== 'activating') {
+          clearInterval(this._activatingPoll!);
+          this._activatingPoll = null;
+        }
+      } catch {
+        // Ignore transient errors.
+      }
+    }, 5000);
   }
 
   private _goBack(): void {
@@ -99,6 +132,7 @@ export class SubscriptionDetailPage extends LitElement {
       if (this._subscription) {
         this._userSubscription = subs.find(u => u.subscription_id === this._subscription!.id) ?? null;
       }
+      this._maybeStartActivatingPoll();
     });
   }
 
@@ -128,6 +162,8 @@ export class SubscriptionDetailPage extends LitElement {
     const sub = this._subscription!;
     const hasActive = this._userSubscription?.status === 'active';
     const hasCancelled = this._userSubscription?.status === 'cancelled';
+    const hasActivating = this._userSubscription?.status === 'activating';
+    const hasFailed = this._userSubscription?.status === 'activation_failed';
     const activePricing = sub.pricing.filter(p => !p.is_archived);
     const isAuthenticated = authService.isAuthenticated();
 
@@ -157,6 +193,13 @@ export class SubscriptionDetailPage extends LitElement {
               <h1 class="title">${sub.name}</h1>
               ${sub.status === 'archived' ? html`<span class="badge-archived">${msg('Archived')}</span>` : null}
               ${hasActive ? html`<span class="badge-active">${msg('Active')}</span>` : null}
+              ${hasActivating ? html`
+                <span class="badge-activating">
+                  <span class="badge-spinner" aria-hidden="true"></span>
+                  ${msg('Activating')}
+                </span>
+              ` : nothing}
+              ${hasFailed ? html`<span class="badge-failed">${msg('Activation failed')}</span>` : nothing}
               ${hasCancelled ? html`<span class="badge-cancelled">${msg('Cancelled')}</span>` : nothing}
             </div>
 
@@ -209,11 +252,13 @@ export class SubscriptionDetailPage extends LitElement {
                       ${this._cancelling ? msg('Cancelling…') : msg('Cancel subscription')}
                     </button>
                   `
-                  : html`
-                    <button class="btn-subscribe" @click=${this._openSubscribeModal}>
-                      ${msg('Subscribe')}
-                    </button>
-                  `}
+                  : !hasActivating
+                    ? html`
+                      <button class="btn-subscribe" @click=${this._openSubscribeModal}>
+                        ${msg('Subscribe')}
+                      </button>
+                    `
+                    : nothing}
               </div>
               <confirm-subscribe-modal @subscription-subscribed=${this._handleSubscribed}></confirm-subscribe-modal>
             ` : null}

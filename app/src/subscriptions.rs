@@ -458,8 +458,7 @@ pub async fn mine_handler(
             r#"SELECT DISTINCT subscription_id, period
                FROM user_subscriptions
                WHERE user_id = $1
-                 AND status = 'active'
-                 AND (expires_at IS NULL OR expires_at > unixepoch())"#,
+                 AND status IN ('active', 'activating', 'activation_failed')"#,
             trailbase_sqlite::params![user_bytes.clone()],
         )
         .await
@@ -682,6 +681,23 @@ pub async fn update_subscription_handler(
                 ],
             )?;
 
+            for tier in &pricing_inputs {
+                let has_subscribers = tx
+                    .query_row(
+                        "SELECT 1 FROM user_subscriptions \
+                         WHERE subscription_id = ? AND period = ? \
+                         AND status IN ('active', 'activating', 'activation_failed') \
+                         LIMIT 1",
+                        trailbase_sqlite::params![sub_bytes.clone(), tier.period.clone()],
+                    )?
+                    .is_some();
+                if has_subscribers {
+                    return Err(trailbase_sqlite::Error::Other(
+                        "pricing period has active or pending subscribers".into(),
+                    ));
+                }
+            }
+
             tx.execute(
                 "UPDATE subscription_pricing SET is_archived = 1 WHERE subscription_id = ? AND is_archived = 0",
                 trailbase_sqlite::params![sub_bytes.clone()],
@@ -709,7 +725,9 @@ pub async fn update_subscription_handler(
         .await
         .map_err(|err| {
             let msg = err.to_string();
-            if msg.contains("not found") {
+            if msg.contains("active or pending subscribers") {
+                ApiError::Conflict(msg)
+            } else if msg.contains("not found") {
                 ApiError::NotFound(msg)
             } else {
                 ApiError::Internal(msg)
@@ -803,13 +821,15 @@ pub async fn delete_subscription_handler(
         .transaction(move |mut tx| -> Result<(), trailbase_sqlite::Error> {
             let has_active = tx
                 .query_row(
-                    "SELECT 1 FROM user_subscriptions WHERE subscription_id = ? AND status = 'active'",
+                    "SELECT 1 FROM user_subscriptions \
+                     WHERE subscription_id = ? \
+                     AND status IN ('active', 'activating', 'activation_failed')",
                     trailbase_sqlite::params![sub_bytes.clone()],
                 )?
                 .is_some();
             if has_active {
                 return Err(trailbase_sqlite::Error::Other(
-                    "subscription has active subscribers".into(),
+                    "subscription has active or pending subscribers".into(),
                 ));
             }
 
@@ -827,7 +847,7 @@ pub async fn delete_subscription_handler(
         .await
         .map_err(|err| {
             let msg = err.to_string();
-            if msg.contains("active subscribers") {
+            if msg.contains("active or pending subscribers") {
                 ApiError::Conflict(msg)
             } else if msg.contains("not found") {
                 ApiError::NotFound(msg)
@@ -1098,7 +1118,7 @@ pub async fn subscriber_count_handler(
         Some(period) => {
             conn.read_query_row_get(
                 r#"SELECT COUNT(*) FROM user_subscriptions
-                   WHERE subscription_id = $1 AND status = 'active' AND period = $2"#,
+                   WHERE subscription_id = $1 AND status IN ('active', 'activating') AND period = $2"#,
                 trailbase_sqlite::params![sub_bytes, period.clone()],
                 0,
             )
@@ -1109,7 +1129,7 @@ pub async fn subscriber_count_handler(
         None => {
             conn.read_query_row_get(
                 r#"SELECT COUNT(*) FROM user_subscriptions
-                   WHERE subscription_id = $1 AND status = 'active'"#,
+                   WHERE subscription_id = $1 AND status IN ('active', 'activating')"#,
                 trailbase_sqlite::params![sub_bytes],
                 0,
             )

@@ -143,6 +143,42 @@ export const subscriptionDetailPageStyles = css`
     color: var(--theme-color-error, #ef4444);
   }
 
+  .badge-activating {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--theme-color-warning-subtle, rgba(245, 158, 11, 0.15));
+    color: var(--theme-color-warning, #d97706);
+  }
+
+  .badge-spinner {
+    width: 10px;
+    height: 10px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .badge-failed {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--theme-color-error-subtle, rgba(239, 68, 68, 0.15));
+    color: var(--theme-color-error, #ef4444);
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   .description {
     color: var(--theme-color-text-secondary);
     line-height: 1.6;
