@@ -1,7 +1,7 @@
 [workspace]
 members = ["app", "vendor/trailbase/crates/auth-ui", "components/wcauth"]
 default-members = ["app"]
-exclude = ["vendor/trailbase", "vendor/mailcrab"]
+exclude = ["vendor/trailbase", "vendor/mailcrab", "vendor/kanidm"]
 resolver = "2"
 
 [workspace.dependencies]
