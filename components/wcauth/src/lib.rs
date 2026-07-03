@@ -6,7 +6,7 @@ use trailbase_wasm::http::{
     Html, HttpError, HttpRoute, IntoBody, IntoResponse, Json, Method, Request, Response,
     StatusCode, header, routing,
 };
-use trailbase_wasm::{Guest, export};
+use trailbase_wasm::{Guest, OptionalManifest, export, export_optional};
 
 mod config;
 mod db_kv;
@@ -41,36 +41,34 @@ struct WasmManifest {
 
 struct Endpoints;
 
+impl OptionalManifest for Endpoints {
+    fn get_manifest() -> String {
+        serde_json::to_string(&WasmManifest {
+            display_name: "WcAuth".to_string(),
+            icon: Some(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" \
+                 fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" \
+                 stroke-linecap=\"round\" stroke-linejoin=\"round\">\
+                 <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 \
+                 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 \
+                 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>\
+                 <path d=\"m9 12 2 2 4-4\"/></svg>"
+                    .to_string(),
+            ),
+            config_path: Some("/_/wasm/wcauth/settings".to_string()),
+            description: Some(
+                "Authentication module: login, registration, password reset, \
+                 MFA, and i18n management."
+                    .to_string(),
+            ),
+        })
+        .unwrap_or_default()
+    }
+}
+
 impl Guest for Endpoints {
     fn http_handlers() -> Vec<HttpRoute> {
         return vec![
-            // Manifest — probed by the host at startup to discover the module's
-            // display name, icon, and config link for the admin WASM Modules section.
-            routing::get(
-                "/_/wasm/wcauth/manifest",
-                async |_req: Request| -> Result<Response, HttpError> {
-                    return Ok(Json(WasmManifest {
-                        display_name: "WcAuth".to_string(),
-                        icon: Some(
-                            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" \
-                             fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" \
-                             stroke-linecap=\"round\" stroke-linejoin=\"round\">\
-                             <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 \
-                             18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 \
-                             1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>\
-                             <path d=\"m9 12 2 2 4-4\"/></svg>"
-                                .to_string(),
-                        ),
-                        config_path: Some("/_/wasm/wcauth/settings".to_string()),
-                        description: Some(
-                            "Authentication module: login, registration, password reset, \
-                             MFA, and i18n management."
-                                .to_string(),
-                        ),
-                    })
-                    .into_response());
-                },
-            ),
             // Settings page — HTML wrapper that loads the bundle and mounts
             // <wcauth-settings>. Linked from the admin WASM Modules section
             // via the manifest's config_path. No admin guard on the page itself;
@@ -361,3 +359,4 @@ impl Guest for Endpoints {
 }
 
 export!(Endpoints);
+export_optional!(Endpoints);
