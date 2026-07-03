@@ -26,6 +26,30 @@ pub mod wit {
   });
 }
 
+// Separate generation for the optional `manifest` world. The main `wit` module
+// targets `interfaces` and only emits that world's exports; the `manifest`
+// world's `manifest-endpoint` export lives here. Components opt in via
+// `export_optional!`.
+pub mod manifest_wit {
+  wit_bindgen::generate!({
+      world: "trailbase:component/manifest",
+      path: [
+          "wit/deps-0.2.6/random",
+          "wit/deps-0.2.6/io",
+          "wit/deps-0.2.6/clocks",
+          "wit/deps-0.2.6/filesystem",
+          "wit/deps-0.2.6/sockets",
+          "wit/deps-0.2.6/cli",
+          "wit/deps-0.2.6/http",
+          "wit/keyvalue-0.2.0-draft",
+          "wit/trailbase/database",
+          "wit/trailbase/component",
+      ],
+      pub_export_macro: true,
+      default_bindings_module: "trailbase_wasm::manifest_wit",
+  });
+}
+
 pub mod auth;
 pub mod db;
 pub mod fetch;
@@ -68,6 +92,17 @@ macro_rules! export {
         type _HttpHandlerIdent = ::trailbase_wasm::HttpIncomingHandler<$impl>;
         ::trailbase_wasm::__wasi::http::proxy::export!(
             _HttpHandlerIdent with_types_in ::trailbase_wasm::__wasi);
+    };
+}
+
+/// Opt a component into the optional manifest capability.
+/// Call this in addition to `export!` for components that implement `OptionalManifest`.
+#[macro_export]
+macro_rules! export_optional {
+    ($impl:ident) => {
+        ::trailbase_wasm::assert_impl_all!($impl: ::trailbase_wasm::OptionalManifest);
+        type _ManifestHandlerIdent = ::trailbase_wasm::ManifestHandler<$impl>;
+        ::trailbase_wasm::manifest_wit::export!(_ManifestHandlerIdent);
     };
 }
 
@@ -118,6 +153,26 @@ pub trait Guest {
     return vec![];
   }
 }
+
+/// Optional capability trait. Implement this to expose a manifest via the
+/// `trailbase:component/manifest-endpoint` WIT interface.
+pub trait OptionalManifest {
+  fn get_manifest() -> String;
+}
+
+pub struct ManifestHandler<T: OptionalManifest> {
+  phantom: std::marker::PhantomData<T>,
+}
+
+impl<T: OptionalManifest> crate::manifest_wit::exports::trailbase::component::manifest_endpoint::Guest
+  for ManifestHandler<T>
+{
+  fn get_manifest() -> String {
+    T::get_manifest()
+  }
+}
+
+pub use crate::manifest_wit::exports::trailbase::component::manifest_endpoint::Guest as ManifestEndpointGuest;
 
 pub struct TrailbaseHandler<T: Guest> {
   phantom: std::marker::PhantomData<T>,

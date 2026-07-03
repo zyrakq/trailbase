@@ -11,49 +11,6 @@ pub(crate) use trailbase_wasm_runtime_axum::{
   build_sync_wasm_runtimes_for_components, wasm_runtime_builders,
 };
 
-/// Probe a WASM component's manifest endpoint by calling it directly
-/// through the runtime's HTTP store. Returns the parsed manifest or None
-/// if the component doesn't expose one or the response is invalid.
-pub(crate) async fn probe_manifest(
-  runtime: &Runtime,
-  manifest_path: &str,
-) -> Option<crate::app_state::WasmManifest> {
-  let manifest_uri = format!("http://localhost{manifest_path}");
-
-  let manifest_store = HttpStore::new(runtime).await.ok()?;
-  let context_header = to_header_value(&HttpContext {
-    kind: HttpContextKind::Http,
-    registered_path: manifest_path.to_string(),
-    path_params: vec![],
-    user: None,
-  })
-  .ok()?;
-
-  let probe_req = hyper::Request::builder()
-    .method(hyper::Method::GET)
-    .uri(manifest_uri)
-    .header("__context", context_header)
-    .body(empty())
-    .ok()?;
-
-  let resp = manifest_store.call_incoming_http_handler(probe_req).await.ok()?;
-
-  if resp.status() != hyper::StatusCode::OK {
-    return None;
-  }
-
-  let (_, body) = resp.into_parts();
-  let collected = body.collect().await.ok()?;
-
-  match serde_json::from_slice::<crate::app_state::WasmManifest>(&collected.to_bytes()) {
-    Ok(manifest) => Some(manifest),
-    Err(err) => {
-      warn!("Manifest at '{manifest_path}' returned invalid JSON: {err}");
-      None
-    }
-  }
-}
-
 pub(crate) async fn install_routes_and_jobs(
   state: &AppState,
   runtime: Arc<RwLock<Runtime>>,
@@ -91,16 +48,22 @@ pub(crate) async fn install_routes_and_jobs(
     .unwrap_or("unknown")
     .to_string();
 
-  // Convention: manifest is always at /_/wasm/<file-stem>/manifest.
-  // Components must register their routes under the same prefix as their file name.
-  let manifest_path = format!("/_/wasm/{component_name}/manifest");
-  if let Some(manifest) = probe_manifest(&*runtime.read().await, &manifest_path).await {
-    info!("Registering manifest for WASM component '{component_name}'");
-    state
-      .wasm_manifests()
-      .write()
-      .await
-      .insert(component_name, manifest);
+  if let Some(manifest_json) = init_result.capabilities.manifest {
+    match serde_json::from_str::<crate::app_state::WasmManifest>(&manifest_json) {
+      Ok(manifest) => {
+        info!("Registering manifest for WASM component '{component_name}'");
+        state
+          .wasm_manifests()
+          .write()
+          .await
+          .insert(component_name, manifest);
+      }
+      Err(err) => {
+        warn!("Component '{component_name}' manifest JSON invalid: {err}");
+      }
+    }
+  } else {
+    debug!("Component '{component_name}' has no manifest capability");
   }
 
   for (name, spec) in init_result.job_handlers {

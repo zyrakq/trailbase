@@ -50,3 +50,12 @@ world init {
   @since(version = 0.1.0)
   export sqlite-function-endpoint;
 }
+
+// Standalone world for the optional manifest capability.
+// The host probes for this interface via the raw wasmtime Instance API;
+// it is never listed as an export of `world interfaces`.
+@since(version = 0.1.0)
+world manifest {
+  @since(version = 0.1.0)
+  export manifest-endpoint;
+}

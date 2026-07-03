@@ -1,0 +1,7 @@
+package trailbase:component@0.1.1;
+
+@since(version = 0.1.0)
+interface manifest-endpoint {
+  @since(version = 0.1.0)
+  get-manifest: func() -> string;
+}
