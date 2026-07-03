@@ -4,6 +4,7 @@
 
 pub mod functions;
 mod host;
+mod optional;
 mod sqlite;
 
 use bytes::Bytes;
@@ -27,6 +28,7 @@ use crate::host::exports::trailbase::component::init_endpoint::Arguments;
 
 pub use crate::host::exports::trailbase::component::init_endpoint::HttpMethodType;
 pub use crate::host::{SharedState, State};
+pub use crate::optional::ComponentCapabilities;
 pub use trailbase_wasi_keyvalue::Store as KvStore;
 
 static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);
@@ -160,24 +162,53 @@ impl<T: StoreBuilder<State>> RuntimeT<T> {
     return &self.state.component_path;
   }
 
-  async fn new_bindings(&self) -> Result<(Store<State>, crate::host::Interfaces), Error> {
+  async fn new_bindings(
+    &self,
+  ) -> Result<
+    (
+      Store<State>,
+      crate::host::Interfaces,
+      crate::optional::ComponentCapabilities,
+    ),
+    Error,
+  > {
     let mut store = self.state.store_builder.new_store(&self.state.engine)?;
 
-    let bindings = crate::host::Interfaces::instantiate_async(
-      &mut store,
-      &self.state.component,
-      &self.state.linker,
-    )
-    .await
-    .map_err(|err| {
+    // Split instantiation so we can access the raw Instance for probing.
+    let instance_pre = self
+      .state
+      .linker
+      .instantiate_pre(&self.state.component)
+      .map_err(|err| {
+        log::error!(
+          "Failed to pre-instantiate WIT component {path:?}: '{err}'.\n{ABI_MISMATCH_WARNING}",
+          path = self.state.component_path
+        );
+        return err;
+      })?;
+
+    let instance = instance_pre
+      .instantiate_async(&mut store)
+      .await
+      .map_err(|err| {
+        log::error!(
+          "Failed to instantiate WIT component {path:?}: '{err}'.\n{ABI_MISMATCH_WARNING}",
+          path = self.state.component_path
+        );
+        return err;
+      })?;
+
+    let bindings = crate::host::Interfaces::new(&mut store, &instance).map_err(|err| {
       log::error!(
-        "Failed to instantiate WIT component {path:?}: '{err}'.\n{ABI_MISMATCH_WARNING}",
+        "Failed to load WIT bindings for {path:?}: '{err}'.",
         path = self.state.component_path
       );
       return err;
     })?;
 
-    return Ok((store, bindings));
+    let capabilities = crate::optional::probe_capabilities(&mut store, &instance).await;
+
+    return Ok((store, bindings, capabilities));
   }
 }
 
@@ -191,6 +222,9 @@ pub struct InitResult {
 
   /// Registered jobs (name, spec)[].
   pub job_handlers: Vec<(String, String)>,
+
+  /// Optional capabilities discovered by probing the component instance.
+  pub capabilities: ComponentCapabilities,
 }
 
 impl StoreBuilder<State> for Arc<SharedState> {
@@ -269,7 +303,7 @@ impl HttpStore {
     let state = self.state.clone();
 
     return Self::call(&self.state.runtime_state, async move {
-      let (mut store, bindings) = state.rt.new_bindings().await?;
+      let (mut store, bindings, capabilities) = state.rt.new_bindings().await?;
       let api = bindings.trailbase_component_init_endpoint();
 
       let args = Arguments {
@@ -286,6 +320,7 @@ impl HttpStore {
           return Ok(InitResult {
             http_handlers: http.handlers,
             job_handlers: job.handlers,
+            capabilities,
           });
         })
         .await?
