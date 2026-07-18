@@ -4,7 +4,6 @@
 
 pub mod functions;
 mod host;
-mod optional;
 mod sqlite;
 
 use bytes::Bytes;
@@ -27,7 +26,6 @@ use wasmtime_wasi_http::p2::bindings::http::types::ErrorCode;
 use crate::host::TransactionImpl;
 
 pub use crate::host::{SharedState, State};
-pub use crate::optional::ComponentCapabilities;
 pub use trailbase_wasi_keyvalue::Store as KvStore;
 
 static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);
@@ -163,19 +161,11 @@ impl<T: StoreBuilder<State>> RuntimeT<T> {
     return &self.state.component_path;
   }
 
-  async fn new_bindings(
+async fn new_bindings(
     &self,
-  ) -> Result<
-    (
-      Store<State>,
-      crate::host::Interfaces,
-      crate::optional::ComponentCapabilities,
-    ),
-    Error,
-  > {
+  ) -> Result<(Store<State>, crate::host::Interfaces), Error> {
     let mut store = self.state.store_builder.new_store(&self.state.engine)?;
 
-    // Split instantiation so we can access the raw Instance for probing.
     let instance_pre = self
       .state
       .linker
@@ -207,9 +197,7 @@ impl<T: StoreBuilder<State>> RuntimeT<T> {
       return err;
     })?;
 
-    let capabilities = crate::optional::probe_capabilities(&mut store, &instance).await;
-
-    return Ok((store, bindings, capabilities));
+    return Ok((store, bindings));
   }
 }
 
@@ -293,7 +281,7 @@ impl HttpStore {
     let state = self.state.clone();
 
     return Self::call(&self.state.runtime_state, async move {
-      let (mut store, bindings, capabilities) = state.rt.new_bindings().await?;
+      let (mut store, bindings) = state.rt.new_bindings().await?;
       let api = bindings.trailbase_component_init_endpoint();
 
       let args = serde_json::to_string(&trailbase_wasm_common::manifest::InitArguments {
@@ -301,6 +289,7 @@ impl HttpStore {
         subsystems: Some(vec![
           trailbase_wasm_common::manifest::Subsystem::Http,
           trailbase_wasm_common::manifest::Subsystem::Jobs,
+          trailbase_wasm_common::manifest::Subsystem::Ui,
         ]),
       })?;
 

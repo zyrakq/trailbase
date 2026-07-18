@@ -19,7 +19,7 @@ pub struct SqliteStore {
 
 impl SqliteStore {
   pub async fn new(runtime: &crate::Runtime) -> Result<Self, Error> {
-    let (store, bindings, _capabilities) = runtime.new_bindings().await?;
+    let (store, bindings) = runtime.new_bindings().await?;
     return Ok(Self {
       state: Arc::new(SqliteStoreInternal {
         store: Mutex::new(store),

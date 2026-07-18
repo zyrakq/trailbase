@@ -151,6 +151,7 @@ pub async fn install_routes_and_jobs<S: Clone + Send + Sync + 'static>(
     http_handlers,
     job_handlers,
     sqlite_functions: _,
+    ..
   } = {
     let store = HttpStore::new(&*runtime.read().await).await?;
     store.initialize(InitArgs { version }).await?
