@@ -1,0 +1,836 @@
+use axum::extract::{Json, State};
+use log::*;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use trailbase_schema::sqlite::{Column, QualifiedName, Table};
+use ts_rs::TS;
+
+use crate::admin::AdminError as Error;
+use crate::app_state::AppState;
+use crate::config::proto::hash_config;
+use crate::transaction_recorder::{TransactionLog, TransactionRecorder};
+
+#[derive(Clone, Debug, Deserialize, TS)]
+pub enum AlterTableOperation {
+  RenameTableTo { name: String },
+  AddColumn { column: Column },
+  DropColumn { name: String },
+  AlterColumn { name: String, column: Column },
+  ChangeColumnOrder { names: Vec<String> },
+}
+
+/// Request for altering `TABLE` schema.
+#[derive(Clone, Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct AlterTableRequest {
+  pub source_schema: Table,
+  pub operations: Vec<AlterTableOperation>,
+
+  pub dry_run: Option<bool>,
+}
+
+#[derive(Clone, Debug, Serialize, TS)]
+#[ts(export)]
+pub struct AlterTableResponse {
+  pub sql: String,
+}
+
+/// Admin-only handler for altering `TABLE` schemas.
+///
+/// NOTE: SQLite has very limited alter table support. Thus, we always recreate the table and move
+/// the data over, see https://sqlite.org/lang_altertable.html.
+pub async fn alter_table_handler(
+  State(state): State<AppState>,
+  Json(request): Json<AlterTableRequest>,
+) -> Result<Json<AlterTableResponse>, Error> {
+  if state.demo_mode() {
+    return Err(Error::Precondition("Disallowed in demo".into()));
+  }
+
+  let AlterTableRequest {
+    source_schema: source_table_schema,
+    operations,
+    dry_run,
+  } = request;
+
+  let dry_run = dry_run.unwrap_or(false);
+  let (conn, migration_path) =
+    super::get_conn_and_migration_path(&state, source_table_schema.name.database_schema.clone())?;
+
+  debug!("Alter table:\nsource: {source_table_schema:?}\nops: {operations:?}",);
+
+  if operations.is_empty() {
+    return Ok(Json(AlterTableResponse {
+      sql: "".to_string(),
+    }));
+  }
+
+  // Check that removing columns won't break record API configuration. Note that table renames
+  // will be fixed up automatically later.
+  check_column_removals_invalidating_config(&state, &source_table_schema, &operations)?;
+
+  let TargetSchema {
+    mut ephemeral_table_schema,
+    ephemeral_table_rename,
+    column_mapping,
+  } = build_ephemeral_target_schema(&source_table_schema, operations)?;
+
+  let target_table_name = ephemeral_table_rename
+    .as_ref()
+    .unwrap_or(&ephemeral_table_schema.name)
+    .clone();
+
+  let tx_log = {
+    let unqualified_source_table_name = source_table_schema.name.name.clone();
+    let unqualified_ephemeral_table_rename =
+      ephemeral_table_rename.as_ref().map(|n| n.name.clone());
+
+    let (source_columns, target_columns): (Vec<String>, Vec<String>) =
+      column_mapping.into_iter().unzip();
+
+    // Strip qualification.
+    ephemeral_table_schema.name.database_schema = None;
+
+    conn
+      .transaction(
+        move |tx| -> Result<Option<TransactionLog>, trailbase_sqlite::Error> {
+          let mut tx = TransactionRecorder::new(tx);
+
+          // Defer any foreign key checks until transaction is being committed.
+          // NOTE: This is *not* enough for other references, e.g. VIEWs and INDEXes.
+          // In which case `PRAGMA legacy_alter_table=ON;` (and OFF afterwards) would be needed.
+          tx.execute("PRAGMA defer_foreign_keys = ON", ())?;
+
+          // Create new table
+          let sql = ephemeral_table_schema.create_table_statement();
+          tx.execute(sql.clone(), ()).map_err(|err| {
+            warn!("Failed creating ephemeral table, likely invalid operations: {sql}\n\t{err}");
+            return err;
+          })?;
+
+          // Copy
+          let unqualified_ephemeral_table_name = ephemeral_table_schema.name.name;
+          let insert_data_query = format!(
+            r#"
+            INSERT INTO
+              "{unqualified_ephemeral_table_name}" ({target_columns})
+            SELECT
+              {source_columns}
+            FROM
+              "{unqualified_source_table_name}"
+          "#,
+            source_columns = escape_and_join_column_names(&source_columns),
+            target_columns = escape_and_join_column_names(&target_columns),
+          );
+          tx.execute(insert_data_query, ())?;
+
+          tx.execute(
+            format!("DROP TABLE \"{unqualified_source_table_name}\""),
+            (),
+          )?;
+
+          if let Some(unqualified_target_name) = unqualified_ephemeral_table_rename {
+            // NOTE: w/o the `legacy_alter_table = ON` the following `RENAME TO` would fail, since
+            // `ALTER TABLE` otherwise does a schema consistency-check and realize that any views
+            // referencing this table are no longer valid (even though may be again after the
+            // rename).
+            tx.execute("PRAGMA legacy_alter_table = ON", ())?;
+            tx.execute(
+              format!(
+                "ALTER TABLE \"{unqualified_ephemeral_table_name}\" RENAME TO \"{unqualified_target_name}\""
+              ),
+              (),
+            )?;
+            tx.execute("PRAGMA legacy_alter_table = OFF", ())?;
+          }
+
+          return tx
+            .rollback()
+            .map_err(|err| trailbase_sqlite::Error::Other(err.into()));
+        },
+      )
+      .await?
+  };
+
+  // Take transaction log, write a migration file and apply.
+  if !dry_run && let Some(ref log) = tx_log {
+    let filename = QualifiedName {
+      name: target_table_name.name.clone(),
+      database_schema: None,
+    }
+    .migration_filename("alter_table");
+
+    let report = log
+      .apply_as_migration(&conn, migration_path, &filename)
+      .await?;
+    debug!("Migration report: {report:?}");
+
+    // Fix configuration: update all table references by existing APIs.
+    if source_table_schema.name != target_table_name {
+      let mut config = (*state.get_config()).clone();
+      let old_config_hash = hash_config(&config);
+
+      for api in &mut config.record_apis {
+        if let Some(ref name) = api.table_name
+          && QualifiedName::parse(name)? == source_table_schema.name
+        {
+          if let Some(ref db) = target_table_name.database_schema {
+            api.table_name = Some(format!("{}.{}", db, target_table_name.name));
+          } else {
+            api.table_name = Some(target_table_name.name.clone());
+          }
+        }
+      }
+
+      state
+        .validate_and_update_config(config, Some(old_config_hash))
+        .await?;
+    }
+
+    state.rebuild_connection_metadata().await?;
+  }
+
+  return Ok(Json(AlterTableResponse {
+    sql: tx_log.map(|l| l.build_sql()).unwrap_or_default(),
+  }));
+}
+
+struct TargetSchema {
+  ephemeral_table_schema: Table,
+  ephemeral_table_rename: Option<QualifiedName>,
+  column_mapping: HashMap<String, String>,
+}
+
+// Returns the (ephemeral) target schema + a rename if necessary, i.e. if the ephemeral and the
+// ultimate target schema are not the same.
+fn build_ephemeral_target_schema(
+  source_schema: &Table,
+  operations: Vec<AlterTableOperation>,
+) -> Result<TargetSchema, Error> {
+  // If the table isn't renamed we need to create a new table with an ephemal and name an
+  // subsequently rename.
+  let mut table_renamed = false;
+  let mut schema = source_schema.clone();
+  let mut column_mapping = HashMap::<String, String>::from_iter(
+    source_schema
+      .columns
+      .iter()
+      .map(|c| (c.name.clone(), c.name.clone())),
+  );
+
+  let mut column_order: Option<Vec<String>> = None;
+
+  for operation in operations {
+    match operation {
+      AlterTableOperation::RenameTableTo { name } => {
+        if name != source_schema.name.name {
+          table_renamed = true;
+          schema.name.name = name
+        }
+      }
+      AlterTableOperation::AddColumn { column } => {
+        if column_mapping.contains_key(&column.name) {
+          return Err(Error::BadRequest(
+            format!("Column '{}' already exists", column.name).into(),
+          ));
+        }
+        schema.columns.push(column);
+      }
+      AlterTableOperation::DropColumn { name } => {
+        schema.columns.retain(|c| c.name != name);
+        if column_mapping.remove(&name).is_none() {
+          return Err(Error::BadRequest(format!("Column '{name}' missing").into()));
+        }
+      }
+      AlterTableOperation::AlterColumn {
+        name: source_name,
+        column,
+      } => {
+        let Some(pos) = schema.columns.iter().position(|c| c.name == source_name) else {
+          return Err(Error::BadRequest(
+            format!("Column '{source_name}' missing").into(),
+          ));
+        };
+
+        let target_name = &column.name;
+        if source_name != *target_name {
+          // Column rename.
+          if column_mapping.contains_key(target_name) {
+            return Err(Error::BadRequest(
+              format!("Column '{target_name}' already exists").into(),
+            ));
+          }
+
+          column_mapping.insert(source_name.clone(), target_name.clone());
+        }
+
+        // Update the column definition.
+        schema.columns[pos] = column;
+      }
+      AlterTableOperation::ChangeColumnOrder { names } => {
+        column_order = Some(names);
+      }
+    }
+  }
+
+  if let Some(column_order) = column_order {
+    // Make sure every column has a final position to avoid ambiguity.
+    for col in &schema.columns {
+      let name = &col.name;
+      if !column_order.iter().any(|n| n == name) {
+        return Err(Error::BadRequest(
+          format!("Missing position for: {name}").into(),
+        ));
+      }
+    }
+
+    // Reorder columns in target schema.
+    schema.columns = column_order
+      .into_iter()
+      .map(|name| {
+        return schema
+          .columns
+          .iter()
+          .find(|c| c.name == name)
+          .cloned()
+          .ok_or_else(|| {
+            return Error::BadRequest(format!("Missing col for: {name}").into());
+          });
+      })
+      .collect::<Result<Vec<_>, _>>()?;
+  }
+
+  if table_renamed {
+    return Ok(TargetSchema {
+      ephemeral_table_schema: schema,
+      ephemeral_table_rename: None,
+      column_mapping,
+    });
+  }
+
+  // If the table has not been renamed, the new table first needs an ephemeral name before being
+  // renamed to the original name.
+  schema.name.name = format!("__alter_table_{}", source_schema.name.name);
+
+  return Ok(TargetSchema {
+    ephemeral_table_schema: schema,
+    ephemeral_table_rename: Some(source_schema.name.clone()),
+    column_mapping,
+  });
+}
+
+fn check_column_removals_invalidating_config(
+  state: &AppState,
+  source_schema: &Table,
+  operations: &[AlterTableOperation],
+) -> Result<(), Error> {
+  // Check that removing columns won't break record API configuration.
+  let deleted_columns: Vec<String> = operations
+    .iter()
+    .flat_map(|op| {
+      if let AlterTableOperation::DropColumn { name } = op {
+        return Some(name.clone());
+      }
+      return None;
+    })
+    .collect();
+
+  if deleted_columns.is_empty() {
+    return Ok(());
+  }
+
+  let config = state.get_config();
+  for api in &config.record_apis {
+    let api_name = api.name();
+    let api_table = QualifiedName::parse(api.table_name.as_deref().unwrap_or_default())?;
+    if api_table != source_schema.name {
+      continue;
+    }
+
+    for expanded_column in &api.expand {
+      if deleted_columns.contains(expanded_column) {
+        return Err(Error::BadRequest(
+          format!("Cannot remove column {expanded_column} referenced by API: {api_name}").into(),
+        ));
+      }
+    }
+
+    for excluded_column in &api.excluded_columns {
+      if deleted_columns.contains(excluded_column) {
+        return Err(Error::BadRequest(
+          format!("Cannot remove column {excluded_column} referenced by API: {api_name}").into(),
+        ));
+      }
+    }
+
+    // Check that column is not referenced in rules.
+    for rule in [
+      &api.read_access_rule,
+      &api.create_access_rule,
+      &api.update_access_rule,
+      &api.delete_access_rule,
+      &api.schema_access_rule,
+    ]
+    .into_iter()
+    .flatten()
+    {
+      for deleted_column in &deleted_columns {
+        // NOTE: ideally, we'd parse the rule like in crate::records::record_api::validate_rule.
+        // The current approach would fail if the column name is a keyword used as part of the rule
+        // query. In the meantime, let's error on the side of false positive.
+        const KEYWORDS: &[&str] = &[
+          "select", "in", "where", "as", "and", "or", "is", "null", "coalesce",
+        ];
+        if KEYWORDS.contains(&deleted_column.to_lowercase().as_str()) {
+          continue;
+        }
+
+        if rule.contains(deleted_column) {
+          return Err(Error::BadRequest(
+            format!("Cannot remove column {deleted_column} referenced by access rule: {rule}")
+              .into(),
+          ));
+        }
+      }
+    }
+  }
+
+  return Ok(());
+}
+
+fn escape_and_join_column_names(names: &[String]) -> String {
+  use itertools::Itertools;
+  return names.iter().map(|n| format!("\"{n}\"")).join(", ");
+}
+
+#[cfg(test)]
+mod tests {
+  use axum::extract::{Path, Query, State};
+  use trailbase_schema::parse::{Bump, parse_into_statement};
+  use trailbase_schema::sqlite::{Column, ColumnAffinityType, ColumnDataType, ColumnOption, Table};
+
+  use super::*;
+  use crate::admin::table::{CreateTableRequest, create_table_handler};
+  use crate::app_state::*;
+  use crate::config::proto::{PermissionFlag, RecordApiConfig};
+  use crate::connection::ConnectionEntry;
+  use crate::records::read_record::{ReadRecordQuery, read_record_handler};
+  use crate::records::test_utils::*;
+
+  fn parse_create_table(create_table_sql: &str) -> Table {
+    let allocator = Bump::new();
+    let create_table_statement = parse_into_statement(&allocator, create_table_sql)
+      .unwrap()
+      .unwrap();
+    return (&create_table_statement).try_into().unwrap();
+  }
+
+  #[test]
+  fn test_target_schema_construction() {
+    let source_schema = parse_create_table(
+      "
+        CREATE TABLE test (
+            id    INTEGER PRIMARY KEY,
+            a     TEXT,
+            b     TEXT NOT NULL
+        );
+      ",
+    );
+
+    {
+      // Table rename.
+      let TargetSchema {
+        ephemeral_table_schema,
+        ephemeral_table_rename,
+        column_mapping,
+      } = build_ephemeral_target_schema(
+        &source_schema,
+        vec![AlterTableOperation::RenameTableTo {
+          name: "rename".to_string(),
+        }],
+      )
+      .unwrap();
+
+      assert!(ephemeral_table_rename.is_none());
+      assert_eq!("rename", ephemeral_table_schema.name.name);
+      assert_eq!(3, column_mapping.len());
+
+      for (source, target) in column_mapping {
+        assert_eq!(source, target);
+      }
+    }
+
+    {
+      // Add/drop column
+      let add_column = Column {
+        name: "c".to_string(),
+        type_name: "real".to_string(),
+        data_type: ColumnDataType::Real,
+        affinity_type: ColumnAffinityType::Real,
+        options: vec![],
+      };
+      let TargetSchema {
+        ephemeral_table_schema,
+        ephemeral_table_rename,
+        column_mapping,
+      } = build_ephemeral_target_schema(
+        &source_schema,
+        vec![
+          AlterTableOperation::DropColumn {
+            name: "a".to_string(),
+          },
+          AlterTableOperation::DropColumn {
+            name: "b".to_string(),
+          },
+          AlterTableOperation::AddColumn {
+            column: add_column.clone(),
+          },
+        ],
+      )
+      .unwrap();
+
+      assert_eq!(
+        Some("test"),
+        ephemeral_table_rename.as_ref().map(|qn| qn.name.as_str())
+      );
+      assert!(ephemeral_table_schema.name.name.starts_with("__"));
+      // With "a" and "b" gone, only the id column has a before<->after mapping.
+      assert_eq!(1, column_mapping.len());
+      assert_eq!(Some(&"id".to_string()), column_mapping.get("id"));
+
+      assert_eq!(2, ephemeral_table_schema.columns.len());
+      assert_eq!(add_column, ephemeral_table_schema.columns[1]);
+    }
+
+    {
+      // Alter column
+      let renamed_column = Column {
+        name: "renamed".to_string(),
+        type_name: "TEXT".to_string(),
+        data_type: ColumnDataType::Text,
+        affinity_type: ColumnAffinityType::Text,
+        options: vec![],
+      };
+      let TargetSchema {
+        ephemeral_table_schema,
+        ephemeral_table_rename,
+        column_mapping,
+      } = build_ephemeral_target_schema(
+        &source_schema,
+        vec![AlterTableOperation::AlterColumn {
+          name: "a".to_string(),
+          column: renamed_column.clone(),
+        }],
+      )
+      .unwrap();
+
+      assert_eq!(
+        Some("test"),
+        ephemeral_table_rename.as_ref().map(|qn| qn.name.as_str())
+      );
+      assert!(ephemeral_table_schema.name.name.starts_with("__"));
+      // With "a" and "b" gone, only the id column has a before<->after mapping.
+      assert_eq!(3, column_mapping.len());
+      assert_eq!(Some(&"renamed".to_string()), column_mapping.get("a"));
+
+      assert_eq!(3, ephemeral_table_schema.columns.len());
+      assert_eq!(renamed_column, ephemeral_table_schema.columns[1]);
+    }
+
+    // Rename column to already existing one.
+    assert!(
+      build_ephemeral_target_schema(
+        &source_schema,
+        vec![AlterTableOperation::AlterColumn {
+          name: "a".to_string(),
+          column: Column {
+            name: "b".to_string(),
+            type_name: "text".to_string(),
+            data_type: ColumnDataType::Text,
+            affinity_type: ColumnAffinityType::Text,
+            options: vec![],
+          },
+        }],
+      )
+      .is_err()
+    );
+
+    // Rename column twice.
+    assert!(
+      build_ephemeral_target_schema(
+        &source_schema,
+        vec![
+          AlterTableOperation::AlterColumn {
+            name: "a".to_string(),
+            column: Column {
+              name: "rename1".to_string(),
+              type_name: "text".to_string(),
+              data_type: ColumnDataType::Text,
+              affinity_type: ColumnAffinityType::Text,
+              options: vec![],
+            },
+          },
+          AlterTableOperation::AlterColumn {
+            name: "a".to_string(),
+            column: Column {
+              name: "rename2".to_string(),
+              type_name: "text".to_string(),
+              data_type: ColumnDataType::Text,
+              affinity_type: ColumnAffinityType::Text,
+              options: vec![],
+            },
+          }
+        ],
+      )
+      .is_err()
+    );
+  }
+
+  #[tokio::test]
+  async fn test_alter_table() {
+    if cfg!(feature = "pg-test") {
+      log::warn!("`test_alter_table()` disabled for PG");
+      return;
+    }
+
+    let state = test_state(None).await.unwrap();
+    let conn = state.conn();
+    let pk_col = "my_pk".to_string();
+
+    let create_table_request = CreateTableRequest {
+      schema: Table {
+        name: QualifiedName::parse("foo").unwrap(),
+        strict: true,
+        columns: vec![Column {
+          name: pk_col.clone(),
+          type_name: "blob".to_string(),
+          data_type: ColumnDataType::Blob,
+          affinity_type: ColumnAffinityType::Blob,
+          options: vec![ColumnOption::Unique {
+            is_primary: true,
+            conflict_clause: None,
+          }],
+        }],
+        foreign_keys: vec![],
+        unique: vec![],
+        checks: vec![],
+        virtual_table: false,
+        temporary: false,
+      },
+      dry_run: Some(false),
+    };
+    debug!(
+      "Create Table: {}",
+      create_table_request.schema.create_table_statement()
+    );
+    let _ = create_table_handler(State(state.clone()), Json(create_table_request.clone()))
+      .await
+      .unwrap();
+
+    conn
+      .read_query_rows(format!("SELECT {pk_col} FROM foo"), ())
+      .await
+      .unwrap();
+
+    {
+      // Noop: source and target identical.
+      let alter_table_request = AlterTableRequest {
+        source_schema: create_table_request.schema.clone(),
+        operations: vec![],
+        dry_run: None,
+      };
+
+      let Json(response) =
+        alter_table_handler(State(state.clone()), Json(alter_table_request.clone()))
+          .await
+          .unwrap();
+      assert_eq!(response.sql, "");
+
+      conn
+        .read_query_rows(format!("SELECT {pk_col} FROM foo"), ())
+        .await
+        .unwrap();
+    }
+
+    {
+      // Add column.
+      let alter_table_request = AlterTableRequest {
+        source_schema: create_table_request.schema.clone(),
+        operations: vec![AlterTableOperation::AddColumn {
+          column: Column {
+            name: "new".to_string(),
+            type_name: "text".to_string(),
+            data_type: ColumnDataType::Text,
+            affinity_type: ColumnAffinityType::Text,
+            options: vec![
+              ColumnOption::NotNull,
+              ColumnOption::Default("'default'".to_string()),
+            ],
+          },
+        }],
+        dry_run: None,
+      };
+
+      let Json(response) =
+        alter_table_handler(State(state.clone()), Json(alter_table_request.clone()))
+          .await
+          .unwrap();
+      assert!(response.sql.contains("new"));
+
+      conn
+        .read_query_rows(format!("SELECT {pk_col}, new FROM foo"), ())
+        .await
+        .unwrap();
+    }
+
+    {
+      // Rename table and remove "new" column.
+      let alter_table_request = AlterTableRequest {
+        source_schema: create_table_request.schema.clone(),
+        operations: vec![AlterTableOperation::RenameTableTo {
+          name: "bar".to_string(),
+        }],
+        dry_run: None,
+      };
+
+      let Json(response) =
+        alter_table_handler(State(state.clone()), Json(alter_table_request.clone()))
+          .await
+          .unwrap();
+      assert!(response.sql.contains("bar"));
+
+      assert!(conn.read_query_rows("SELECT * FROM foo", ()).await.is_err());
+      conn
+        .read_query_rows(format!("SELECT {pk_col} FROM bar"), ())
+        .await
+        .unwrap();
+    }
+  }
+
+  #[tokio::test]
+  async fn test_alter_table_updates_apis() {
+    if cfg!(feature = "pg-test") {
+      log::warn!("`test_alter_table_updates_apis()` disabled for PG");
+      return;
+    }
+
+    let state = test_state(None).await.unwrap();
+    let conn = state.conn();
+
+    const TABLE_NAME: &str = "test_table";
+    const API_NAME: &str = "test_api";
+
+    conn
+      .execute_batch(
+        // NOTE: The PK isn't auto-incrementing on PG, that's fine.
+        format!(
+          r#"
+            CREATE TABLE {TABLE_NAME} (
+              id          INTEGER PRIMARY KEY,
+              data        TEXT
+            ) {strict};
+
+            INSERT INTO test_table (id, data) VALUES (1, 'test');
+          "#,
+          strict = strict(conn)
+        ),
+      )
+      .await
+      .unwrap();
+
+    state.rebuild_connection_metadata().await.unwrap();
+
+    add_record_api_config(
+      &state,
+      RecordApiConfig {
+        name: Some(API_NAME.to_string()),
+        table_name: Some(TABLE_NAME.to_string()),
+        acl_world: [PermissionFlag::Create as i32, PermissionFlag::Read as i32].into(),
+        ..Default::default()
+      },
+    )
+    .await
+    .unwrap();
+
+    {
+      let Json(value) = read_record_handler(
+        State(state.clone()),
+        Path((API_NAME.to_string(), "1".to_string())),
+        Query(ReadRecordQuery::default()),
+        None,
+      )
+      .await
+      .unwrap();
+
+      assert_eq!("test", value.get("data").unwrap());
+      assert!(value.get("new").is_none());
+    }
+
+    let ConnectionEntry {
+      metadata,
+      connection: _,
+    } = state.connection_manager().main_entry();
+
+    let table_metadata = metadata
+      .get_table(&QualifiedName {
+        name: TABLE_NAME.to_string(),
+        database_schema: None,
+      })
+      .unwrap();
+
+    // Add column.
+    let alter_table_request = AlterTableRequest {
+      source_schema: table_metadata.schema.clone(),
+      operations: vec![AlterTableOperation::AddColumn {
+        column: Column {
+          name: "new".to_string(),
+          type_name: "text".to_string(),
+          data_type: ColumnDataType::Text,
+          affinity_type: ColumnAffinityType::Text,
+          options: vec![
+            ColumnOption::NotNull,
+            ColumnOption::Default("'default'".to_string()),
+          ],
+        },
+      }],
+      dry_run: None,
+    };
+
+    let Json(response) =
+      alter_table_handler(State(state.clone()), Json(alter_table_request.clone()))
+        .await
+        .unwrap();
+    assert!(response.sql.contains("new"));
+
+    assert_eq!(
+      "default",
+      conn
+        .read_query_row_get::<String>(
+          format!("SELECT new FROM {TABLE_NAME} WHERE id = $1"),
+          (1,),
+          0,
+        )
+        .await
+        .unwrap()
+        .unwrap()
+    );
+
+    {
+      let Json(value) = read_record_handler(
+        State(state.clone()),
+        Path((API_NAME.to_string(), "1".to_string())),
+        Query(ReadRecordQuery::default()),
+        None,
+      )
+      .await
+      .unwrap();
+
+      assert_eq!("test", value.get("data").unwrap());
+      assert_eq!(
+        Some(&serde_json::Value::String("default".to_string())),
+        value.get("new"),
+        "Got: {value:?}"
+      );
+    }
+  }
+}

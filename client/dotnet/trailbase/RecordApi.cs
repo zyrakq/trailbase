@@ -1,0 +1,547 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
+using System.Net.Http.Json;
+using System.Diagnostics.CodeAnalysis;
+
+namespace TrailBase;
+
+/// <summary>Response returned by RecordApi.Create().</summary>
+internal class CreateRecordResponse {
+  /// <summary>Serialized id, could be integer or UUID.</summary>
+  public List<string> ids { get; }
+
+  /// <summary>CreateRecordResponse constructor.</summary>
+  public CreateRecordResponse(List<string> ids) {
+    this.ids = ids;
+  }
+}
+
+/// <summary>Pagination state representation.</summary>
+public class Pagination {
+  /// <summary>Limit of elements per page.</summary>
+  public int? limit { get; }
+  /// <summary>Offset cursor.</summary>
+  public string? cursor { get; }
+  /// <summary>Numeric offset parameter. Prefer cursor when possible.</summary>
+  public int? offset { get; }
+
+  /// <summary>Pagination constructor.</summary>
+  public Pagination(int? limit = null, string? cursor = null, int? offset = null) {
+    this.cursor = cursor;
+    this.limit = limit;
+    this.offset = offset;
+  }
+}
+
+/// <summary>
+/// Representation of ListResponse JSON objects.
+/// </summary>
+// @JsonSerializable(explicitToJson: true)
+public class ListResponse<T> {
+  /// <summary>List cursor for subsequent fetches.</summary>
+  public string? cursor { get; }
+  /// <summary>The total count of record matching the filter. Useful for pagination.</summary>
+  public int? total_count { get; }
+  /// <summary>The actual records.</summary>
+  public List<T> records { get; }
+
+  /// <summary>ListResponse constructor.</summary>
+  [JsonConstructor]
+  public ListResponse(
+      string? cursor = null,
+      int? total_count = null,
+      List<T>? records = null
+  ) {
+    this.cursor = cursor;
+    this.total_count = total_count;
+    this.records = records ?? [];
+  }
+}
+
+/// <summary>Comparison operation for column filters, e.g. col != 'val'.</summary>
+public enum CompareOp {
+  /// <summary>Equal operator: '='.</summary>
+  Equal,
+  /// <summary>Not equal operator: '&lt;&gt;'.</summary>
+  NotEqual,
+  /// <summary>Less than operator: '&lt;'.</summary>
+  LessThan,
+  /// <summary>Less than equal operator: '&lt;='.</summary>
+  LessThanEqual,
+  /// <summary>Greater than operator: '&gt;'.</summary>
+  GreaterThan,
+  /// <summary>Greater than equal operator: '&gt;='.</summary>
+  GreaterThanEqual,
+  /// <summary>Like string operator: 'LIKE'.</summary>
+  Like,
+  /// <summary>Regular expression operator: 'REGEXP'.</summary>
+  Regexp,
+  /// <summary>Geometry within operator: 'ST_Within'.</summary>
+  StWithin,
+  /// <summary>Geometry intersects operator: 'ST_Intersects'.</summary>
+  StIntersects,
+  /// <summary>Geometry contains operator: 'ST_Contains'.</summary>
+  StContains,
+  /// <summary>Is null operator: 'IS NULL'.</summary>
+  IsNull,
+  /// <summary>Is not null operator: 'IS NOT NULL'.</summary>
+  IsNotNull,
+}
+
+/// <summary>Abstract base class for filters.</summary>
+public abstract class FilterBase {
+  /// <summary>Helper function to traverse nested filters and add them to the "queryParams".</summary>
+  internal static void addFiltersToParams(ref Dictionary<string, string> queryParams, String path, FilterBase filter) {
+    String op(CompareOp op) {
+      return op switch {
+        CompareOp.Equal => "$eq",
+        CompareOp.NotEqual => "$eq",
+        CompareOp.LessThan => "$lt",
+        CompareOp.LessThanEqual => "$lte",
+        CompareOp.GreaterThan => "$gt",
+        CompareOp.GreaterThanEqual => "$gte",
+        CompareOp.Like => "$like",
+        CompareOp.Regexp => "$re",
+        CompareOp.StWithin => "@within",
+        CompareOp.StIntersects => "@intersects",
+        CompareOp.StContains => "@contains",
+        CompareOp.IsNull => "$is",
+        CompareOp.IsNotNull => "$is",
+        _ => "??",
+      };
+    }
+
+    switch (filter) {
+      case Filter f:
+        if (f.op != null) {
+          var o = op((CompareOp)f.op);
+          var v = f.op switch {
+            CompareOp.IsNull => "NULL",
+            CompareOp.IsNotNull => "!NULL",
+            _ => f.value,
+          };
+          queryParams.Add($"{path}[{f.column}][{o}]", v);
+        }
+        else {
+          queryParams.Add($"{path}[{f.column}]", f.value);
+        }
+        break;
+      case And f:
+        var i = 0;
+        foreach (var fil in f.filters) {
+          addFiltersToParams(ref queryParams, $"{path}[$and][{i++}]", fil);
+        }
+        break;
+      case Or f:
+        var j = 0;
+        foreach (var fil in f.filters) {
+          addFiltersToParams(ref queryParams, $"{path}[$or][{j++}]", fil);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+/// <summary>Column filters.</summary>
+sealed public class Filter : FilterBase {
+  internal String column;
+  internal CompareOp? op;
+  internal String value;
+
+  /// <summary>Constructs column filter by column name, value and comparison operation</summary>
+  public Filter(String column, String value, CompareOp? op = null) {
+    this.column = column;
+    this.op = op;
+    this.value = value;
+  }
+
+  /// <summary>Filter rows where <paramref name="column"/> IS NULL.</summary>
+  public static Filter IsNull(String column) =>
+    new Filter(column, "NULL", CompareOp.IsNull);
+
+  /// <summary>Filter rows where <paramref name="column"/> IS NOT NULL.</summary>
+  public static Filter IsNotNull(String column) =>
+    new Filter(column, "!NULL", CompareOp.IsNotNull);
+}
+
+/// <summary>Logical "and" for column filters.</summary>
+sealed public class And : FilterBase {
+  internal List<FilterBase> filters;
+
+  /// <summary>Constructs logical "and".</summary>
+  public And(List<FilterBase> filters) {
+    this.filters = filters;
+  }
+}
+
+/// <summary>Logical "or" for column filters.</summary>
+sealed public class Or : FilterBase {
+  internal List<FilterBase> filters;
+
+  /// <summary>Constructs logical "or".</summary>
+  public Or(List<FilterBase> filters) {
+    this.filters = filters;
+  }
+}
+
+/// <summary>Main API to interact with Records.</summary>
+public class RecordApi {
+  static readonly string _recordApi = "api/records/v1";
+  const string DynamicCodeMessage = "Use overload with JsonTypeInfo instead";
+  const string UnreferencedCodeMessage = "Use overload with JsonTypeInfo instead";
+
+  Client client { get; }
+  string name { get; }
+
+  internal RecordApi(Client client, string name) {
+    this.client = client;
+    this.name = name;
+  }
+
+  /// <summary>Read the record with given id.</summary>
+  [RequiresDynamicCode(DynamicCodeMessage)]
+  [RequiresUnreferencedCode(UnreferencedCodeMessage)]
+  public async Task<T?> Read<T>(RecordId id, List<string>? expand = null) {
+    string json = await (await ReadImpl(id, expand)).ReadAsStringAsync();
+    return JsonSerializer.Deserialize<T>(json);
+  }
+  /// <summary>Read the record with given id.</summary>
+  [RequiresDynamicCode(DynamicCodeMessage)]
+  [RequiresUnreferencedCode(UnreferencedCodeMessage)]
+  public async Task<T?> Read<T>(string id, List<string>? expand = null) => await Read<T>(new UuidRecordId(id), expand);
+  /// <summary>Read the record with given id.</summary>
+  [RequiresDynamicCode(DynamicCodeMessage)]
+  [RequiresUnreferencedCode(UnreferencedCodeMessage)]
+  public async Task<T?> Read<T>(long id, List<string>? expand = null) => await Read<T>(new IntegerRecordId(id), expand);
+
+  /// <summary>Read the record with given id.</summary>
+  public async Task<T?> Read<T>(RecordId id, JsonTypeInfo<T> jsonTypeInfo, List<string>? expand = null) {
+    string json = await (await ReadImpl(id, expand)).ReadAsStringAsync();
+    return JsonSerializer.Deserialize<T>(json, jsonTypeInfo);
+  }
+  /// <summary>Read the record with given id.</summary>
+  public async Task<T?> Read<T>(string id, JsonTypeInfo<T> jsonTypeInfo, List<string>? expand = null)
+    => await Read<T>(new UuidRecordId(id), jsonTypeInfo, expand);
+  /// <summary>Read the record with given id.</summary>
+  public async Task<T?> Read<T>(long id, JsonTypeInfo<T> jsonTypeInfo, List<string>? expand = null)
+    => await Read<T>(new IntegerRecordId(id), jsonTypeInfo, expand);
+
+  private async Task<HttpContent> ReadImpl(
+    RecordId id,
+    List<string>? expand
+  ) {
+    var queryParams = expand != null ?
+      new Dictionary<string, string>() {
+        ["expand"] = String.Join(",", expand.ToArray())
+      } : null;
+
+    var response = await client.Fetch(
+      $"{RecordApi._recordApi}/{name}/{id}",
+      HttpMethod.Get,
+      null,
+      queryParams
+    );
+    return response.Content;
+  }
+
+  /// <summary>Create a new record with the given value.</summary>
+  [RequiresDynamicCode(DynamicCodeMessage)]
+  [RequiresUnreferencedCode(UnreferencedCodeMessage)]
+  public async Task<RecordId> Create<T>(T record) {
+    var options = new JsonSerializerOptions {
+      DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+    var recordJson = JsonContent.Create(record, typeof(T), default, options);
+    return (await CreateImpl(recordJson))[0];
+  }
+
+  /// <summary>Create a new record with the given value.</summary>
+  public async Task<RecordId> Create<T>(T record, JsonTypeInfo<T> jsonTypeInfo) {
+    var recordJson = JsonContent.Create(record, jsonTypeInfo, default);
+    return (await CreateImpl(recordJson))[0];
+  }
+
+  /// <summary>Creates new record create operation.</summary>
+  [RequiresDynamicCode(DynamicCodeMessage)]
+  [RequiresUnreferencedCode(UnreferencedCodeMessage)]
+  public Operation CreateOp<T>(T record) {
+    var options = new JsonSerializerOptions {
+      DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+    return new CreateOperation(name, value: JsonSerializer.SerializeToNode(record, options)!);
+  }
+
+  /// <summary>Creates new record create operation.</summary>
+  public Operation CreateOp<T>(T record, JsonTypeInfo<T> jsonTypeInfo) {
+    return new CreateOperation(name, value: JsonSerializer.SerializeToNode(record, jsonTypeInfo)!);
+  }
+
+  /// <summary>Create new records in bulk with the given values.</summary>
+  [RequiresDynamicCode(DynamicCodeMessage)]
+  [RequiresUnreferencedCode(UnreferencedCodeMessage)]
+  public async Task<List<RecordId>> CreateBulk<T>(List<T> record) {
+    var options = new JsonSerializerOptions {
+      DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+    var recordJson = JsonContent.Create(record, typeof(List<T>), default, options);
+    return await CreateImpl(recordJson);
+  }
+
+  /// <summary>Create new records in bulk with the given values.</summary>
+  public async Task<List<RecordId>> CreateBulk<T>(List<T> record, JsonTypeInfo<T> jsonTypeInfo) {
+    var recordJson = JsonContent.Create(record, jsonTypeInfo, default);
+    return await CreateImpl(recordJson);
+  }
+
+  private async Task<List<RecordId>> CreateImpl(HttpContent recordJson) {
+    var response = await client.Fetch(
+      $"{RecordApi._recordApi}/{name}",
+      HttpMethod.Post,
+      recordJson,
+      null
+    );
+
+    string json = await response.Content.ReadAsStringAsync();
+    var createResponse = JsonSerializer.Deserialize<CreateRecordResponse>(
+        json,
+        SerializeResponseRecordIdContext.Default.CreateRecordResponse
+    )!;
+
+    return createResponse.ids.ConvertAll(id => RecordId.Parse(id));
+  }
+
+  /// <summary>
+  /// List records.
+  /// </summary>
+  /// <param name="pagination">Pagination state.</param>
+  /// <param name="order">Sort results by the given columns in ascending/descending order, e.g. "-col_name".</param>
+  /// <param name="filters">Results filters, e.g. "col0[gte]=100".</param>
+  /// <param name="expand">Foreign key column names to be expanded.</param>
+  /// <param name="count">Fetch total number of records.</param>
+  [RequiresDynamicCode(DynamicCodeMessage)]
+  [RequiresUnreferencedCode(UnreferencedCodeMessage)]
+  public async Task<ListResponse<T>> List<T>(
+    Pagination? pagination = null,
+    List<string>? order = null,
+    List<FilterBase>? filters = null,
+    List<string>? expand = null,
+    bool count = false
+  ) {
+    string json = await (await ListImpl(pagination, order, filters, expand, count)).ReadAsStringAsync();
+    return JsonSerializer.Deserialize<ListResponse<T>>(json) ?? new ListResponse<T>();
+  }
+
+  /// <summary>
+  /// List records.
+  /// </summary>
+  /// <param name="jsonTypeInfo">Serialization type info for AOT mode.</param>
+  /// <param name="pagination">Pagination state.</param>
+  /// <param name="order">Sort results by the given columns in ascending/descending order, e.g. "-col_name".</param>
+  /// <param name="filters">Results filters, e.g. "col0[gte]=100".</param>
+  /// <param name="expand">Foreign key column names to be expanded.</param>
+  /// <param name="count">Fetch total number of records.</param>
+  public async Task<ListResponse<T>> List<T>(
+    JsonTypeInfo<ListResponse<T>> jsonTypeInfo,
+    Pagination? pagination = null,
+    List<string>? order = null,
+    List<FilterBase>? filters = null,
+    List<string>? expand = null,
+    bool count = false
+  ) {
+    string json = await (await ListImpl(pagination, order, filters, expand, count)).ReadAsStringAsync();
+    return JsonSerializer.Deserialize<ListResponse<T>>(json, jsonTypeInfo) ?? new ListResponse<T>();
+  }
+
+  /// <summary>
+  /// List records.
+  /// </summary>
+  /// <param name="pagination">Pagination state.</param>
+  /// <param name="order">Sort results by the given columns in ascending/descending order, e.g. "-col_name".</param>
+  /// <param name="filters">Results filters, e.g. "col0[gte]=100".</param>
+  /// <param name="expand">Foreign key column names to be expanded.</param>
+  /// <param name="count">Fetch total number of records.</param>
+  public async Task<ListResponse<JsonObject>> List(
+    Pagination? pagination = null,
+    List<string>? order = null,
+    List<FilterBase>? filters = null,
+    List<string>? expand = null,
+    bool count = false
+  ) {
+    string json = await (await ListImpl(pagination, order, filters, expand, count)).ReadAsStringAsync();
+    return JsonSerializer.Deserialize<ListResponse<JsonObject>>(
+        json, SerializeResponseRecordIdContext.Default.ListResponseJsonObject) ?? new ListResponse<JsonObject>();
+  }
+
+  private async Task<HttpContent> ListImpl(
+    Pagination? pagination,
+    List<string>? order,
+    List<FilterBase>? filters,
+    List<string>? expand,
+    bool count
+  ) {
+    var param = new Dictionary<string, string>();
+    if (pagination != null) {
+      var cursor = pagination.cursor;
+      if (cursor != null) {
+        param.Add("cursor", cursor);
+      }
+
+      var limit = pagination.limit;
+      if (limit != null) {
+        param.Add("limit", $"{limit}");
+      }
+
+      var offset = pagination.offset;
+      if (offset != null) {
+        param.Add("offset", $"{offset}");
+      }
+    }
+
+    if (order != null) {
+      param.Add("order", String.Join(",", order.ToArray()));
+    }
+
+    if (count) {
+      param.Add("count", "true");
+    }
+
+    if (expand != null) {
+      param.Add("expand", String.Join(",", expand.ToArray()));
+    }
+
+    foreach (var filter in filters ?? []) {
+      FilterBase.addFiltersToParams(ref param, "filter", filter);
+    }
+
+    var response = await client.Fetch(
+      $"{RecordApi._recordApi}/{name}",
+      HttpMethod.Get,
+      null,
+      param
+    );
+
+    return response.Content;
+  }
+
+  /// <summary>Update record with the given id with the given values.</summary>
+  [RequiresDynamicCode(DynamicCodeMessage)]
+  [RequiresUnreferencedCode(UnreferencedCodeMessage)]
+  public async Task Update<T>(
+    RecordId id,
+    T record
+  ) {
+    var options = new JsonSerializerOptions {
+      DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+    var recordJson = JsonContent.Create(record, typeof(T), default, options);
+    await UpdateImpl(id, recordJson);
+  }
+
+  /// <summary>Update record with the given id with the given values.</summary>
+  public async Task Update<T>(
+    RecordId id,
+    T record,
+    JsonTypeInfo<T> jsonTypeInfo
+  ) {
+    var recordJson = JsonContent.Create(record, jsonTypeInfo, default);
+    await UpdateImpl(id, recordJson);
+  }
+
+  /// <summary>Creates new record update operation.</summary>
+  [RequiresDynamicCode(DynamicCodeMessage)]
+  [RequiresUnreferencedCode(UnreferencedCodeMessage)]
+  public Operation UpdateOp<T>(RecordId id, T record) {
+    var options = new JsonSerializerOptions {
+      DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+    return new UpdateOperation(name, id.ToString(), value: JsonSerializer.SerializeToNode(record, options)!);
+  }
+
+  /// <summary>Creates new record update operation.</summary>
+  public Operation UpdateOp<T>(RecordId id, T record, JsonTypeInfo<T> jsonTypeInfo) {
+    return new UpdateOperation(name, id.ToString(), value: JsonSerializer.SerializeToNode(record, jsonTypeInfo)!);
+  }
+
+  private async Task UpdateImpl(
+    RecordId id,
+    HttpContent recordJson
+  ) {
+    await client.Fetch(
+      $"{RecordApi._recordApi}/{name}/{id}",
+      HttpMethod.Patch,
+      recordJson,
+      null
+    );
+  }
+
+  /// <summary>Delete record with the given id.</summary>
+  public async Task Delete(RecordId id) {
+    var response = await client.Fetch(
+      $"{RecordApi._recordApi}/{name}/{id}",
+      HttpMethod.Delete,
+      null,
+      null
+    );
+  }
+
+  /// <summary>Creates new record delete operation.</summary>
+  public Operation DeleteOp(RecordId id) {
+    return new DeleteOperation(name, id.ToString());
+  }
+
+  /// <summary>Listen for changes to record with given id.</summary>
+  public async Task<IAsyncEnumerable<Event>> Subscribe(RecordId id) {
+    var response = await SubscribeImpl(id.ToString()!);
+    return StreamToEnumerableImpl(await response.ReadAsStreamAsync());
+  }
+
+  /// <summary>Listen for all accessible changes to this Record API.</summary>
+  public async Task<IAsyncEnumerable<Event>> SubscribeAll(List<FilterBase>? filters = null) {
+    var response = await SubscribeImpl("*", filters);
+    return StreamToEnumerableImpl(await response.ReadAsStreamAsync());
+  }
+
+  private async Task<HttpContent> SubscribeImpl(string id, List<FilterBase>? filters = null) {
+    Dictionary<string, string>? queryParams = null;
+    if (filters != null) {
+      queryParams = new Dictionary<string, string>();
+      foreach (var filter in filters ?? []) {
+        FilterBase.addFiltersToParams(ref queryParams, "filter", filter);
+      }
+    }
+
+    var response = await client.Fetch(
+      $"{RecordApi._recordApi}/{name}/subscribe/{id}",
+      HttpMethod.Get,
+      null,
+      queryParams,
+      HttpCompletionOption.ResponseHeadersRead
+    );
+
+    return response.Content;
+  }
+
+  private static async IAsyncEnumerable<Event> StreamToEnumerableImpl(Stream stream) {
+    using (var streamReader = new StreamReader(stream)) {
+      string? message;
+      while ((message = await streamReader.ReadLineAsync()) is not null) {
+        if (message != null) {
+          message.Trim();
+          if (message.StartsWith("data: ")) {
+            yield return Event.Parse(message.Substring(6));
+          }
+        }
+      }
+    }
+  }
+}
+
+[JsonSourceGenerationOptions(WriteIndented = true)]
+[JsonSerializable(typeof(CreateRecordResponse))]
+[JsonSerializable(typeof(ListResponse<JsonObject>))]
+internal partial class SerializeResponseRecordIdContext : JsonSerializerContext {
+}

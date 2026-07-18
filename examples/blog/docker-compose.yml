@@ -1,0 +1,21 @@
+services:
+
+  blog:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ./traildepot:/app/traildepot
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/data:/data
+      - ./caddy/config:/config

@@ -1,0 +1,799 @@
+package io.trailbase.client
+
+import io.ktor.client.*
+import io.ktor.client.call.body
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.sse.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlin.io.encoding.Base64
+import kotlin.time.Clock
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
+
+@Serializable data class User(val id: String, val email: String?, val username: String?)
+
+@Serializable
+data class Tokens(
+        val auth_token: String,
+        val refresh_token: String? = null,
+        val csrf_token: String? = null
+)
+
+@Serializable data class MultiFactorAuthToken(val mfa_token: String)
+
+@Serializable
+data class JwtTokenClaims(
+        val sub: String,
+        val iat: Long,
+        val exp: Long,
+        val email: String?,
+        val username: String?,
+        val csrf_token: String
+)
+
+@Serializable
+sealed class ChangeEvent {
+  public class Update(val seq: Long?, val obj: JsonObject) : ChangeEvent()
+  public class Insert(val seq: Long?, val obj: JsonObject) : ChangeEvent()
+  public class Delete(val seq: Long?, val obj: JsonObject) : ChangeEvent()
+
+  public enum class ErrorStatus(val id: Long) {
+    UNKNOWN(0),
+    FORBIDDEN(1),
+    LOSS(2);
+
+    companion object {
+      private val byId: Map<Long, ErrorStatus> = entries.associateBy { it.id }
+
+      fun fromId(id: Long?): ErrorStatus = byId[id ?: 0] ?: UNKNOWN
+    }
+  }
+  public class Error(val seq: Long?, val status: ErrorStatus, val message: String?) : ChangeEvent()
+
+  companion object {
+    fun parse(msg: String): ChangeEvent? {
+      val obj: JsonObject = jsonSerializer.decodeFromString(msg)
+      val seq: Long? = obj.get("seq")?.jsonPrimitive?.longOrNull
+
+      val update = obj.get("Update")
+      if (update != null) {
+        return ChangeEvent.Update(seq, update.jsonObject)
+      }
+      val insert = obj.get("Insert")
+      if (insert != null) {
+        return ChangeEvent.Insert(seq, insert.jsonObject)
+      }
+      val delete = obj.get("Delete")
+      if (delete != null) {
+        return ChangeEvent.Delete(seq, delete.jsonObject)
+      }
+      val error = obj.get("Error")
+      if (error != null) {
+        val errObj = error.jsonObject
+        return ChangeEvent.Error(
+                seq,
+                ErrorStatus.fromId(errObj.get("status")?.jsonPrimitive?.longOrNull),
+                errObj.get("message")?.jsonPrimitive?.contentOrNull,
+        )
+      }
+
+      return null
+    }
+  }
+}
+
+@Serializable
+sealed class Operation {
+  public class Create(val apiName: String, val value: JsonObject) : Operation()
+  public class Update(val apiName: String, val id: RecordId, val value: JsonObject) : Operation()
+  public class Delete(val apiName: String, val id: RecordId) : Operation()
+
+  companion object {
+    fun toJson(op: Operation): JsonObject {
+      return when (op) {
+        is Create -> {
+          buildJsonObject {
+            put(
+                    "Create",
+                    buildJsonObject {
+                      put("api_name", op.apiName)
+                      put("value", op.value)
+                    }
+            )
+          }
+        }
+        is Update -> {
+          buildJsonObject {
+            put(
+                    "Update",
+                    buildJsonObject {
+                      put("api_name", op.apiName)
+                      put("record_id", op.id.id())
+                      put("value", op.value)
+                    }
+            )
+          }
+        }
+        is Delete -> {
+          buildJsonObject {
+            put(
+                    "Delete",
+                    buildJsonObject {
+                      put("api_name", op.apiName)
+                      put("record_id", op.id.id())
+                    }
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+@Serializable
+sealed class OperationResult {
+  public class Id(val id: RecordId) : OperationResult()
+  public class Error(val message: String) : OperationResult()
+
+  companion object {
+    fun fromJson(obj: JsonObject): OperationResult {
+      val error = obj.get("Error")
+      if (error != null) {
+        return OperationResult.Error(error.jsonPrimitive.content)
+      }
+      val id = obj.get("Id")
+      if (id != null) {
+        return OperationResult.Id(RecordId.parse(id.jsonPrimitive.content))
+      }
+
+      throw Exception("Invalid OperationResult")
+    }
+  }
+}
+
+class TokenState(val state: Pair<Tokens, JwtTokenClaims>?, val headers: Map<String, List<String>>) {
+  companion object {
+    fun build(tokens: Tokens?): TokenState {
+      return TokenState(
+              if (tokens != null) Pair(tokens, decodeJwtTokenClaims(tokens.auth_token)) else null,
+              buildHeaders(tokens)
+      )
+    }
+  }
+
+  fun user(): User? {
+    val jwt = state?.second
+    return if (jwt != null) User(jwt.sub, jwt.email, jwt.username) else null
+  }
+
+  @OptIn(kotlin.time.ExperimentalTime::class)
+  internal fun shouldRefresh(): String? {
+    if (state != null) {
+      val now = Clock.System.now().toEpochMilliseconds() / 1000
+      if (state.second.exp - 60 < now) {
+        return state.first.refresh_token
+      }
+    }
+    return null
+  }
+}
+
+sealed class RecordId {
+  abstract fun id(): String
+
+  companion object {
+    fun uuid(id: String): RecordId {
+      return StringRecordId(id)
+    }
+
+    fun string(id: String): RecordId {
+      return StringRecordId(id)
+    }
+
+    fun int(id: Int): RecordId {
+      return IntegerRecordId(id)
+    }
+
+    fun parse(id: String): RecordId {
+      val i = id.toIntOrNull()
+      return if (i != null) IntegerRecordId(i) else StringRecordId(id)
+    }
+  }
+
+  override fun equals(other: Any?): Boolean {
+    return other is RecordId && id() == other.id()
+  }
+
+  override fun toString(): String {
+    return id()
+  }
+}
+
+class StringRecordId(private val id: String) : RecordId() {
+  override fun id(): String {
+    return id
+  }
+}
+
+class IntegerRecordId(private val id: Int) : RecordId() {
+  override fun id(): String {
+    return id.toString()
+  }
+}
+
+@Serializable private data class ResponseRecordIds(val ids: List<String>)
+
+@Serializable
+data class ListResponse<T>(
+        val records: List<T>,
+        val cursor: String? = null,
+        val total_count: Int? = null
+)
+
+class Pagination(val cursor: String? = null, val limit: Int? = null, val offset: Int? = null) {}
+
+enum class CompareOp {
+  equal,
+  notEqual,
+  lessThan,
+  lessThanEqual,
+  greaterThan,
+  greaterThanEqual,
+  like,
+  regexp,
+  stWithin,
+  stIntersects,
+  stContains,
+  isNull,
+  isNotNull,
+}
+
+private fun opToString(op: CompareOp): String {
+  return when (op) {
+    CompareOp.equal -> "\$eq"
+    CompareOp.notEqual -> "\$ne"
+    CompareOp.lessThan -> "\$lt"
+    CompareOp.lessThanEqual -> "\$lte"
+    CompareOp.greaterThan -> "\$gt"
+    CompareOp.greaterThanEqual -> "\$gte"
+    CompareOp.like -> "\$like"
+    CompareOp.regexp -> "\$re"
+    CompareOp.stWithin -> "@within"
+    CompareOp.stIntersects -> "@intersects"
+    CompareOp.stContains -> "@contains"
+    CompareOp.isNull -> "\$is"
+    CompareOp.isNotNull -> "\$is"
+  }
+}
+
+sealed class FilterBase {}
+
+class Filter(val column: String, val value: String, val op: CompareOp? = null) : FilterBase() {
+  companion object {
+    ///  Filter rows where [column] IS NULL. Wire: `filter[<column>][$is]=NULL`.
+    fun isNull(column: String): Filter =
+            Filter(column = column, value = "NULL", op = CompareOp.isNull)
+
+    /// Filter rows where [column] IS NOT NULL. Wire: `filter[<column>][$is]=!NULL`.
+    fun isNotNull(column: String): Filter =
+            Filter(column = column, value = "!NULL", op = CompareOp.isNotNull)
+  }
+}
+
+class And(val filters: List<FilterBase>) : FilterBase() {}
+
+class Or(val filters: List<FilterBase>) : FilterBase() {}
+
+class RecordApi(val name: String, val client: Client) {
+  suspend inline fun <reified T> read(id: RecordId, expand: List<String>? = null): T {
+    return client.fetch(
+                    "${RECORD_API}/${name}/${id.id()}",
+                    params =
+                            if (expand != null) mapOf(Pair("expand", expand.joinToString(",")))
+                            else null
+            )
+            .body()
+  }
+
+  suspend inline fun <reified T> list(
+          pagination: Pagination? = null,
+          order: List<String>? = null,
+          filters: List<FilterBase>? = null,
+          count: Boolean = false,
+          expand: List<String>? = null,
+  ): ListResponse<T> {
+    val params: MutableMap<String, String> = mutableMapOf()
+    if (pagination != null) {
+      val cursor = pagination.cursor
+      if (cursor != null) params["cursor"] = cursor
+
+      val limit = pagination.limit
+      if (limit != null) params["limit"] = limit.toString()
+
+      val offset = pagination.offset
+      if (offset != null) params["offset"] = offset.toString()
+    }
+    if (order != null) {
+      params["order"] = order.joinToString(",")
+    }
+    if (count) {
+      params["count"] = "true"
+    }
+    if (expand != null) {
+      params["expand"] = expand.joinToString(",")
+    }
+
+    filters?.forEach { addFiltersToParams(params, "filter", it) }
+
+    return client.fetch("${RECORD_API}/${name}", params = params).body()
+  }
+
+  suspend fun <T> create(record: T): RecordId {
+    val response = client.fetch("${RECORD_API}/${name}", Method.post, record)
+    val ids: ResponseRecordIds = response.body()
+    return RecordId.parse(ids.ids[0])
+  }
+
+  inline fun <reified T> createOp(record: T): Operation {
+    return Operation.Create(name, jsonSerializer.encodeToJsonElement(record).jsonObject)
+  }
+
+  suspend fun <T> update(id: RecordId, record: T) {
+    client.fetch("${RECORD_API}/${name}/${id.id()}", Method.patch, record)
+  }
+
+  inline fun <reified T> updateOp(id: RecordId, record: T): Operation {
+    return Operation.Update(name, id, jsonSerializer.encodeToJsonElement(record).jsonObject)
+  }
+
+  suspend fun delete(id: RecordId) {
+    client.fetch("${RECORD_API}/${name}/${id.id()}", Method.delete)
+  }
+
+  fun deleteOp(id: RecordId): Operation {
+    return Operation.Delete(name, id)
+  }
+
+  suspend inline fun <reified T> subscribe(id: RecordId): Flow<ChangeEvent> {
+    val path = "${RECORD_API}/${name}/subscribe/${id.id()}"
+
+    // NOTE: We should probably push this into a Client.sse.
+    val tokenState = TokenState.build(client.tokens())
+
+    val session = client.transport.sse(path, Method.get, tokenState.headers)
+
+    // Check HTTP status before processing SSE events
+    if (!session.call.response.status.isSuccess()) {
+      throw Exception("Stream connection failed: ${session.call.response.status}")
+    }
+
+    return flow {
+      session.incoming.collect { ev ->
+        // event.data?.takeIf { predicate }(predicate)
+        val data = ev.data
+        if (data != null) {
+          val event = ChangeEvent.parse(data)
+          if (event != null) {
+            emit(event)
+          }
+        }
+      }
+    }
+  }
+}
+
+enum class Method {
+  get,
+  post,
+  patch,
+  delete,
+}
+
+class HttpException(val status: Int, message: String?) : Throwable(message) {
+  override fun toString(): String {
+    return "HttpException(status='$status', message='$message')"
+  }
+}
+
+abstract class Transport {
+  abstract suspend fun fetch(
+          path: String,
+          method: Method = Method.get,
+          headers: Map<String, List<String>>? = null,
+          params: Map<String, String>? = null,
+          body: Any? = null,
+  ): HttpResponse
+
+  abstract suspend fun sse(
+          path: String,
+          method: Method = Method.get,
+          headers: Map<String, List<String>>? = null,
+          params: Map<String, String>? = null,
+  ): ClientSSESession
+}
+
+class DefaultTransport(private val base: Url, public val http: HttpClient = initClient()) :
+        Transport() {
+
+  override suspend fun fetch(
+          path: String,
+          method: Method,
+          headers: Map<String, List<String>>?,
+          params: Map<String, String>?,
+          body: Any?,
+  ): HttpResponse {
+    if (path.startsWith("/")) {
+      throw Exception("path start with '/': ${path}")
+    }
+
+    val response =
+            http.request(base) {
+              this.method =
+                      when (method) {
+                        Method.get -> HttpMethod.Get
+                        Method.post -> HttpMethod.Post
+                        Method.patch -> HttpMethod.Patch
+                        Method.delete -> HttpMethod.Delete
+                      }
+              url {
+                path(path)
+                if (params != null) {
+                  for ((k, v) in params) {
+                    parameters.append(k, v)
+                  }
+                }
+              }
+              headers { headers?.forEach { appendAll(it.key, it.value) } }
+              contentType(ContentType.Application.Json)
+              setBody(body)
+            }
+
+    return response
+  }
+
+  override suspend fun sse(
+          path: String,
+          method: Method,
+          headers: Map<String, List<String>>?,
+          params: Map<String, String>?,
+  ): ClientSSESession {
+    if (path.startsWith("/")) {
+      throw Exception("path start with '/': ${path}")
+    }
+
+    return http.sseSession(
+            urlString = base.toString(),
+            block = {
+              this.method =
+                      when (method) {
+                        Method.get -> HttpMethod.Get
+                        Method.post -> HttpMethod.Post
+                        Method.patch -> HttpMethod.Patch
+                        Method.delete -> HttpMethod.Delete
+                      }
+              url {
+                path(path)
+                if (params != null) {
+                  for ((k, v) in params) {
+                    parameters.append(k, v)
+                  }
+                }
+              }
+              headers { headers?.forEach { appendAll(it.key, it.value) } }
+              contentType(ContentType.Application.Json)
+            }
+    )
+  }
+}
+
+class Client(
+        private val site: Url,
+        private var tokenState: TokenState,
+        public val transport: Transport = DefaultTransport(site),
+) {
+  constructor(
+          site: String
+  ) : this(
+          Url(site),
+          TokenState.build(null),
+  )
+
+  companion object {
+    suspend fun withTokens(site: String, tokens: Tokens): Client {
+      val client = Client(site)
+      client.tokenState = TokenState.build(tokens)
+      client.refreshAuthToken()
+      return client
+    }
+  }
+
+  fun site(): Url {
+    return this.site
+  }
+
+  fun tokens(): Tokens? {
+    return tokenState.state?.first
+  }
+
+  fun user(): User? {
+    return tokenState.user()
+  }
+
+  fun records(name: String): RecordApi {
+    return RecordApi(name, this)
+  }
+
+  suspend fun execute(ops: List<Operation>, transaction: Boolean = true): List<OperationResult> {
+    @Serializable data class Request(val operations: List<JsonObject>, val transaction: Boolean)
+
+    val response =
+            fetch(
+                    TRANSACTION_BASE_PATH,
+                    Method.post,
+                    Request(ops.map { Operation.toJson(it) }, transaction),
+                    throwOnError = true
+            )
+
+   @Serializable data class Response(val results: List<JsonObject>)
+
+    val r : Response = response.body()
+    return r.results.map { OperationResult.fromJson(it) }
+  }
+
+  suspend fun login(emailOrUsername: String, password: String): MultiFactorAuthToken? {
+    @Serializable data class Credentials(val email_or_username: String, val password: String)
+
+    val response =
+            fetch(
+                    "${AUTH_API}/login",
+                    Method.post,
+                    Credentials(emailOrUsername, password),
+                    throwOnError = false
+            )
+
+    when (response.status) {
+      HttpStatusCode.Forbidden -> {
+        val token: MultiFactorAuthToken = response.body()
+        return token
+      }
+      HttpStatusCode.OK -> {
+        val tokens: Tokens = response.body()
+        tokenState = TokenState.build(tokens)
+        return null
+      }
+      else -> {
+        throw HttpException(response.status.value, response.body())
+      }
+    }
+  }
+
+  suspend fun loginSecond(token: MultiFactorAuthToken, code: String) {
+    @Serializable data class Credentials(val mfa_token: String, val totp: String)
+
+    val response =
+            fetch(
+                    "${AUTH_API}/login_mfa",
+                    Method.post,
+                    Credentials(token.mfa_token, code),
+            )
+
+    val tokens: Tokens = response.body()
+    tokenState = TokenState.build(tokens)
+  }
+
+  suspend fun requestOtp(emailOrUsername: String) {
+    @Serializable data class Credentials(val email_or_username: String, val redirect_uri: String?)
+
+    fetch(
+            "${AUTH_API}/otp/request",
+            Method.post,
+            Credentials(emailOrUsername, null),
+    )
+  }
+
+  suspend fun loginOtp(email: String, code: String) {
+    @Serializable data class Credentials(val email: String, val code: String)
+
+    val response =
+            fetch(
+                    "${AUTH_API}/otp/login",
+                    Method.post,
+                    Credentials(email, code),
+            )
+
+    val tokens: Tokens = response.body()
+    tokenState = TokenState.build(tokens)
+  }
+
+  suspend fun loginAnonymously() {
+    val response =
+            fetch(
+                    "${AUTH_API}/login_anonymous",
+                    Method.post,
+                    "{}",
+            )
+
+    val tokens: Tokens = response.body()
+    tokenState = TokenState.build(tokens)
+  }
+
+  suspend fun logout() {
+    try {
+      val refreshToken = tokenState.state?.first?.refresh_token
+      if (refreshToken != null) {
+        @Serializable data class Body(val refresh_token: String)
+
+        fetch("${AUTH_API}/logout", Method.post, Body(refreshToken))
+      } else {
+        fetch("${AUTH_API}/logout")
+      }
+    } finally {
+      tokenState = TokenState.build(null)
+    }
+  }
+
+  suspend fun promoteAnonymous(
+          password: String,
+          email: String? = null,
+          username: String? = null,
+  ) {
+    @Serializable
+    data class Request(val new_password: String, val new_email: String?, val new_username: String?)
+
+    fetch(
+            "${AUTH_API}/promote_anonymous",
+            Method.post,
+            Request(password, email, username),
+    )
+  }
+
+  suspend fun refreshAuthToken(force: Boolean = false) {
+    val refreshToken: String? =
+            when (force) {
+              true -> tokenState.state?.first?.refresh_token
+              false -> tokenState.shouldRefresh()
+            }
+    if (refreshToken != null) {
+      tokenState = refreshTokensImpl(transport, refreshToken)
+    }
+  }
+
+  suspend fun fetch(
+          path: String,
+          method: Method = Method.get,
+          body: Any? = null,
+          params: Map<String, String>? = null,
+          throwOnError: Boolean = true,
+  ): HttpResponse {
+    val refreshToken = tokenState.shouldRefresh()
+    if (refreshToken != null) {
+      tokenState = refreshTokensImpl(transport, refreshToken)
+    }
+
+    val response = transport.fetch(path, method, tokenState.headers, params, body)
+    if (!response.status.isSuccess() && throwOnError) {
+      throw HttpException(response.status.value, response.body())
+    }
+
+    return response
+  }
+}
+
+private suspend fun refreshTokensImpl(transport: Transport, refreshToken: String): TokenState {
+  @Serializable data class Body(val refresh_token: String)
+
+  val response =
+          transport.fetch(
+                  "${AUTH_API}/refresh",
+                  Method.post,
+                  /*headers=*/ null,
+                  /*params=*/ null,
+                  Body(refreshToken),
+          )
+
+  return when (response.status) {
+    HttpStatusCode.Unauthorized -> {
+      // Refresh token was rejected w/o means to recover. May as well log out.
+      TokenState.build(null)
+    }
+    HttpStatusCode.OK -> {
+      TokenState.build(response.body())
+    }
+    else -> {
+      throw HttpException(response.status.value, response.body())
+    }
+  }
+}
+
+private fun initClient(): HttpClient {
+  return HttpClient(CIO.create()) {
+    install(SSE)
+    install(ContentNegotiation) {
+      // Register Kotlinx.serialization converter
+      json(
+              Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+              }
+      )
+    }
+  }
+}
+
+private fun buildHeaders(tokens: Tokens?): Map<String, List<String>> {
+  val headers: MutableMap<String, List<String>> = mutableMapOf()
+
+  if (tokens != null) {
+    headers["Authorization"] = listOf("Bearer ${tokens.auth_token}")
+
+    val refresh = tokens.refresh_token
+    if (refresh != null) {
+      headers["Refresh-Token"] = listOf(refresh)
+    }
+
+    val csrf = tokens.csrf_token
+    if (csrf != null) {
+      headers["CSRF-Token"] = listOf(csrf)
+    }
+  }
+
+  return headers
+}
+
+val jsonSerializer = Json {
+  ignoreUnknownKeys = true
+  isLenient = true
+}
+
+@OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+private fun decodeJwtTokenClaims(jwt: String): JwtTokenClaims {
+  val parts = jwt.split('.')
+  if (parts.size != 3) {
+    throw Exception("Invalid JWT format")
+  }
+
+  val decoded =
+          Base64.UrlSafe.withPadding(Base64.PaddingOption.PRESENT_OPTIONAL)
+                  .decode(parts[1])
+                  .decodeToString()
+
+  return jsonSerializer.decodeFromString(decoded)
+}
+
+fun addFiltersToParams(params: MutableMap<String, String>, path: String, filter: FilterBase) {
+  when (filter) {
+    is Filter -> {
+      if (filter.op != null) {
+        val value =
+                when (filter.op) {
+                  CompareOp.isNull -> "NULL"
+                  CompareOp.isNotNull -> "!NULL"
+                  else -> filter.value
+                }
+        params["${path}[${filter.column}][${opToString(filter.op)}]"] = value
+      } else {
+        params["${path}[${filter.column}]"] = filter.value
+      }
+    }
+    is And -> {
+      for ((i, f) in filter.filters.withIndex()) {
+        addFiltersToParams(params, "${path}[\$and][${i}]", f)
+      }
+    }
+    is Or -> {
+      for ((i, f) in filter.filters.withIndex()) {
+        addFiltersToParams(params, "${path}[\$or][${i}]", f)
+      }
+    }
+  }
+}
+
+private const val AUTH_API: String = "api/auth/v1"
+const val RECORD_API: String = "api/records/v1"
+const val TRANSACTION_BASE_PATH: String = "api/transaction/v1/execute"

@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS _wcauth_kv (
-  key   TEXT PRIMARY KEY NOT NULL,
-  value TEXT NOT NULL
-);

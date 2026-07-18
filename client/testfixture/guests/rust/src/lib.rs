@@ -1,0 +1,245 @@
+#![forbid(unsafe_code)]
+#![allow(clippy::needless_return)]
+#![warn(clippy::await_holding_lock, clippy::inefficient_to_string)]
+
+use base64::prelude::*;
+use std::sync::atomic::{AtomicI64, Ordering};
+use trailbase_wasm::db::{Transaction, Value, execute, query};
+use trailbase_wasm::fetch::{Uri, get};
+use trailbase_wasm::fs::read_file;
+use trailbase_wasm::http::{HttpError, HttpRoute, Json, StatusCode, routing};
+use trailbase_wasm::job::Job;
+use trailbase_wasm::sqlite::SqliteFunctionFlag;
+use trailbase_wasm::time::{Duration, SystemTime, Timer};
+use trailbase_wasm::{Guest, SqliteFunction, export};
+
+// Implement the function exported in this world (see above).
+struct Endpoints;
+
+static SEQ: AtomicI64 = AtomicI64::new(-32);
+
+impl Guest for Endpoints {
+  fn http_handlers() -> Vec<HttpRoute> {
+    SEQ.fetch_add(1000, Ordering::SeqCst);
+
+    return vec![
+      routing::get("/method", async |_req| Ok("get")),
+      routing::post("/method", async |_req| Ok("post")),
+      routing::delete("/method", async |_req| Ok("delete")),
+      routing::get("/readfile", async |_req| {
+        let r = read_file("/crates/sqlite/Cargo.toml")
+          .map_err(|err| HttpError::message(StatusCode::NOT_FOUND, err))?;
+        eprintln!("result: {}", String::from_utf8_lossy(&r));
+        return Ok(());
+      }),
+      routing::get("/json", async |_req| {
+        let value = serde_json::json!({
+            "int": 5,
+            "real": 4.2,
+            "msg": "foo",
+            "obj": {
+              "nested": true,
+            },
+        });
+
+        return Json(value);
+      }),
+      routing::get("/fetch", async |req| {
+        if let Some(url) = req.query_param("url") {
+          let uri: Uri = Uri::try_from(url).map_err(internal)?;
+          return get(uri).await.map_err(internal);
+        }
+
+        return Err(HttpError::message(
+          StatusCode::BAD_REQUEST,
+          "Missing ?url= param",
+        ));
+      }),
+      routing::get("/error", async |_req| -> Result<(), HttpError> {
+        return Err(HttpError {
+          status: StatusCode::IM_A_TEAPOT,
+          message: Some("I'm a teapot".to_string()),
+        });
+      }),
+      routing::get("/await", async |req| -> Result<Vec<u8>, HttpError> {
+        let ms: u64 = req.query_param("ms").map_or(10, |p| p.parse().unwrap());
+        eprintln!("waiting {ms}ms");
+
+        Timer::after(Duration::from_millis(ms)).wait().await;
+        return Ok(vec![b'A'; 5000]);
+      }),
+      // Test Database interactions
+      routing::get("/addDeletePost", async |_req| {
+        let user_id = &query(
+          "SELECT id FROM _user WHERE email = 'admin@localhost'",
+          vec![],
+        )
+        .await
+        .map_err(internal)?[0][0];
+
+        eprintln!("[print from WASM guest] user id: {user_id:?}");
+
+        let mut bytes: [u8; 32] = [0; 32];
+        trailbase_wasm::rand::get_random_bytes(&mut bytes);
+
+        let body = format!(
+          "{now:?} - {rand}",
+          now = SystemTime::now(),
+          rand = String::from_utf8_lossy(&bytes),
+        );
+
+        let num_insertions = execute(
+          "INSERT INTO post (author, title, body) VALUES (?1, 'title' , ?2)",
+          vec![user_id.clone(), Value::Text(body.clone())],
+        )
+        .await
+        .unwrap();
+
+        let num_deletions = execute(
+          "DELETE FROM post WHERE body = ?1",
+          vec![Value::Text(body.clone())],
+        )
+        .await
+        .unwrap();
+
+        return if num_insertions == num_deletions {
+          Ok("Ok")
+        } else {
+          Ok("Fail")
+        };
+      }),
+      routing::get("/transaction", async |_req| {
+        let mut tx = Transaction::begin().map_err(internal)?;
+        tx.execute(
+          "CREATE TABLE IF NOT EXISTS tx (id INTEGER PRIMARY KEY)",
+          &[],
+        )
+        .map_err(internal)?;
+
+        let rows = tx.query("SELECT COUNT(*) FROM tx", &[]).map_err(internal)?;
+        let Value::Integer(count) = &rows[0][0] else {
+          return Err(internal("expected int"));
+        };
+
+        let rows_affected = tx
+          .execute(
+            "INSERT INTO tx (id) VALUES (?1)",
+            &[Value::Integer(count + 1)],
+          )
+          .map_err(internal)?;
+
+        assert_eq!(1, rows_affected);
+
+        tx.commit().map_err(internal)?;
+
+        // Keep one dangling to make sure RAII-cleanup works.
+        let _tx_dangling = Transaction::begin();
+
+        return Ok(());
+      }),
+      routing::get("/attach_db", async |_req| {
+        let _ = execute("ATTACH DATABASE foo.db AS foo", vec![])
+          .await
+          .map_err(internal)?;
+        return Ok(());
+      }),
+      routing::get("/detach_db", async |_req| {
+        let _ = query("DETACH DATABASE foo", vec![])
+          .await
+          .map_err(internal)?;
+        return Ok(());
+      }),
+      // Benchmark runtime performance.
+      routing::get("/fibonacci", async |req| {
+        let n: usize = req.query_param("n").map_or(40, |p| p.parse().unwrap());
+        return format!("{}\n", fibonacci(n));
+      }),
+      routing::get("/sqlite_echo", async |_req| {
+        let Value::Integer(i) = &query("SELECT custom_echo(?1)", vec![Value::Integer(5)])
+          .await
+          .map_err(internal)?[0][0]
+        else {
+          panic!("Expected Integer");
+        };
+        assert_eq!(5, *i);
+
+        return Ok(format!("{i}\n"));
+      }),
+      routing::get("/stateful", async |_req| {
+        return Ok(format!("{}\n", SEQ.fetch_add(1, Ordering::SeqCst)));
+      }),
+      routing::get("/sqlite_stateful", async |_req| {
+        let Value::Integer(i) = &query("SELECT custom_stateful()", vec![])
+          .await
+          .map_err(internal)?[0][0]
+        else {
+          panic!("Expected Integer");
+        };
+        return Ok(format!("{i}\n"));
+      }),
+      routing::get("/panic", async |_req| {
+        if true {
+          panic!("/panic called");
+        }
+        return Ok(());
+      }),
+      routing::get("/test_sqlite-vec", async |_req| {
+        let Value::Blob(ref vec) = query("SELECT vec_f32('[0, 1, 2, 3]')", vec![])
+          .await
+          .unwrap()[0][0]
+        else {
+          return Err(internal("expected blob"));
+        };
+        return Ok(BASE64_STANDARD.encode(vec));
+      }),
+    ];
+  }
+
+  fn job_handlers() -> Vec<Job> {
+    SEQ.fetch_add(4000, Ordering::SeqCst);
+
+    return vec![Job::hourly("WASM-registered Job", async || {
+      eprintln!("JS-registered cron job reporting for duty 🚀");
+    })];
+  }
+
+  fn sqlite_scalar_functions() -> Vec<SqliteFunction> {
+    SEQ.fetch_add(32, Ordering::SeqCst);
+    return vec![
+      SqliteFunction::new::<1>(
+        "custom_echo".to_string(),
+        |args: [trailbase_wasm::sqlite::Value; _]| {
+          return Ok(args[0].clone());
+        },
+        &[
+          SqliteFunctionFlag::Deterministic,
+          SqliteFunctionFlag::Innocuous,
+        ],
+      ),
+      SqliteFunction::new::<0>(
+        "custom_stateful".to_string(),
+        |_args: [trailbase_wasm::sqlite::Value; _]| {
+          return Ok(trailbase_wasm::sqlite::Value::Integer(
+            SEQ.fetch_add(1, Ordering::SeqCst),
+          ));
+        },
+        &[],
+      ),
+    ];
+  }
+}
+
+export!(Endpoints);
+
+#[inline]
+fn fibonacci(n: usize) -> usize {
+  return match n {
+    0 => 0,
+    1 => 1,
+    n => fibonacci(n - 1) + fibonacci(n - 2),
+  };
+}
+
+fn internal(err: impl std::string::ToString) -> HttpError {
+  return HttpError::message(StatusCode::INTERNAL_SERVER_ERROR, err);
+}

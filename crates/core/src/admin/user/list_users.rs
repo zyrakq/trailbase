@@ -1,0 +1,185 @@
+use axum::{
+  Json,
+  extract::{RawQuery, State},
+};
+use serde::Serialize;
+use std::borrow::Cow;
+use trailbase_qs::{Order, OrderPrecedent, Query};
+use ts_rs::TS;
+use uuid::Uuid;
+
+use crate::admin::AdminError as Error;
+use crate::app_state::AppState;
+use crate::auth::user::DbUser;
+use crate::connection::ConnectionEntry;
+use crate::constants::USER_TABLE_FQ;
+use crate::listing::{WhereClause, build_filter_where_clause, limit_or_default};
+use crate::util::row_id_column;
+
+#[derive(Debug, Serialize, TS)]
+pub struct UserJson {
+  pub id: String,
+  pub email: Option<String>,
+  pub username: Option<String>,
+  pub verified: bool,
+  pub admin: bool,
+
+  // For external oauth providers.
+  pub provider_id: i64,
+  pub provider_user_id: Option<String>,
+
+  pub created: i64,
+  pub updated: i64,
+}
+
+impl From<DbUser> for UserJson {
+  fn from(value: DbUser) -> Self {
+    UserJson {
+      id: Uuid::from_bytes(value.id).to_string(),
+      email: value.email,
+      username: value.username,
+      verified: value.verified,
+      admin: value.admin,
+      provider_id: value.provider_id,
+      provider_user_id: value.provider_user_id,
+      created: value.created,
+      updated: value.updated,
+    }
+  }
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct ListUsersResponse {
+  total_row_count: i64,
+
+  users: Vec<UserJson>,
+}
+
+pub async fn list_users_handler(
+  State(state): State<AppState>,
+  RawQuery(raw_url_query): RawQuery,
+) -> Result<Json<ListUsersResponse>, Error> {
+  let ConnectionEntry {
+    connection: conn,
+    metadata,
+  } = state.connection_manager().main_entry();
+
+  let Query {
+    limit,
+    offset,
+    order,
+    filter: filter_params,
+    ..
+  } = raw_url_query
+    .as_ref()
+    .map_or_else(|| Ok(Query::default()), |query| Query::parse(query))
+    .map_err(|err| {
+      return Error::BadRequest(format!("Invalid query '{err}': {raw_url_query:?}").into());
+    })?;
+
+  let Some(table_metadata) = metadata.get_table(&USER_TABLE_FQ) else {
+    // QUESTION: Should this actually be an internal error? Hardly a user failure.
+    log::debug!("User table not found: {metadata:?}");
+    return Err(Error::Precondition(format!(
+      "Table {} not found",
+      USER_TABLE_FQ.escaped_string()
+    )));
+  };
+  // Where clause contains column filters and offset depending on what's present in the url query
+  // string.
+  let filter_where_clause =
+    build_filter_where_clause("_ROW_", &table_metadata.column_metadata, filter_params)?;
+
+  let total_row_count: i64 = conn
+    .read_query_row_get(
+      format!(
+        "SELECT COUNT(*) FROM {fq_table_name} AS _ROW_ WHERE {where_clause}",
+        fq_table_name = USER_TABLE_FQ.escaped_string(),
+        where_clause = filter_where_clause.clause
+      ),
+      filter_where_clause.params.clone(),
+      0,
+    )
+    .await?
+    .unwrap_or(-1);
+
+  let users = fetch_users(
+    &conn,
+    filter_where_clause.clone(),
+    offset,
+    &order.unwrap_or_else(|| Order {
+      columns: vec![(row_id_column(&conn).to_string(), OrderPrecedent::Descending)],
+    }),
+    limit_or_default(limit, None).map_err(|err| Error::BadRequest(err.into()))?,
+  )
+  .await?;
+
+  return Ok(Json(ListUsersResponse {
+    total_row_count,
+    users: users
+      .into_iter()
+      .map(|user| user.into())
+      .collect::<Vec<UserJson>>(),
+  }));
+}
+
+async fn fetch_users(
+  conn: &trailbase_sqlite::Connection,
+  filter_where_clause: WhereClause,
+  offset: Option<usize>,
+  order: &Order,
+  limit: usize,
+) -> Result<Vec<DbUser>, Error> {
+  let WhereClause {
+    mut params,
+    clause: where_clause,
+  } = filter_where_clause;
+
+  params.push((
+    Cow::Borrowed(":limit"),
+    trailbase_sqlite::Value::Integer(limit as i64),
+  ));
+  params.push((
+    Cow::Borrowed(":offset"),
+    trailbase_sqlite::Value::Integer(offset.unwrap_or(0) as i64),
+  ));
+
+  let order_clause = order
+    .columns
+    .iter()
+    .map(|(col, ord)| {
+      format!(
+        r#"_ROW_."{col}" {}"#,
+        match ord {
+          OrderPrecedent::Descending => "DESC",
+          OrderPrecedent::Ascending => "ASC",
+        }
+      )
+    })
+    .collect::<Vec<_>>()
+    .join(", ");
+
+  let sql_query = format!(
+    r#"
+      SELECT _ROW_.*
+      FROM {fq_table_name} as _ROW_
+      WHERE
+        {where_clause}
+      ORDER BY
+        {order_clause}
+      LIMIT :limit
+      OFFSET :offset;
+    "#,
+    fq_table_name = USER_TABLE_FQ.escaped_string(),
+  );
+
+  let users = conn
+    .read_query_values::<DbUser>(sql_query.clone(), params)
+    .await
+    .map_err(|err| {
+      log::error!("fetch users failed '{sql_query}': {err:?}");
+      return err;
+    })?;
+  return Ok(users);
+}

@@ -1,4 +1,0 @@
-target/
-dist/
-*.pem
-mailcrab/Cargo.lock

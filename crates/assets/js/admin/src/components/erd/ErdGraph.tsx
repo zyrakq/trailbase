@@ -1,0 +1,270 @@
+import { createEffect, onMount } from "solid-js";
+import { Graph, Cell, Shape, Edge, NodeMetadata, EdgeMetadata } from "@antv/x6";
+
+import { cn } from "@/lib/utils";
+import type { ResolvedTheme } from "@/lib/theme";
+
+export const LINE_HEIGHT = 24;
+export const NODE_WIDTH = 250;
+
+const ACCENT_600 = "#0073aa";
+const GRAY_100 = "#f3f7f9";
+const EDGE_COLOR = "#A2B1C3";
+
+type Theme = {
+  fill: string;
+  accent: string;
+  edge: string;
+  text: string;
+};
+
+const lightTheme: Theme = {
+  fill: GRAY_100,
+  accent: ACCENT_600,
+  edge: EDGE_COLOR,
+  text: "black",
+};
+
+const darkTheme: Theme = {
+  fill: "black",
+  accent: ACCENT_600,
+  edge: "white",
+  text: "white",
+};
+
+export function nodeName(theme: ResolvedTheme): string {
+  return theme === "dark" ? "dark:er-rect" : "light:er-rect";
+}
+
+export function erdTheme(dark: boolean): Theme {
+  return dark
+    ? {
+        fill: "black",
+        accent: ACCENT_600,
+        edge: "white",
+        text: "white",
+      }
+    : {
+        fill: GRAY_100,
+        accent: ACCENT_600,
+        edge: EDGE_COLOR,
+        text: "black",
+      };
+}
+
+function setupGraph() {
+  const ER_PORT_POSITION_NAME = "erPortPosition";
+
+  Graph.registerPortLayout(
+    ER_PORT_POSITION_NAME,
+    (portsPositionArgs) => {
+      return portsPositionArgs.map((_, index) => {
+        return {
+          position: {
+            x: 0,
+            y: (index + 1) * LINE_HEIGHT,
+          },
+          angle: 0,
+        };
+      });
+    },
+    true,
+  );
+
+  for (const themeName of ["light", "dark"] as ResolvedTheme[]) {
+    const theme = themeName === "light" ? lightTheme : darkTheme;
+
+    Graph.registerNode(
+      nodeName(themeName),
+      {
+        inherit: "rect",
+        markup: [
+          {
+            tagName: "rect",
+            selector: "body",
+          },
+          {
+            tagName: "text",
+            selector: "label",
+          },
+        ],
+        attrs: {
+          rect: {
+            strokeWidth: 1,
+            stroke: theme.accent,
+            fill: theme.accent,
+          },
+          label: {
+            fontWeight: "bold",
+            fill: "white",
+            fontSize: 12,
+          },
+        },
+        ports: {
+          groups: {
+            list: {
+              markup: [
+                {
+                  tagName: "rect",
+                  selector: "portBody",
+                },
+                {
+                  tagName: "text",
+                  selector: "portNameLabel",
+                },
+                {
+                  tagName: "text",
+                  selector: "portTypeLabel",
+                },
+              ],
+              attrs: {
+                portBody: {
+                  width: NODE_WIDTH,
+                  height: LINE_HEIGHT,
+                  strokeWidth: 1,
+                  stroke: theme.accent,
+                  fill: theme.fill,
+                  magnet: true,
+                },
+                portNameLabel: {
+                  ref: "portBody",
+                  refX: 6,
+                  refY: 6,
+                  fontSize: 10,
+                  fill: theme.text,
+                },
+                portTypeLabel: {
+                  ref: "portBody",
+                  refX: 95,
+                  refY: 6,
+                  fontSize: 10,
+                  fill: theme.text,
+                },
+              },
+              position: ER_PORT_POSITION_NAME,
+            },
+          },
+        },
+      },
+      true,
+    );
+  }
+}
+
+setupGraph();
+
+function createEdge(): Edge {
+  return new Shape.Edge({
+    attrs: {
+      line: {
+        stroke: EDGE_COLOR,
+        strokeWidth: 2,
+      },
+    },
+  });
+}
+
+export function ErdGraph(props: {
+  class?: string;
+  nodes: NodeMetadata[];
+  edges: EdgeMetadata[];
+  onMount?: (graph: Graph) => void;
+}) {
+  let ref: HTMLDivElement | undefined;
+
+  let graph: Graph | undefined;
+  createEffect(() => {
+    graph?.dispose();
+
+    const g = (graph = new Graph({
+      container: ref,
+      grid: {
+        visible: true,
+      },
+      autoResize: true,
+      interacting: {
+        edgeLabelMovable: false,
+        magnetConnectable: false,
+      },
+      connecting: {
+        connector: "rounded",
+        router: {
+          name: "er",
+          args: {
+            offset: 25,
+            direction: "H",
+          },
+        },
+        createEdge,
+      },
+      panning: {
+        enabled: true,
+      },
+      mousewheel: {
+        enabled: true,
+        // modifiers: ['ctrl', 'meta'],
+        minScale: 0.5,
+        maxScale: 2,
+      },
+    }));
+
+    // Implement our own simple grid layout since @antv/layout seems to be out of sync:
+    //
+    // v0.3.25 results in "layout is not a function": https://github.com/antvis/X6/issues/4441
+    // v1.2 has completely in-compatible APIs. They'll probably need to overhaul x6 first.
+    const maxHeight = props.nodes.reduce((acc, node) => {
+      const numPorts = node.ports instanceof Array ? node.ports.length : 1;
+      return Math.max(acc, (numPorts + 1) * LINE_HEIGHT);
+    }, 0);
+
+    const width = NODE_WIDTH + 20;
+    const height = maxHeight + 10;
+
+    // The idea is to have the aspect of the total node area match the screen's
+    // as well as possible.
+    //
+    // screenAspect == nodeAreaAspect == (width * columns) / (rows * height)
+    // rows == ceil(nodex.length / columns)
+    //
+    // => columns = sqrt(screenAspect * length * height / width)
+    const screenAspect = window.innerWidth / window.innerHeight;
+    const columns = Math.ceil(
+      Math.sqrt((screenAspect * props.nodes.length * height) / width),
+    );
+    const rows = Math.ceil(props.nodes.length / columns);
+
+    const cells: Cell[] = [
+      ...props.nodes.map((n, index) => {
+        // Scatter nodes on a grid if no explicit position is already set.
+        if (n.position === undefined) {
+          const col = index % columns;
+          const row = Math.floor(index / columns);
+
+          n.position = {
+            x: col * width,
+            y: row * height,
+          };
+        }
+
+        return g.createNode(n);
+      }),
+      ...props.edges.map((e) => g.createEdge(e)),
+    ];
+
+    g.resetCells(cells);
+
+    if (cells.length > 0) {
+      // The zoomToFit seems a bit buggy. It will happily cut off boxes at the bottom.
+      g.zoomToRect({
+        x: -20,
+        y: -20,
+        width: columns * width + 20,
+        height: rows * height + 20,
+      });
+    }
+
+    props.onMount?.(g);
+  });
+
+  return <div ref={ref} class={cn(props.class, "overflow-clip")} />;
+}

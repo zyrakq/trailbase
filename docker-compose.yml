@@ -1,22 +1,17 @@
-x-logging: &default-logging
-  driver: json-file
-  options:
-    max-size: ${LOG_MAX_SIZE:-10m}
-    max-file: ${LOG_MAX_FILE:-3}
-    compress: ${LOG_COMPRESS:-true}
-
 services:
-  velora-web:
-    container_name: velora-web
-    image: velora
-    build: .
-    restart: unless-stopped
-    logging: *default-logging
-    ports:
-      - 4000:4000
-    volumes:
-      - velora-traildepot:/workspace/app/traildepot
 
-volumes:
-  velora-traildepot:
-    name: velora-traildepot
+  trail:
+    image: docker.io/trailbase/trailbase:latest
+    ports:
+      - "${PORT:-4000}:4000"
+    restart: unless-stopped
+    volumes:
+      # NOTE: Docker compose will automatically create missing directories with
+      # "root" ownership. However, the TrailBase image drops root privileges.
+      # You therefore need to ensure that a `traildepot` folder with the
+      # appropriate permissions exist. Otherwise, you'll see "PermissionDenied"
+      # errors in the logs.
+      - ${DATA_DIR:-.}/traildepot:/app/traildepot
+    environment:
+      RUST_BACKTRACE: "1"
+    # command: "/app/trail --data-dir /app/traildepot run --address 0.0.0.0:4000"

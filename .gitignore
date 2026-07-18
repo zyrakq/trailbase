@@ -1,21 +1,17 @@
-# AI
-thoughts
+# Build artifacts
+target/
+node_modules/
+dist/
 
-# Logs
-logs
-*.log
+# Dart workspace artifacts
+.dart_tool
 
-node_modules
-build
-dist
-dist-ssr
-*.local
+# macOS-specific files
+.DS_Store
 
-# Editor directories and files
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+# jetbrains setting folder
+.idea/
 
-.env
-
-target
+# Avoid `pnpm-lock.yaml` files when not in the root. They are produced when
+# building with `--ignore-worspace`.
+**/pnpm-lock.yaml

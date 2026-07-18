@@ -1,0 +1,803 @@
+mod serve;
+
+use axum::body::Body;
+use axum::extract::{DefaultBodyLimit, Request, State};
+use axum::handler::HandlerWithoutStateExt;
+use axum::http::{HeaderValue, StatusCode};
+use axum::middleware::{self, Next};
+use axum::response::{IntoResponse, Response};
+use axum::routing::get;
+use axum::{RequestExt, Router};
+use bytes::Bytes;
+use http_body_util::BodyExt;
+use http_body_util::combinators::UnsyncBoxBody;
+use log::*;
+use std::borrow::Cow;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::{Arc, LazyLock};
+use tokio::signal;
+use tokio::task::JoinSet;
+use tokio_rustls::TlsAcceptor;
+use tokio_rustls::rustls::ServerConfig;
+use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
+use tower::Service;
+use tower_cookies::CookieManagerLayer;
+use tower_governor::GovernorLayer;
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_http::services::fs::{ServeDir, ServeFile};
+use tower_http::{cors, limit::RequestBodyLimitLayer, trace::TraceLayer};
+use tracing_subscriber::{filter, prelude::*};
+use trailbase_assets::AssetService;
+
+use crate::admin;
+use crate::app_state::AppState;
+use crate::auth::util::is_admin;
+use crate::auth::{self, AuthError, User};
+use crate::connection::ConnectionEntry;
+use crate::constants::{ADMIN_API_PATH, HEADER_CSRF_TOKEN};
+use crate::data_dir::DataDir;
+use crate::extract::ip::RealIpKeyExtractor;
+use crate::init_error::InitError;
+use crate::logging;
+use crate::records;
+
+/// A set of options to configure serving behaviors. Changing any of these options
+/// requires a server restart, which makes them a natural fit for being exposed as command line
+/// arguments.
+#[derive(Clone, Debug, Default)]
+pub struct ServerOptions {
+  // Authority (<host>:<port>) the HTTP server binds to, e.g. "localhost:4000".
+  pub address: String,
+
+  // Optional address of the admin UI + API.
+  pub admin_address: Option<String>,
+
+  /// Optional path to static assets that will be served at the HTTP root.
+  pub public_dir: Option<PathBuf>,
+
+  /// Enable SPA fallback mode for public_dir.
+  pub public_dir_spa: bool,
+
+  /// log an event to stdout.
+  pub log_responses: bool,
+
+  /// Limit the set of allowed origins the HTTP server will answer to.
+  pub cors_allowed_origins: Vec<String>,
+
+  /// Optional dedicated Tokio runtime to execute async WASM code on.
+  // pub wasm_tokio_runtime: Option<tokio::runtime::Handle>,
+
+  /// TLS certificate path.
+  pub tls_cert: Option<CertificateDer<'static>>,
+  /// TLS key path.
+  pub tls_key: Option<Arc<PrivateKeyDer<'static>>>,
+
+  /// Custom axum router.
+  pub custom_router: Option<Router<AppState>>,
+}
+
+pub struct Server {
+  pub state: AppState,
+
+  // Routers.
+  pub main_router: (String, Router),
+  pub admin_router: Option<(String, Router)>,
+
+  // TLS/SSL
+  pub tls: Option<(CertificateDer<'static>, PrivateKeyDer<'static>)>,
+}
+
+impl Server {
+  /// Initializes the server. Will create a new data directory on first start.
+  ///
+  /// The `custom_routes` will be registered with the http server and `on_first_init` will be
+  /// called only when a new data directory and therefore databases are created. This hook can
+  /// be used to customize the setup in a simple manner, e.g. create tables, etc.
+  /// Note, however, that for a multi-stage deployment (dev, test, staging, prod, ...) or prod
+  /// setups migrations are a more robust approach to consistent and continuous management of
+  /// schemas.
+  pub async fn init(state: AppState, opts: ServerOptions) -> Result<Self, InitError> {
+    let ServerOptions {
+      address,
+      admin_address,
+      public_dir,
+      public_dir_spa,
+      log_responses,
+      cors_allowed_origins,
+      tls_cert,
+      tls_key,
+      custom_router,
+    } = opts;
+
+    let version_info = trailbase_build::get_version_info!();
+    info!(
+      "Initializing server version: {version} {date}",
+      version = version_info.git_version_tag.unwrap_or_default(),
+      date = version_info.git_commit_date.unwrap_or_default(),
+    );
+
+    Self::build_tracing(&state, log_responses).init();
+
+    let mut custom_routers: Vec<Router<AppState>> = Vec::from_iter(custom_router);
+
+    for rt in state.wasm_runtimes() {
+      if let Some(wasm_router) = crate::wasm::install_routes_and_jobs(&state, rt.clone())
+        .await
+        .map_err(|err| InitError::ScriptError(err.to_string()))?
+      {
+        custom_routers.push(wasm_router);
+      }
+    }
+
+    // Install an Ip-based rate limiter on auth APIs to avoid abuse.
+    //
+    // NOTE: If you run into rate-limits and are running behind a reverse proxy, please set the
+    // "x-forwarded-for" header correctly to ensure ip-based rate limiting and request logging
+    // works correctly.
+    // NOTE: We're using a closure here because of the awkward typing.
+    let install_auth_rate_limiter = if !state.dev_mode()
+      && let Some(rate_limit) = state.get_config().server.auth_ip_rate_limit
+      && rate_limit > 0
+    {
+      let governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+          // Quota.
+          .burst_size(rate_limit)
+          // Replenish one after 1 seconds.
+          .per_second(1)
+          .key_extractor(RealIpKeyExtractor)
+          // Set rate limiting headers on reply.
+          .use_headers()
+          // Only block POST method for abuse prevention (e.g. sign-up, ...), e.g. allow unlimited
+          // GET auth status.
+          .methods(vec![axum::http::Method::POST])
+          .finish()
+          .expect("startup"),
+      );
+
+      // Periodically clean up governor.
+      let governor_limiter = governor_conf.limiter().clone();
+      tokio::spawn(async move {
+        let interval = tokio::time::Duration::from_secs(60);
+        loop {
+          tokio::time::sleep(interval).await;
+          log::trace!("rate limiting storage size: {}", governor_limiter.len());
+          governor_limiter.retain_recent();
+        }
+      });
+
+      Some(move |router: Router<crate::AppState>| {
+        router.layer(GovernorLayer::new(governor_conf.clone()))
+      })
+    } else {
+      None
+    };
+
+    let admin_router = Self::build_admin_router(&state);
+    let independent_admin_router = if let Some(admin_address) = admin_address
+      && admin_address != address
+    {
+      let router = Router::new()
+        .merge(
+          install_auth_rate_limiter
+            .as_ref()
+            .map_or_else(auth::admin_auth_router, |inst| {
+              inst(auth::admin_auth_router())
+            }),
+        )
+        .merge(admin_router);
+
+      Some((
+        admin_address.to_string(),
+        Self::wrap_with_default_layers(&state, router, &cors_allowed_origins),
+      ))
+    } else {
+      custom_routers.push(admin_router);
+      None
+    };
+
+    Ok(Self {
+      state: state.clone(),
+      main_router: Self::build_main_router(
+        &state,
+        &address,
+        public_dir.as_ref(),
+        public_dir_spa,
+        &cors_allowed_origins,
+        install_auth_rate_limiter.as_ref(),
+        custom_routers,
+      )
+      .await?,
+      admin_router: independent_admin_router,
+      tls: load_tls(state.data_dir(), tls_cert, tls_key),
+    })
+  }
+
+  fn build_tracing(
+    state: &AppState,
+    log_responses: bool,
+  ) -> impl tracing_subscriber::layer::SubscriberExt {
+    // Initialize tracing subscribers/layers.
+    //
+    // A few notes in case initialization below panics. The `log` and `tracing` crates/systems are
+    // mostly independent. Both like to be initialized only once given their global nature. There
+    // is a `.try_init()`, which has not effect when already initialized.
+    //
+    // Here we specifically only initialize `tracing`, since we critically rely on the
+    // `SqliteLogLayer`. We leave `log` initialization to the program level.
+    //
+    // The current setup prevents users from initializing tracing themselves. This is only relevant
+    // for the frameworks-use-case. If we wanted to allow it, we could check that if already
+    // initialized, the "logging::SqliteLogLayer" is present.
+    //
+    // If the `tracing_subscriber` crate is built with the default feature `tracing-log`,
+    // initializing `tracing` will also initialize the `log` crate. So this approach will only
+    // work if built w/o `tracing-log`. Otherwise, initializing `log` before will lead to a panic
+    // here. We do *not* want to use a `.try_init()` here, otherwise may silently miss
+    // `SqliteLogLayer`.
+    //
+    // Response log events are emitted at the INFO level, see `logging.rs`
+    #[cfg(not(feature = "otel"))]
+    let subscriber = tracing_subscriber::Registry::default();
+
+    #[cfg(feature = "otel")]
+    let subscriber = {
+      let (subscriber, otel_guard) =
+        init_tracing_opentelemetry::tracing_subscriber_ext::regiter_otel_layers(
+          tracing_subscriber::Registry::default(),
+        )
+        .expect("startup");
+
+      // TODO: We have to keep this alive. Let's find something better than a singleton.
+      use std::sync::OnceLock;
+      static SINGLETON: OnceLock<init_tracing_opentelemetry::Guard> = OnceLock::new();
+      SINGLETON.get_or_init(move || init_tracing_opentelemetry::Guard::global(Some(otel_guard)));
+
+      subscriber
+    };
+
+    let filter_layer = filter::Targets::new()
+      .with_default(filter::LevelFilter::OFF)
+      .with_target(crate::logging::EVENT_TARGET, crate::logging::LEVEL);
+
+    return subscriber
+      .with(filter_layer)
+      .with(logging::SqliteLogLayer::new(
+        state,
+        /* log-to-stdout= */ log_responses,
+      ));
+  }
+
+  pub async fn serve(self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Install a HUP/hangup signal handler to reload config.
+    #[cfg(unix)]
+    {
+      let state = self.state.clone();
+
+      // An infinite stream of hangup signals.
+      let mut stream = signal::unix::signal(signal::unix::SignalKind::hangup()).expect("startup");
+
+      tokio::spawn(async move {
+        loop {
+          stream.recv().await;
+
+          info!(
+            "Received SIGHUP: reloading WASM components (dev), re-apply db migrations, and finally re-load config."
+          );
+
+          if state.dev_mode()
+            && let Err(err) = state.reload_wasm_runtimes().await
+          {
+            warn!("Reloading WASM failed: {err}");
+          }
+
+          // Re-apply migrations. This needs to happen before reloading the config, which is
+          // consistent with the startup order. Otherwise, we may validate a configuration
+          // against a stale database schema.
+          //
+          // TODO: Right now we're only re-applying main migrations.
+          let user_migrations_path = state.data_dir().migrations_path();
+          let conn = state.connection_manager().main_entry().connection;
+
+          match crate::migrations::apply_main_migrations(&conn, Some(user_migrations_path))
+            .await
+            .map_err(|err| trailbase_sqlite::Error::Other(err.into()))
+          {
+            Err(err) => {
+              // NOTE: it's not clear what the best error behavior here is. Should the server
+              // continue to run when migrations fail?
+              error!("Failed to apply migrations: {err}");
+            }
+            Ok(_new_db) => {
+              let user_migrations_path = state.data_dir().migrations_path();
+              info!("Migrations applied: {user_migrations_path:?}");
+            }
+          }
+
+          // NOTE: we're always invalidating: simple & safe. We could also avoid invalidation
+          // when no new migrations were applied :shrug:.
+          if let Err(err) = state.rebuild_connection_metadata().await {
+            error!("Failed to invalidate schema cache: {err}");
+          }
+
+          // Reload config:
+          match crate::config::load_or_init_config_textproto(
+            state.data_dir(),
+            &state.connection_manager(),
+          )
+          .await
+          {
+            Ok(config) => {
+              if let Err(err) = state.validate_and_update_config(config, None).await {
+                error!("Failed to reload config: {err}");
+              }
+            }
+            Err(err) => {
+              error!("Failed to reload config: {err}");
+            }
+          }
+        }
+      });
+    }
+
+    let (cleanup_sender, cleanup_receiver) = tokio::sync::oneshot::channel::<()>();
+
+    tokio::spawn(async move {
+      if cleanup_receiver.await.is_ok() {
+        log::debug!("cleanup started");
+
+        self.state.subscription_manager().shutdown();
+      }
+    });
+
+    // Finally start serving.
+    //
+    // NOTE: This will only return when graceful shutdown succeeded.
+    serve_impl(
+      self.main_router,
+      self.admin_router,
+      self.tls,
+      cleanup_sender,
+    )
+    .await?;
+
+    return Ok(());
+  }
+
+  fn build_admin_router(state: &AppState) -> Router<AppState> {
+    return Router::new()
+      .nest(
+        &format!("/{ADMIN_API_PATH}/"),
+        admin::router().layer(middleware::from_fn_with_state(
+          state.clone(),
+          assert_admin_api_access,
+        )),
+      )
+      // NOTE: We cannot ACL-lock the UI assets. We need to be able to sign into the SPA.
+      .nest_service(
+        "/_/admin",
+        AssetService::<trailbase_assets::AdminAssets>::with_parameters(
+          |_path: &str| -> Option<Response<Body>> {
+            // SPA fallback.
+            let file = trailbase_assets::AdminAssets::get("index.html")?;
+
+            return Some(
+              Response::builder()
+                .header(axum::http::header::CONTENT_TYPE, file.metadata.mimetype())
+                .body(Body::from(cow_to_bytes(file.data)))
+                .unwrap_or_default(),
+            );
+          },
+        ),
+      );
+  }
+
+  async fn build_main_router(
+    state: &AppState,
+    address: &str,
+    public_dir: Option<&PathBuf>,
+    public_dir_spa: bool,
+    cors_allowed_origins: &[String],
+    install_auth_rate_limiter: Option<&impl Fn(Router<AppState>) -> Router<AppState>>,
+    custom_routers: Vec<Router<AppState>>,
+  ) -> Result<(String, Router<()>), InitError> {
+    let enable_transactions =
+      state.access_config(|conn| conn.server.enable_record_transactions.unwrap_or(false));
+
+    let ConnectionEntry {
+      connection: conn, ..
+    } = state.connection_manager().main_entry();
+
+    let mut router = Router::new()
+      // Public, stable and versioned APIs.
+      .merge(records::router(conn.connection_type(), enable_transactions))
+      .merge(install_auth_rate_limiter.map_or_else(
+        || auth::router(&state.get_config()),
+        |inst| inst(auth::router(&state.get_config())),
+      ))
+      .route("/api/healthcheck", get(healthcheck_handler));
+
+    for custom_router in custom_routers {
+      router = router.merge(custom_router);
+    }
+
+    if let Some(public_dir) = public_dir {
+      if !tokio::fs::try_exists(public_dir).await.unwrap_or(false) {
+        panic!("--public_dir={public_dir:?} path does not exist.")
+      }
+
+      const NOT_FOUND: &[u8] = b"Not found";
+      async fn handle_404() -> (StatusCode, &'static [u8]) {
+        (StatusCode::NOT_FOUND, NOT_FOUND)
+      }
+
+      router = if public_dir_spa {
+        let spa_fallback = public_dir.join("index.html");
+        if tokio::fs::try_exists(&spa_fallback).await.unwrap_or(false) {
+          let mut index_file = ServeFile::new(spa_fallback);
+          let fallback = async move |req: Request| {
+            static SUFFIX_RE: LazyLock<regex::Regex> =
+              LazyLock::new(|| regex::Regex::new(r"[.]\w+$").expect("const"));
+
+            // Return NOT_FOUND when the requested path ends in a suffix. Not sure if this is ideal
+            // but we definitely don't want to return an "index.html" on a favicon request.
+            if SUFFIX_RE.is_match(req.uri().path()) {
+              return Ok(
+                Response::builder()
+                  .status(StatusCode::NOT_FOUND)
+                  .body(axum::body::Body::from(NOT_FOUND).boxed_unsync())
+                  .expect("infallible"),
+              );
+            }
+
+            return index_file.call(req).await.map(|response| {
+              response.map(|body| UnsyncBoxBody::new(body.map_err(axum::Error::new)))
+            });
+          };
+
+          router.fallback_service(ServeDir::new(public_dir).fallback(fallback.into_service()))
+        } else {
+          warn!("--spa specified but index.html not found");
+          router.fallback_service(ServeDir::new(public_dir).fallback(handle_404.into_service()))
+        }
+      } else {
+        router
+          .fallback_service(ServeDir::new(public_dir).not_found_service(handle_404.into_service()))
+      };
+    }
+
+    return Ok((
+      address.to_string(),
+      Self::wrap_with_default_layers(state, router, cors_allowed_origins),
+    ));
+  }
+
+  pub fn wrap_with_default_layers(
+    state: &AppState,
+    router: Router<AppState>,
+    cors_allowed_origins: &[String],
+  ) -> Router<()> {
+    #[cfg(feature = "otel")]
+    let router = router
+      .layer(axum_tracing_opentelemetry::middleware::OtelInResponseLayer)
+      .layer(axum_tracing_opentelemetry::middleware::OtelAxumLayer::default());
+
+    return router
+      .layer(CookieManagerLayer::new())
+      .layer(build_cors(cors_allowed_origins, state.dev_mode()))
+      .layer(
+        // This declares: **what information** is logged at what level in to events and spans.
+        TraceLayer::new_for_http()
+          .make_span_with(logging::sqlite_logger_make_span)
+          .on_request(logging::sqlite_logger_on_request)
+          .on_response(logging::sqlite_logger_on_response),
+      )
+      // Default request size limit is only 2MB Increase to 10MB by default if no explicit user
+      // limit is provided.
+      .layer(DefaultBodyLimit::disable())
+      .layer(RequestBodyLimitLayer::new(
+        state
+          .get_config()
+          .server
+          .request_size_limit_bytes
+          .map_or(10 * 1024 * 1024, |limit| limit as usize),
+      ))
+      .with_state(state.clone());
+  }
+}
+
+async fn healthcheck_handler() -> Response {
+  return (StatusCode::OK, "Ok").into_response();
+}
+
+/// Assert that the caller is an admin and provides a valid CSRF token. Unlike the access to the
+/// HTML/js assets, this one errors.
+///
+/// NOTE: returning a redirect (like below) only makes sense for the html serving, not the APIs.
+async fn assert_admin_api_access(
+  State(state): State<AppState>,
+  mut req: Request,
+  next: Next,
+) -> Result<Response, AuthError> {
+  let user = req.extract_parts_with_state::<User, _>(&state).await?;
+
+  if !is_admin(&state, &user.uuid).await {
+    return Err(AuthError::Forbidden);
+  }
+
+  // CSRF protection.
+  let Some(received_csrf_token) = req
+    .headers()
+    .get(HEADER_CSRF_TOKEN)
+    .and_then(|header| header.to_str().ok())
+  else {
+    return Err(AuthError::BadRequest("admin APIs require csrf header"));
+  };
+
+  let expected_csrf = &user.csrf_token;
+  if expected_csrf != received_csrf_token {
+    return Err(AuthError::BadRequest("invalid CSRF token"));
+  }
+
+  return Ok(next.run(req).await);
+}
+
+fn build_cors(cors_allowed_origins: &[String], dev: bool) -> cors::CorsLayer {
+  if dev {
+    return cors::CorsLayer::very_permissive();
+  }
+
+  let wildcard = cors_allowed_origins.iter().any(|s| s == "*");
+
+  let origins = if wildcard {
+    info!("CORS: allow any origin");
+    // cors::AllowOrigin::any()
+    cors::AllowOrigin::mirror_request()
+  } else {
+    cors::AllowOrigin::list(cors_allowed_origins.iter().filter_map(
+      |o| match HeaderValue::from_str(o.as_str()) {
+        Ok(value) => Some(value),
+        Err(err) => {
+          error!("Invalid CORS origin {o}: {err}");
+          None
+        }
+      },
+    ))
+  };
+
+  // Cannot combine `Access-Control-Allow-Credentials: true` with `Access-Control-Allow-Methods: *`
+  return cors::CorsLayer::new()
+    .allow_methods(cors::Any)
+    .allow_headers(cors::Any)
+    .allow_origin(origins);
+}
+
+async fn shutdown_signal() {
+  let ctrl_c = async {
+    signal::ctrl_c()
+      .await
+      .expect("failed to install Ctrl+C handler");
+  };
+
+  #[cfg(unix)]
+  let terminate = async {
+    signal::unix::signal(signal::unix::SignalKind::terminate())
+      .expect("failed to install signal handler")
+      .recv()
+      .await;
+  };
+
+  #[cfg(not(unix))]
+  let terminate = std::future::pending::<()>();
+
+  fn start_shutdown_timer(handle: tokio::runtime::Handle) {
+    std::thread::spawn(move || {
+      let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("We're shutting down and failed to start the watch timer - might as well panic.");
+
+      rt.block_on(async {
+        use tokio::time::*;
+
+        log::debug!(
+          "Shutdown watchdog started. Pending tasks: {}",
+          handle.metrics().num_alive_tasks()
+        );
+
+        const SECONDS: usize = 10;
+
+        for remaining in (0..SECONDS).rev() {
+          tokio::select! {
+            _ = sleep(Duration::from_secs(1)) => {}
+            _ = signal::ctrl_c() => {
+                println!("Got another Ctrl+C => force shutdown");
+                std::process::exit(1);
+            }
+          };
+
+          if remaining > 0 {
+            println!(
+              "Waiting {SECONDS}s for graceful shutdown (pending: {}): {remaining}s remaining.",
+              handle.metrics().num_alive_tasks()
+            );
+          } else {
+            println!("Graceful shutdown failed. Shutting down");
+            std::process::exit(0);
+          }
+        }
+      })
+    });
+  }
+
+  let rt = tokio::runtime::Handle::current();
+
+  // We're spawning a timer. We *must* not await it. Otherwise we're holding up the shut-down.
+  tokio::select! {
+      _ = ctrl_c => {
+      println!("Received Ctrl+C. Shutting down gracefully.");
+      start_shutdown_timer(rt);
+    },
+      _ = terminate => {
+      println!("Received termination. Shutting down gracefully.");
+      start_shutdown_timer(rt);
+    },
+  };
+
+  // Ready to shut down.
+}
+
+pub async fn serve_impl(
+  main_router: (String, Router),
+  admin_router: Option<(String, Router)>,
+  tls: Option<(CertificateDer<'static>, PrivateKeyDer<'static>)>,
+  cleanup_sender: tokio::sync::oneshot::Sender<()>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  // Make sure TLS provider is installed (both for incoming and outgoing traffic, including traffic
+  // from WASM components).
+  use tokio_rustls::rustls::crypto;
+  if crypto::CryptoProvider::get_default().is_none() {
+    info!("No process-wide TLS provider found. Falling back to `aws_lc_rs`.");
+    if let Err(_provider) = crypto::aws_lc_rs::default_provider().install_default() {
+      // QUESTION: Should this be a panic or is this still acceptable for users who don't
+      // need TLS (neither to serve nor for WASM components).
+      error!("Installing fallback TLS provider failed.");
+    }
+  }
+
+  let has_tls = tls.is_some();
+  let addr = main_router.0.clone();
+  let admin_addr = admin_router
+    .as_ref()
+    .map_or_else(|| addr.clone(), |(addr, _)| addr.clone());
+
+  let mut set = JoinSet::new();
+
+  if let Some((addr, router)) = admin_router {
+    set.spawn({
+      let tls = tls
+        .as_ref()
+        .map(|(cert, key)| (cert.clone(), key.clone_key()));
+      async move { start_listen(&addr, router, tls, None).await }
+    });
+  }
+
+  set.spawn({
+    let (addr, router) = main_router;
+    async move { start_listen(&addr, router, tls, Some(cleanup_sender)).await }
+  });
+
+  info!(
+    "Listening on {protocol}://{addr} 🚀 (Admin UI http://{admin_addr}/_/admin/)",
+    protocol = if has_tls { "https" } else { "http" },
+  );
+
+  set.join_all().await;
+
+  println!("Shut down gracefully 👋");
+
+  return Ok(());
+}
+
+async fn start_listen(
+  addr: &str,
+  router: Router<()>,
+  tls: Option<(CertificateDer<'static>, PrivateKeyDer<'static>)>,
+  cleanup_sender: Option<tokio::sync::oneshot::Sender<()>>,
+) {
+  let tcp_listener = match tokio::net::TcpListener::bind(addr).await {
+    Ok(listener) => listener,
+    Err(err) => {
+      error!("Failed to listen on: {addr}: {err}");
+      std::process::exit(1);
+    }
+  };
+
+  if let Err(err) = match tls {
+    Some((cert, key)) => {
+      info!("TLS enabled");
+
+      serve::serve(
+        serve::TlsListener {
+          listener: tcp_listener,
+          acceptor: TlsAcceptor::from(Arc::new({
+            ServerConfig::builder()
+              .with_no_client_auth()
+              .with_single_cert(vec![cert], key)
+              .expect("Failed to build server config")
+          })),
+        },
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+      )
+      .with_graceful_shutdown(async {
+        shutdown_signal().await;
+
+        if let Some(cleanup) = cleanup_sender {
+          let _ = cleanup.send(());
+        }
+      })
+      .await
+    }
+    _ => {
+      serve::serve(
+        tcp_listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+      )
+      .with_graceful_shutdown(async {
+        shutdown_signal().await;
+
+        if let Some(cleanup) = cleanup_sender {
+          let _ = cleanup.send(());
+        }
+      })
+      .await
+    }
+  } {
+    error!("Failed to start server: {err}");
+    std::process::exit(1);
+  }
+}
+
+fn cow_to_bytes(cow: Cow<'static, [u8]>) -> Bytes {
+  match cow {
+    Cow::Borrowed(x) => Bytes::from(x),
+    Cow::Owned(x) => Bytes::from(x),
+  }
+}
+
+fn load_tls(
+  data_dir: &DataDir,
+  tls_cert: Option<CertificateDer<'static>>,
+  tls_key: Option<Arc<PrivateKeyDer<'static>>>,
+) -> Option<(CertificateDer<'static>, PrivateKeyDer<'static>)> {
+  let tls_cert = tls_cert.map_or_else(
+    || {
+      std::fs::read(data_dir.secrets_path().join("certs").join("cert.pem"))
+        .ok()
+        .and_then(|cert| CertificateDer::from_pem_slice(&cert).ok())
+    },
+    Some,
+  );
+  let tls_key = tls_key.map_or_else(
+    || {
+      std::fs::read(data_dir.secrets_path().join("certs").join("key.pem"))
+        .ok()
+        .and_then(|key| PrivateKeyDer::from_pem_slice(&key).ok())
+    },
+    |key| Some(key.clone_key()),
+  );
+
+  return match (tls_cert, tls_key) {
+    (Some(cert), Some(key)) => Some((cert, key)),
+    (Some(_cert), None) => {
+      warn!("TLS cert provided but key missing");
+      None
+    }
+    (None, Some(_key)) => {
+      warn!("TLS key provided but cert missing");
+      None
+    }
+    (None, None) => None,
+  };
+}
